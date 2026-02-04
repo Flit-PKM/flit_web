@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+/* ---------------------------------------------------------------------------
+   Flit-PKM design tokens (from https://flit-pkm.com)
+   --------------------------------------------------------------------------- */
+:root {
+	--color-green: oklch(0.63 0.2 142);
+	--color-red: oklch(0.63 0.2 31);
+	--color-blue: oklch(0.63 0.2 240);
+	--color-mid-grey: oklch(50% 0 0);
+
+	--color-canvas: oklch(90% .005 76);
+	--color-ink: oklch(15% 0.005 176);
+	--color-link: color-mix(in oklab, var(--color-blue) 20%, var(--color-ink));
+	--color-ink-negative: color-mix(in oklab, var(--color-red) 50%, var(--color-ink) 50%);
+	--color-ink-positive: color-mix(in oklab, var(--color-green) 50%, var(--color-ink) 50%);
+	--color-canvas-negative: color-mix(in oklab, var(--color-red) 50%, var(--color-canvas) 50%);
+	--color-canvas-positive: color-mix(in oklab, var(--color-green) 50%, var(--color-canvas) 50%);
+
+	--flit-card-bg: color-mix(in oklab, var(--color-mid-grey) 7%, transparent);
+	--flit-footer-bg: color-mix(in oklab, var(--flit-canvas), var(--color-mid-grey) 10%);
+	--flit-shadow-color: color-mix(in oklab, var(--flit-ink) 15%, transparent);
+	--flit-shadow-sm: 1px 1px 3px var(--flit-shadow-color);
+	--flit-shadow-md: 4px 4px 12px var(--flit-shadow-color);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--color-canvas: oklch(18% .005 76);
+		--color-ink: oklch(90% .005 176);
+	}
+}
+
+/* User/session color scheme overrides (set by layout from profile preference) */
+[data-color-scheme="light"] {
+	--color-canvas: oklch(90% 0 76);
+	--color-ink: oklch(15% 0.005 176);
+}
+
+[data-color-scheme="dark"] {
+	--color-canvas: oklch(18% .005 76);
+	--color-ink: oklch(90% .005 176);
+}
+
+@theme {
+	--color-flit-primary: var(--color-blue);
+	--color-flit-canvas: var(--color-canvas);
+	--color-flit-ink: var(--color-ink);
+	--color-flit-link: var(--color-link);
+	--color-flit-muted: var(--color-mid-grey);
+	--color-flit-negative: var(--color-ink-negative);
+	--color-flit-positive: var(--color-ink-positive);
+	--color-flit-card: var(--flit-card-bg);
+	--color-flit-footer: var(--flit-footer-bg);
+
+	--shadow-flit-sm: var(--flit-shadow-sm);
+	--shadow-flit-md: var(--flit-shadow-md);
+
+	/* Typography: landing uses system-ui, h1 2.5rem/700, h2 2rem/700, h3 1.5rem/600 */
+	--font-sans: system-ui, sans-serif;
+}
+
+/* Focus styles for accessibility (flit-primary accent) */
+a:focus-visible,
+button:focus-visible {
+	outline: 2px solid var(--color-blue);
+	outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Reusable component utilities
+   --------------------------------------------------------------------------- */
+.btn {
+	@apply inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium shadow-flit-sm focus:ring-2 focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none disabled:opacity-50;
+}
+
+.btn-primary {
+	@apply border-transparent bg-flit-primary text-white hover:opacity-90 focus:ring-flit-primary;
+}
+
+.btn-secondary {
+	@apply border-flit-muted/30 bg-flit-card text-flit-ink backdrop-blur-sm transition-colors hover:bg-flit-muted/10 focus:ring-flit-primary;
+}
+
+.btn-danger {
+	@apply border-transparent bg-flit-negative text-white hover:opacity-90 focus:ring-flit-negative;
+}
+
+.input {
+	@apply w-full rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-3 py-2 text-flit-ink placeholder-flit-muted shadow-flit-sm focus:border-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none;
+}
+
+.card {
+	@apply rounded-xl border border-flit-muted/20 bg-flit-card p-6 shadow-flit-sm;
+}
+
+/* Prose modifier for markdown content (matches Flit design tokens) */
+@utility prose-flit {
+	--tw-prose-body: var(--color-ink);
+	--tw-prose-headings: var(--color-ink);
+	--tw-prose-links: var(--color-link);
+	--tw-prose-bold: var(--color-ink);
+	--tw-prose-quotes: var(--color-ink);
+	--tw-prose-code: var(--color-ink);
+}
