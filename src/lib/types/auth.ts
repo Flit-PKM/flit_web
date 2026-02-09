@@ -11,6 +11,17 @@
 export type ColorScheme = 'light' | 'dark' | 'default';
 
 /**
+ * User's subscription as returned on UserRead (at most one per user).
+ * product_id is optional; when present, matches plan.product_id for the current plan card.
+ */
+export interface UserSubscriptionRead {
+	status: string | null;
+	current_period_end: string | null;
+	dodo_subscription_id: string | null;
+	product_id?: string | null;
+}
+
+/**
  * User model as returned by the API
  */
 export interface User {
@@ -23,6 +34,7 @@ export interface User {
 	readonly is_verified: boolean;
 	readonly created_at: string; // ISO 8601 datetime string
 	readonly updated_at: string; // ISO 8601 datetime string
+	subscription?: UserSubscriptionRead | null;
 }
 
 /**
@@ -101,7 +113,6 @@ export interface AuthState {
 	token: string | null;
 	user: User | null;
 	isLoading: boolean;
-	isAuthenticated: boolean;
 }
 
 /**

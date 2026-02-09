@@ -6,9 +6,8 @@
 	import { page } from '$app/stores';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient, HttpError } from '$lib/api/client';
-	import { errorLogger, handleApiError, formatErrorForUser } from '$lib/utils/error-handler';
-	import { marked } from 'marked';
-	import DOMPurify from 'dompurify';
+	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+	import { markdownToSafeHtml } from '$lib/utils/markdown';
 	import type {
 		NoteDetail,
 		NoteRead,
@@ -47,17 +46,10 @@
 	let noteSearchResults = $state<NoteRead[]>([]);
 	let noteSearchLoading = $state(false);
 	let noteSearchDebounce: ReturnType<typeof setTimeout> | null = null;
-	let noteSearchInputEl: HTMLInputElement | null = null;
+	let noteSearchInputEl = $state<HTMLInputElement | null>(null);
 
 	// Markdown-rendered HTML (detail view only, client-side)
 	let markdownHtml = $state('');
-
-	// Redirect if not authenticated (immediate check)
-	$effect(() => {
-		if (!$isAuthenticated) {
-			goto(resolve('/login'));
-		}
-	});
 
 	// Debounced note search when popup is open
 	$effect(() => {
@@ -88,41 +80,12 @@
 
 	// Parse markdown to HTML when viewing (not editing)
 	$effect(() => {
-		if (!browser) return;
-		if (isEditing || !note) {
+		if (!browser || isEditing || !note) {
 			markdownHtml = '';
 			return;
 		}
-		void parseMarkdownContent();
+		markdownHtml = markdownToSafeHtml(note.content ?? '');
 	});
-
-	async function parseMarkdownContent() {
-		if (!note || isEditing) {
-			markdownHtml = '';
-			return;
-		}
-
-		const raw = note.content ?? '';
-		if (!raw.trim()) {
-			markdownHtml = '';
-			return;
-		}
-
-		try {
-			errorLogger.logDebug('Parsing markdown content', { noteId: note.id });
-			const parsed = await marked.parse(raw);
-			markdownHtml = DOMPurify.sanitize(parsed);
-			errorLogger.logDebug('Markdown parsed successfully', { noteId: note.id });
-		} catch (err) {
-			errorLogger.logError(err instanceof Error ? err : new Error(String(err)), {
-				component: 'NoteDetail',
-				operation: 'markdownParse',
-				noteId: note.id
-			});
-			// If markdown parsing fails, fall back to raw content
-			markdownHtml = '';
-		}
-	}
 
 	async function loadNote(noteId: number) {
 		try {
@@ -266,13 +229,11 @@
 			await apiClient.updateNote(noteId, { title, content });
 			errorLogger.logDebug('Note saved successfully', { noteId });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			saveError = captureApiError(err, {
 				component: 'NoteDetail',
 				operation: 'saveNoteFields',
 				noteId
 			});
-			saveError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { noteId });
 			return;
 		} finally {
 			isSaving = false;
@@ -292,7 +253,12 @@
 			await loadNote(note.id);
 			addCategoryId = '';
 		} catch (err) {
-			saveError = err instanceof HttpError ? err.message : 'Failed to add category.';
+			saveError = captureApiError(err, {
+				component: 'NoteDetail',
+				operation: 'addCategory',
+				noteId: note.id,
+				categoryId
+			});
 		} finally {
 			isSaving = false;
 		}
@@ -308,14 +274,12 @@
 			await loadNote(note.id);
 			errorLogger.logDebug('Category removed successfully', { noteId: note.id, categoryId });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			saveError = captureApiError(err, {
 				component: 'NoteDetail',
 				operation: 'removeCategory',
 				noteId: note.id,
 				categoryId
 			});
-			saveError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { noteId: note.id, categoryId });
 		} finally {
 			isSaving = false;
 		}
@@ -346,7 +310,11 @@
 			addRelNoteTitle = '';
 			addRelType = 'RELATED_TO';
 		} catch (err) {
-			saveError = err instanceof HttpError ? err.message : 'Failed to add relationship.';
+			saveError = captureApiError(err, {
+				component: 'NoteDetail',
+				operation: 'addRelationship',
+				noteId: note.id
+			});
 		} finally {
 			isSaving = false;
 		}
@@ -365,14 +333,12 @@
 			await loadNote(note.id);
 			errorLogger.logDebug('Relationship removed successfully', { noteId: note.id });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			saveError = captureApiError(err, {
 				component: 'NoteDetail',
 				operation: 'removeRelationship',
 				noteId: note.id,
 				relId: `${rel.note_a_id}-${rel.note_b_id}-${rel.type}`
 			});
-			saveError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { noteId: note.id });
 		} finally {
 			isSaving = false;
 		}
@@ -676,15 +642,15 @@
 	{#if showNoteSearchPopup}
 		<div
 			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+			tabindex="-1"
 			onkeydown={handleNoteSearchKeydown}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="note-search-title"
-			onclick={() => closeNoteSearchPopup()}
+			onclick={(e) => e.target === e.currentTarget && closeNoteSearchPopup()}
 		>
 			<div
 				class="w-full max-w-md rounded-xl border border-flit-muted/20 bg-flit-card p-4 shadow-flit-sm"
-				onclick={(e) => e.stopPropagation()}
 				role="document"
 			>
 				<h2

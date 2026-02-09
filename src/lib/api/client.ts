@@ -29,9 +29,45 @@ import type {
 import type {
 	CheckoutSessionRequest,
 	CheckoutSessionResponse,
+	PlanDetailResponse,
 	SubscriptionStatusResponse
 } from '../types/billing';
 import { errorLogger, handleApiError } from '$lib/utils/error-handler';
+
+/**
+ * Build query string from params (omits undefined and empty string).
+ * Returns the query string without leading "?" (e.g. "skip=0&limit=10").
+ */
+function buildQueryString(params: Record<string, string | number | undefined>): string {
+	const searchParams = new URLSearchParams();
+	for (const [key, value] of Object.entries(params)) {
+		if (value !== undefined && value !== '') {
+			searchParams.append(key, String(value));
+		}
+	}
+	return searchParams.toString();
+}
+
+/**
+ * Return path with optional query string (e.g. "/notes" or "/notes?search=foo").
+ */
+function endpointWithQuery(
+	path: string,
+	params: Record<string, string | number | undefined>
+): string {
+	const query = buildQueryString(params);
+	return query ? `${path}?${query}` : path;
+}
+
+/**
+ * Resolve API base URL: same origin in production (browser), else dev env or localhost.
+ */
+function getApiBaseUrl(): string {
+	if (typeof window !== 'undefined' && import.meta.env.PROD) {
+		return window.location.origin;
+	}
+	return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+}
 
 export class ApiClient {
 	private config: ApiConfig;
@@ -39,7 +75,7 @@ export class ApiClient {
 
 	constructor(config: Partial<ApiConfig> = {}) {
 		this.config = {
-			baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+			baseUrl: getApiBaseUrl(),
 			timeout: 10000, // 10 seconds
 			retries: 3,
 			retryDelay: 1000, // 1 second
@@ -98,7 +134,7 @@ export class ApiClient {
 			config.body = JSON.stringify(options.body);
 		}
 
-		let lastError: Error;
+		let lastError: Error = new Error('Request failed');
 
 		// Retry logic for failed requests
 		for (let attempt = 0; attempt <= this.config.retries; attempt++) {
@@ -165,10 +201,10 @@ export class ApiClient {
 					headers: response.headers
 				};
 			} catch (error) {
-				lastError = error as Error;
+				lastError = error instanceof Error ? error : new Error(String(error));
 
 				// Log the error with context
-				errorLogger.logError(error, {
+				errorLogger.logError(lastError, {
 					component: 'ApiClient',
 					operation: 'request',
 					endpoint,
@@ -242,18 +278,7 @@ export class ApiClient {
 	 * User management endpoints
 	 */
 	async getUsers(params: { skip?: number; limit?: number } = {}): Promise<PaginatedResponse<User>> {
-		const queryParams = new URLSearchParams();
-
-		if (params.skip !== undefined) {
-			queryParams.append('skip', params.skip.toString());
-		}
-
-		if (params.limit !== undefined) {
-			queryParams.append('limit', params.limit.toString());
-		}
-
-		const queryString = queryParams.toString();
-		const endpoint = `/users/${queryString ? `?${queryString}` : ''}`;
+		const endpoint = endpointWithQuery('/users/', params);
 
 		const response = await this.request<User[]>(endpoint, {
 			method: 'GET'
@@ -324,13 +349,24 @@ export class ApiClient {
 	}
 
 	/**
-	 * Create a Dodo checkout session. POST /billing/checkout. Requires Bearer auth.
-	 * Returns session_id and checkout_url; redirect the user to checkout_url to complete payment.
+	 * List available subscription plans. GET /billing/plans. Public; no auth required.
+	 * Returns plans with product_id, name, description, price, addons. Cached on backend.
 	 */
-	async createCheckoutSession(body: CheckoutSessionRequest = {}): Promise<CheckoutSessionResponse> {
+	async getBillingPlans(): Promise<PlanDetailResponse[]> {
+		const response = await this.request<PlanDetailResponse[]>('/billing/plans', {
+			method: 'GET'
+		});
+		return response.data;
+	}
+
+	/**
+	 * Create a Dodo checkout session. POST /billing/checkout. Requires Bearer auth.
+	 * Pass product_id (required) and optional return_url. Redirect the user to checkout_url to complete payment.
+	 */
+	async createCheckoutSession(body: CheckoutSessionRequest): Promise<CheckoutSessionResponse> {
 		const response = await this.request<CheckoutSessionResponse>('/billing/checkout', {
 			method: 'POST',
-			body: body ?? {}
+			body
 		});
 		return response.data;
 	}
@@ -382,13 +418,7 @@ export class ApiClient {
 	async getNotes(
 		params: { skip?: number; limit?: number; search?: string; filter?: string } = {}
 	): Promise<NoteRead[]> {
-		const queryParams = new URLSearchParams();
-		if (params.skip !== undefined) queryParams.append('skip', params.skip.toString());
-		if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
-		if (params.search) queryParams.append('search', params.search);
-		if (params.filter) queryParams.append('filter', params.filter);
-		const queryString = queryParams.toString();
-		const endpoint = `/notes${queryString ? `?${queryString}` : ''}`;
+		const endpoint = endpointWithQuery('/notes', params);
 		const response = await this.request<NoteRead[]>(endpoint, { method: 'GET' });
 		return response.data;
 	}
@@ -398,11 +428,7 @@ export class ApiClient {
 	 * GET /categories. Requires Bearer auth.
 	 */
 	async getCategories(params: { skip?: number; limit?: number } = {}): Promise<CategoryRead[]> {
-		const queryParams = new URLSearchParams();
-		if (params.skip !== undefined) queryParams.append('skip', params.skip.toString());
-		if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
-		const queryString = queryParams.toString();
-		const endpoint = `/categories${queryString ? `?${queryString}` : ''}`;
+		const endpoint = endpointWithQuery('/categories', params);
 		const response = await this.request<CategoryRead[]>(endpoint, { method: 'GET' });
 		return response.data;
 	}

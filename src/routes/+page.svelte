@@ -28,8 +28,7 @@
 			Butterfly on the web of consciousness, Flutter.
 		</p>
 		<p class="mx-auto mt-6 max-w-2xl text-flit-ink">
-			Welcome to the Flit-PKM ecosystem. View your notes and insights as a knowledge graph, refine
-			them with edit/delete, and export or import as PDF, CSV, or JSON.
+			Welcome to the Flit-PKM ecosystem. Build your personal knowledge base here; with powerful AI relationship analysis, summarization and insight generation.
 		</p>
 	</header>
 
@@ -125,9 +124,9 @@
 					/>
 				</svg>
 			</div>
-			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Secure Authentication</h3>
+			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Secure Authentication and Database Encryption</h3>
 			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				Industry-standard security with JWT tokens and protected routes.
+				Industry-standard security and resting encryption of your data.
 			</p>
 		</div>
 
@@ -146,7 +145,10 @@
 			</div>
 			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Knowledge Graph</h3>
 			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				View notes and insights as a graph, manage relationships and categories.
+				Build your personal knowledge base; create/edit/delete notes,
+				 joint them together with 2-way relationships, categorize them 
+				 for easy navigation and summariation, and find new connections
+				  and insights with AI.
 			</p>
 		</div>
 
@@ -165,7 +167,7 @@
 			</div>
 			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Export & Import</h3>
 			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				Export or import your notes as PDF, CSV, or JSON.
+				Import and Export in a standardized Markdown format, for easy sharing and collaboration.
 			</p>
 		</div>
 	</div>

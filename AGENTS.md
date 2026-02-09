@@ -1,8 +1,8 @@
-# AGENT.md
+# AGENTS.md
 
 ## Overview
 
-**Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and Tailwind CSS 4.x. It provides a client-side interface for a FastAPI backend, handling authentication, notes management, and category organization.
+**Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and Tailwind CSS 4.x. It provides a client-side interface for a FastAPI backend, handling authentication, notes and category management, billing/subscription, profile, and connected apps.
 
 ## Tech Stack
 
@@ -34,22 +34,25 @@ Client-driven API architecture with centralized API client handling HTTP communi
 ```
 src/
 ├── lib/
-│   ├── api/      # API client (ApiClient class)
-│   ├── components/  # Reusable Svelte components
-│   ├── stores/   # Global state (authStore, etc.)
-│   ├── types/    # TypeScript definitions
-│   └── utils/    # Helper functions
-└── routes/       # SvelteKit pages/layouts
+│   ├── api/        # API client (ApiClient class)
+│   ├── assets/     # Static assets (favicon, etc.)
+│   ├── components/ # Reusable Svelte components (e.g. GeneralErrorAlert)
+│   ├── stores/     # Global state (authStore, pendingColorScheme, etc.)
+│   ├── types/      # TypeScript definitions
+│   └── utils/      # Helper functions (auth, validation, error-handler)
+└── routes/         # SvelteKit pages/layouts
+    └── (protected)/ # Auth guard layout; profile, notes, billing live here
 ```
 
 ## Essential Workflows
 
 1. **Development**: `npm run dev` → checks with `npm run check` → lint with `npm run lint` → format with `npm run format`
-2. **API Usage**: Always use `apiClient` methods (no raw fetch)
-3. **State**: Use `$state` for local, `authStore` for global auth state
-4. **Error Handling**: Wrap in `try-catch` with `handleApiError()` utility
-5. **Auth**: Check `isAuthenticated` before protected routes, redirect with `$effect`
-6. **OpenAPI** Always confirm the Flit-Core api endpoints using 'curl http://localhost:8000/openapi.json' in the terminal
+2. **Tests**: `npm run test` (watch) or `npm run test:run` (single run). New logic should be covered by unit tests (auth utils, error-handler, validation).
+3. **API Usage**: Always use `apiClient` methods (no raw fetch)
+4. **State**: Use `$state` for local, `authStore` for global auth state
+5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
+6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI
+7. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
 
 ## Critical Rules
 

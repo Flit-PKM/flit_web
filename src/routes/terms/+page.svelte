@@ -1,149 +1,280 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	// Terms of Service page - generic content
 </script>
 
 <svelte:head>
-	<title>Terms of Service - Flit Web</title>
-	<meta name="description" content="Terms of Service for Flit Web application." />
+	<title>Terms of Service & Privacy Policy - Flit</title>
+	<meta
+		name="description"
+		content="Flit Terms of Service and Privacy Policy. Privacy-first personal knowledge management."
+	/>
 </svelte:head>
 
 <div class="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
 	<div class="rounded-2xl bg-flit-card p-8 shadow-flit-sm backdrop-blur-sm">
-		<h1 class="text-3xl font-bold text-flit-ink sm:text-4xl">Terms of Service</h1>
-		<p class="mt-2 text-sm text-flit-muted">Last updated: January 30, 2026</p>
+		<!-- Terms of Service -->
+		<h1 class="text-3xl font-bold text-flit-ink sm:text-4xl">Flit Terms of Service</h1>
+		<p class="mt-2 text-sm text-flit-muted">Effective Date: February 05, 2026</p>
+
+		<p class="mt-4 text-flit-ink">
+			Welcome to Flit! We're delighted you've found your way to our privacy-first personal knowledge
+			management ecosystem. These Terms of Service ("Terms") are a straightforward agreement between
+			you and the operator of Flit ("we," "us," or "our")—a sole developer building tools to help you
+			capture, connect, and reflect on your thoughts securely.
+		</p>
+		<p class="mt-3 text-flit-muted">
+			By joining the waitlist, creating an account, or using any part of Flit (the "Service"—including
+			the mobile apps, web dashboard, Core sync, and AI features), you agree to these Terms. If you
+			don't agree, please don't use the Service.
+		</p>
 
 		<div class="mt-6 space-y-6 text-flit-ink">
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">1. Acceptance of Terms</h2>
-				<p class="mt-3 text-flit-muted">
-					By accessing and using Flit Web, you accept and agree to be bound by the terms and
-					provision of this agreement. If you do not agree to these terms, please do not use this
-					service.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">2. Use License</h2>
-				<p class="mt-3 text-flit-muted">
-					Permission is granted to temporarily access and use Flit Web for personal,
-					non-commercial purposes. This is the grant of a license, not a transfer of title, and
-					under this license you may not:
-				</p>
+				<h2 class="text-2xl font-semibold text-flit-ink">1. Accounts and Access</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>Modify or copy the materials</li>
-					<li>Use the materials for any commercial purpose or public display</li>
-					<li>Attempt to reverse engineer any software contained in Flit Web</li>
-					<li>Remove any copyright or proprietary notations from the materials</li>
-					<li>Transfer the materials to another person or "mirror" the materials on any server</li>
+					<li>
+						You need an account to use most features (currently via waitlist email; full accounts
+						will use OAuth with JWT and upcoming SSO).
+					</li>
+					<li>You're responsible for keeping your login details secure and for all activity on your account.</li>
+					<li>
+						The Service is offered as-is during its early stages. Access may be limited, features
+						may change, and we may pause or restrict accounts if needed to protect the system.
+					</li>
 				</ul>
 			</section>
 
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">3. User Accounts</h2>
-				<p class="mt-3 text-flit-muted">
-					When you create an account with us, you must provide accurate, complete, and current
-					information. Failure to do so constitutes a breach of the Terms. You are responsible for
-					safeguarding the password and for all activities that occur under your account.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">4. User Content</h2>
-				<p class="mt-3 text-flit-muted">
-					You retain all rights to the content you create and store in Flit Web. By using our
-					service, you grant us the right to store, process, and display your content solely for
-					the purpose of providing the service to you.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">5. Privacy</h2>
-				<p class="mt-3 text-flit-muted">
-					Your use of Flit Web is also governed by our Privacy Policy. We are committed to
-					protecting your personal information and your right to privacy. Please review our Privacy
-					Policy to understand our practices.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">6. Prohibited Uses</h2>
-				<p class="mt-3 text-flit-muted">You may not use Flit Web:</p>
+				<h2 class="text-2xl font-semibold text-flit-ink">2. Free and Paid Features</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>In any way that violates any applicable law or regulation</li>
-					<li>To transmit any harmful or malicious code</li>
-					<li>To impersonate or attempt to impersonate another user</li>
-					<li>To engage in any automated use of the system</li>
-					<li>To interfere with or disrupt the service or servers</li>
+					<li>All Flit apps (mobile and web) are 100% free forever.</li>
+					<li>
+						Core features—cloud database sync and optional off-device AI speech-to-text—are
+						available through a paid subscription (details will be shown in-app when launched).
+					</li>
+					<li>
+						Payments will be processed via a third-party provider (e.g., Stripe). We do not store
+						your full payment card details; they are handled securely by the provider.
+					</li>
+					<li>Subscriptions auto-renew unless cancelled. No refunds for partial periods except where required by law.</li>
 				</ul>
 			</section>
 
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">7. Disclaimer</h2>
+				<h2 class="text-2xl font-semibold text-flit-ink">3. Your Content and Privacy</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>You own all your notes, voice recordings, journal entries, and any other content you create ("Your Content").</li>
+					<li>
+						In the Flit apps, transcription and AI processing happen 100% on-device—nothing leaves
+						your phone unless you explicitly opt into Core off-device processing.
+					</li>
+					<li>
+						If you subscribe to Core and enable off-device speech-to-text, you grant us a limited,
+						revocable license to process that audio solely to provide the transcription service. We
+						delete the audio immediately after processing.
+					</li>
+					<li>We will never sell, share for advertising, or use your personal content for training public AI models.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">4. Acceptable Use</h2>
 				<p class="mt-3 text-flit-muted">
-					The materials on Flit Web are provided on an 'as is' basis. We make no warranties,
-					expressed or implied, and hereby disclaim all other warranties including, without
-					limitation, implied warranties or conditions of merchantability, fitness for a particular
-					purpose, or non-infringement of intellectual property.
+					While we don't impose unusual restrictions, you agree to use Flit only for lawful, personal
+					purposes and not to:
+				</p>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>interfere with the Service or other users,</li>
+					<li>upload harmful code,</li>
+					<li>attempt to access data that isn't yours, or</li>
+					<li>use the Service in ways that violate third-party rights.</li>
+				</ul>
+				<p class="mt-3 text-flit-muted">Basically: be kind to the system and to others.</p>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">5. Intellectual Property</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>Flit (code, design, branding) belongs to us. You get a limited, non-transferable license to use the Service for personal knowledge management.</li>
+					<li>You keep full rights to Your Content and any insights you generate.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">6. Disclaimers and Limitation of Liability</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>Flit is provided "as is" without warranties. We're in active development—things might break, change, or be temporarily unavailable.</li>
+					<li>
+						AI transcriptions and insights are helpful tools, not perfect or professional advice
+						(especially for wellness features). Always verify important information yourself.
+					</li>
+					<li>
+						To the fullest extent permitted by law, we are not liable for indirect, incidental, or
+						consequential damages. Total liability is capped at the amount you paid us in the last 12
+						months (or ZAR 1,000 if you paid nothing).
+					</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">7. Termination</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>You can stop using Flit and delete your account anytime.</li>
+					<li>We may suspend or terminate access if you breach these Terms or if we discontinue the Service.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">8. Changes to Terms</h2>
+				<p class="mt-3 text-flit-muted">
+					We may update these Terms from time to time. We'll notify you (via email or in-app) of
+					material changes. Continued use after changes means you accept the new Terms.
 				</p>
 			</section>
 
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">8. Limitations</h2>
+				<h2 class="text-2xl font-semibold text-flit-ink">9. Governing Law and Disputes</h2>
 				<p class="mt-3 text-flit-muted">
-					In no event shall Flit Web or its suppliers be liable for any damages (including, without
-					limitation, damages for loss of data or profit, or due to business interruption) arising
-					out of the use or inability to use Flit Web.
+					These Terms are governed by the laws of the Republic of South Africa. Any disputes will be
+					resolved in the competent courts of South Africa.
 				</p>
 			</section>
 
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">9. Service Modifications</h2>
+				<h2 class="text-2xl font-semibold text-flit-ink">10. Contact</h2>
 				<p class="mt-3 text-flit-muted">
-					We reserve the right to modify or discontinue, temporarily or permanently, the service
-					(or any part thereof) with or without notice. We shall not be liable to you or any third
-					party for any modification, suspension, or discontinuance of the service.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">10. Termination</h2>
-				<p class="mt-3 text-flit-muted">
-					We may terminate or suspend your account immediately, without prior notice or liability,
-					for any reason whatsoever, including without limitation if you breach the Terms. Upon
-					termination, your right to use the service will immediately cease.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">11. Changes to Terms</h2>
-				<p class="mt-3 text-flit-muted">
-					We reserve the right to revise these terms of service at any time. By continuing to
-					access or use our service after those revisions become effective, you agree to be bound
-					by the revised terms.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">12. Governing Law</h2>
-				<p class="mt-3 text-flit-muted">
-					These Terms shall be governed and construed in accordance with applicable laws, without
-					regard to its conflict of law provisions.
-				</p>
-			</section>
-
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">13. Contact Information</h2>
-				<p class="mt-3 text-flit-muted">
-					If you have any questions about these Terms, please contact us through
+					For questions about these Terms, reach us at
 					<a
-						href="https://bmd-studios.com"
-						target="_blank"
-						rel="noopener noreferrer"
+						href="mailto:support@flit-pkm.com"
 						class="font-medium text-flit-link transition-opacity hover:opacity-80"
 					>
-						BMD-Studios
+						support@flit-pkm.com
+					</a>
+					(or the contact form on our site).
+				</p>
+				<p class="mt-3 text-flit-muted">
+					Thank you for trusting Flit with your thoughts—we're building this with privacy and care at the heart.
+				</p>
+			</section>
+		</div>
+
+		<!-- Privacy Policy -->
+		<hr class="my-12 border-flit-muted/20" />
+		<h1 class="text-3xl font-bold text-flit-ink sm:text-4xl">Flit Privacy Policy</h1>
+		<p class="mt-2 text-sm text-flit-muted">Effective Date: February 05, 2026</p>
+
+		<p class="mt-4 text-flit-ink">
+			At Flit, your privacy is not a feature—it's the foundation. We designed the system so most
+			processing stays on your device. This Privacy Policy explains what little data we do collect,
+			how we use it, and your rights.
+		</p>
+
+		<div class="mt-6 space-y-6 text-flit-ink">
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">1. Data We Collect</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li><strong class="text-flit-ink">Account data:</strong> Email address (for waitlist and login), and any profile details you add.</li>
+					<li><strong class="text-flit-ink">Usage data:</strong> Anonymous analytics about which features you use (to improve the apps—no personal identifiers).</li>
+					<li><strong class="text-flit-ink">Content:</strong> Your notes, voice recordings, journals—processed primarily on-device.</li>
+					<li><strong class="text-flit-ink">Payment data:</strong> If you subscribe, billing info is handled securely by our payment processor (we only receive confirmation and subscription status).</li>
+					<li><strong class="text-flit-ink">Off-device audio:</strong> Only if you explicitly enable Core off-device speech-to-text; deleted immediately after transcription.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">2. How We Use Your Data</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>To provide and improve the Service (account management, sync, optional transcription).</li>
+					<li>To communicate updates, feature announcements, or support responses.</li>
+					<li>To process payments and manage subscriptions.</li>
+					<li>For legal compliance if required.</li>
+				</ul>
+				<p class="mt-3 text-flit-muted">We do <strong class="text-flit-ink">not</strong>:</p>
+				<ul class="mt-2 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>Sell your data.</li>
+					<li>Share it for marketing.</li>
+					<li>Use your personal content to train AI models.</li>
+					<li>Track you across other sites or apps.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">3. Data Storage and Security</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>Your encrypted content (when using Core sync) is stored on secure servers in the United States (via Render, US East region).</li>
+					<li>We use industry-standard encryption in transit and at rest.</li>
+					<li>On-device processing means most sensitive data never leaves your phone.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">4. International Data Transfers</h2>
+				<p class="mt-3 text-flit-muted">
+					Data may be transferred to and processed in the United States. We implement appropriate
+					safeguards to protect your information in accordance with South African law (POPIA).
+				</p>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">5. Your Rights</h2>
+				<p class="mt-3 text-flit-muted">
+					Under POPIA and applicable laws, you may:
+				</p>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li>Access, correct, or delete your personal data.</li>
+					<li>Object to or restrict certain processing.</li>
+					<li>Withdraw consent where we rely on it.</li>
+					<li>Lodge a complaint with the Information Regulator (South Africa).</li>
+				</ul>
+				<p class="mt-3 text-flit-muted">
+					To exercise these rights, contact us at
+					<a
+						href="mailto:support@flit-pkm.com"
+						class="font-medium text-flit-link transition-opacity hover:opacity-80"
+					>
+						support@flit-pkm.com
 					</a>.
+				</p>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">6. Data Retention</h2>
+				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
+					<li><strong class="text-flit-ink">Account data:</strong> Kept while your account is active; deleted on request or after prolonged inactivity.</li>
+					<li><strong class="text-flit-ink">Content:</strong> Deleted when you delete it or your account.</li>
+					<li><strong class="text-flit-ink">Transaction records:</strong> Kept as required for tax/legal purposes.</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">7. Children's Privacy</h2>
+				<p class="mt-3 text-flit-muted">
+					Flit is not directed at children under 13. We do not knowingly collect personal data from
+					children. If we learn we have, we'll delete it promptly.
+				</p>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">8. Changes to This Policy</h2>
+				<p class="mt-3 text-flit-muted">
+					We may update this Policy occasionally. Significant changes will be notified via email or
+					in-app notice.
+				</p>
+			</section>
+
+			<section>
+				<h2 class="text-2xl font-semibold text-flit-ink">9. Contact Us</h2>
+				<p class="mt-3 text-flit-muted">
+					Questions or requests? Email
+					<a
+						href="mailto:support@flit-pkm.com"
+						class="font-medium text-flit-link transition-opacity hover:opacity-80"
+					>
+						support@flit-pkm.com
+					</a>.
+				</p>
+				<p class="mt-3 text-flit-muted">
+					Thank you for choosing a tool that respects your privacy as much as you do.
 				</p>
 			</section>
 		</div>

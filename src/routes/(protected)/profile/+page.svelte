@@ -13,10 +13,15 @@
 		getPasswordStrengthLabel
 	} from '$lib/utils/auth';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
-	import { errorLogger, handleApiError, formatErrorForUser } from '$lib/utils/error-handler';
-	import type { ProfileFormData, FormErrors } from '$lib/types/auth';
+	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import type { ProfileFormData, FormErrors, UserUpdate } from '$lib/types/auth';
 	import type { ConnectedApp } from '$lib/types/connect';
-	import type { SubscriptionStatusResponse } from '$lib/types/billing';
+	import type {
+		PlanDetailResponse,
+		PlanPrice,
+		SubscriptionStatusResponse
+	} from '$lib/types/billing';
 
 	// State
 	let isLoading = $state(true);
@@ -45,6 +50,37 @@
 	let subscriptionStatus = $state<SubscriptionStatusResponse | null>(null);
 	let subscriptionLoading = $state(false);
 	let subscriptionError = $state('');
+	let plans = $state<PlanDetailResponse[]>([]);
+	let plansLoading = $state(false);
+	let plansError = $state('');
+	// Derived: active subscription from user (prefer) or from GET /billing/subscription
+	let hasActiveSubscription = $derived(
+		$currentUser?.subscription?.status === 'active' || $currentUser?.subscription?.status === 'trialing' ||
+		subscriptionStatus?.status === 'active' || subscriptionStatus?.status === 'trialing'
+	);
+	let currentPlanProductId = $derived($currentUser?.subscription?.product_id ?? null);
+	let currentPeriodEnd = $derived(
+		$currentUser?.subscription?.current_period_end ?? subscriptionStatus?.current_period_end ?? null
+	);
+
+	// Billing: partition by plan_type prefix (backend: monthly_core_ai, annual_core_ai, etc.)
+	function isMonthlyPlan(plan: PlanDetailResponse): boolean {
+		return typeof plan.plan_type === 'string' && plan.plan_type.startsWith('monthly');
+	}
+	function isAnnualPlan(plan: PlanDetailResponse): boolean {
+		return typeof plan.plan_type === 'string' && plan.plan_type.startsWith('annual');
+	}
+
+	let subscriptionPlans = $derived.by(() => {
+		const list = plans.filter((p) => isMonthlyPlan(p) || isAnnualPlan(p));
+		return [...list].sort((a, b) => {
+			if (isMonthlyPlan(a) && !isMonthlyPlan(b)) return -1;
+			if (!isMonthlyPlan(a) && isMonthlyPlan(b)) return 1;
+			if (isAnnualPlan(a) && !isAnnualPlan(b)) return -1;
+			if (!isAnnualPlan(a) && isAnnualPlan(b)) return 1;
+			return 0;
+		});
+	});
 
 	// Form data
 	let formData: ProfileFormData = $state({
@@ -114,13 +150,6 @@
 		}
 	});
 
-	// Redirect if not authenticated (immediate check)
-	$effect(() => {
-		if (!$isAuthenticated) {
-			goto(resolve('/login'));
-		}
-	});
-
 	// Apply color scheme immediately on profile (unsaved preview); clear when leaving or after save
 	$effect(() => {
 		if ($page.url.pathname !== '/profile') return;
@@ -160,12 +189,10 @@
 				connectedApps = await apiClient.getConnectedApps();
 				errorLogger.logDebug('Connected apps loaded successfully', { count: connectedApps.length });
 			} catch (err) {
-				const handledError = handleApiError(err, {
+				connectedAppsError = captureApiError(err, {
 					component: 'Profile',
 					operation: 'loadConnectedApps'
 				});
-				connectedAppsError = formatErrorForUser(handledError);
-				errorLogger.logError(handledError, { operation: 'loadConnectedApps' });
 			} finally {
 				connectedAppsLoading = false;
 			}
@@ -180,22 +207,34 @@
 					status: subscriptionStatus?.status ?? null
 				});
 			} catch (err) {
-				const handledError = handleApiError(err, {
+				subscriptionError = captureApiError(err, {
 					component: 'Profile',
 					operation: 'loadSubscription'
 				});
-				subscriptionError = formatErrorForUser(handledError);
-				errorLogger.logError(handledError, { operation: 'loadSubscription' });
 			} finally {
 				subscriptionLoading = false;
 			}
+
+			// Load billing plans
+			plansLoading = true;
+			plansError = '';
+			try {
+				errorLogger.logDebug('Loading billing plans');
+				plans = await apiClient.getBillingPlans();
+				errorLogger.logDebug('Billing plans loaded', { count: plans.length });
+			} catch (err) {
+				plansError = captureApiError(err, {
+					component: 'Profile',
+					operation: 'loadBillingPlans'
+				});
+			} finally {
+				plansLoading = false;
+			}
 		} catch (error) {
-			const handledError = handleApiError(error, {
+			generalError = captureApiError(error, {
 				component: 'Profile',
 				operation: 'loadProfileData'
 			});
-			errorLogger.logError(handledError, { operation: 'loadProfileData' });
-			generalError = 'Failed to load profile data. Please refresh the page.';
 		} finally {
 			isLoading = false;
 		}
@@ -274,13 +313,7 @@
 		console.log('[Profile] Validation passed');
 
 		try {
-			const updateData: {
-				current_password: string;
-				username?: string;
-				email?: string;
-				password?: string;
-				color_scheme?: string;
-			} = {
+			const updateData: UserUpdate = {
 				// current_password is always required by backend
 				current_password: formData.currentPassword || ''
 			};
@@ -341,13 +374,10 @@
 			successMessage = 'Profile updated successfully!';
 			console.log('[Profile] Profile update completed successfully');
 		} catch (error) {
-			const handledError = handleApiError(error, {
+			generalError = captureApiError(error, {
 				component: 'Profile',
 				operation: 'updateProfile'
 			});
-			errorLogger.logError(handledError, { operation: 'updateProfile' });
-			const errorMessage = formatErrorForUser(handledError);
-			generalError = errorMessage;
 		} finally {
 			errorLogger.logDebug('[Profile] handleSubmit completed', { operation: 'updateProfile' });
 			isSaving = false;
@@ -423,12 +453,10 @@
 			connectCodeApp = res.app;
 			errorLogger.logDebug('Connection code requested successfully');
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			connectCodeError = captureApiError(err, {
 				component: 'Profile',
 				operation: 'requestConnectCode'
 			});
-			connectCodeError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { operation: 'requestConnectCode' });
 		} finally {
 			connectCodeLoading = false;
 		}
@@ -470,13 +498,11 @@
 			connectedApps = connectedApps.filter((app) => app.id !== appId);
 			errorLogger.logDebug('Connected app revoked successfully', { appId });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			revokeError = captureApiError(err, {
 				component: 'Profile',
 				operation: 'revokeConnectedApp',
 				appId
 			});
-			revokeError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { operation: 'revokeConnectedApp', appId });
 		} finally {
 			revokingAppId = null;
 		}
@@ -488,22 +514,35 @@
 			if (err.status === 503) return 'Billing is temporarily unavailable.';
 			if (err.status === 502) return 'Something went wrong. Try again later.';
 		}
-		const handledError = handleApiError(err, {
+		return captureApiError(err, {
 			component: 'Profile',
 			operation: 'createCheckoutSession'
 		});
-		return formatErrorForUser(handledError);
 	}
 
-	// Billing: create checkout session and redirect to Dodo Payments
-	async function handleCheckout() {
+	// Billing: format plan price for display (cents -> $X.XX, interval)
+	function formatPlanPrice(price: PlanPrice): string {
+		const amount = (price.price / 100).toFixed(2);
+		const symbol = price.currency === 'USD' ? '$' : price.currency + ' ';
+		const count = price.payment_frequency_count ?? 1;
+		const interval = (price.payment_frequency_interval ?? 'Month').toLowerCase();
+		const intervalLabel = count === 1 ? interval : `${count} ${interval}s`;
+		return `${symbol}${amount}/${intervalLabel}`;
+	}
+
+	// Billing: create checkout session for plan and redirect to Dodo (card click or Manage Subscription)
+	async function handleCheckout(productId: string) {
+		if (!productId) return;
 		checkoutError = '';
 		checkoutLoading = true;
 		try {
-			errorLogger.logDebug('Creating checkout session');
+			errorLogger.logDebug('Creating checkout session', { productId });
 			const returnUrl =
 				typeof window !== 'undefined' ? `${window.location.origin}${base}/billing/complete` : undefined;
-			const data = await apiClient.createCheckoutSession({ return_url: returnUrl ?? undefined });
+			const data = await apiClient.createCheckoutSession({
+				product_id: productId,
+				return_url: returnUrl ?? undefined
+			});
 			if (!data?.checkout_url) {
 				errorLogger.logError(new Error('Missing checkout_url in response'), {
 					operation: 'createCheckoutSession'
@@ -853,6 +892,167 @@
 				{/if}
 			</div>
 
+			<!-- Billing -->
+			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
+				<h2 class="mb-2 text-lg font-semibold text-flit-ink">Billing</h2>
+				<p class="mb-4 text-sm text-flit-muted">Manage your subscription and payment.</p>
+
+				{#if subscriptionLoading}
+					<p class="text-sm text-flit-muted">Loading subscription…</p>
+				{:else if subscriptionError}
+					<div
+						class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
+						role="alert"
+					>
+						<p class="text-sm text-flit-ink">{subscriptionError}</p>
+					</div>
+				{/if}
+
+				{#if !subscriptionLoading && hasActiveSubscription}
+					<div
+						class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
+						role="status"
+					>
+						<p class="text-sm font-medium text-flit-ink">You have an active subscription.</p>
+						{#if currentPlanProductId && subscriptionPlans.length > 0}
+							{@const currentPlan = subscriptionPlans.find((p) => p.product_id === currentPlanProductId)}
+							{#if currentPlan?.name}
+								<p class="mt-1 text-sm text-flit-muted">Your plan: {currentPlan.name}</p>
+							{/if}
+						{/if}
+						{#if currentPeriodEnd}
+							<p class="mt-1 text-sm text-flit-muted">
+								Next billing date: {formatDate(currentPeriodEnd)}
+							</p>
+						{/if}
+						{#if currentPlanProductId}
+							<button
+								type="button"
+								onclick={() => handleCheckout(currentPlanProductId)}
+								disabled={checkoutLoading}
+								class="btn btn-primary mt-3 px-4 disabled:cursor-not-allowed"
+								aria-label="Manage Subscription"
+							>
+								{#if checkoutLoading}
+									<svg
+										class="mr-2 h-5 w-5 animate-spin"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									Redirecting…
+								{:else}
+									Manage Subscription
+								{/if}
+							</button>
+						{/if}
+					</div>
+				{/if}
+
+				{#if !subscriptionLoading}
+					{#if checkoutError}
+						<div
+							class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
+							role="alert"
+						>
+							<div class="flex">
+								<div class="flex-shrink-0">
+									<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
+										<path
+											fill-rule="evenodd"
+											d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+											clip-rule="evenodd"
+										/>
+									</svg>
+								</div>
+								<div class="ml-3">
+									<p class="text-sm text-flit-ink">{checkoutError}</p>
+								</div>
+							</div>
+						</div>
+					{/if}
+					{#if !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
+						{@const status = subscriptionStatus?.status ?? ''}
+						{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
+						<p class="mb-4 text-sm text-flit-muted">
+							{isPaymentIssue
+								? 'Payment issue — update your payment method or resubscribe below.'
+								: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
+						</p>
+					{:else if !hasActiveSubscription}
+						<p class="mb-4 text-sm text-flit-muted">
+							Upgrade or manage your subscription via secure checkout.
+						</p>
+					{/if}
+
+					{#if plansLoading}
+						<p class="text-sm text-flit-muted">Loading plans…</p>
+					{:else if plansError}
+						<div
+							class="rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
+							role="alert"
+						>
+							<p class="text-sm text-flit-ink">{plansError}</p>
+						</div>
+					{:else if plans.length === 0}
+						<p class="text-sm text-flit-muted">No plans available at the moment.</p>
+					{:else if !hasActiveSubscription}
+						<!-- Subscription plans: click card to go to checkout -->
+						{#if subscriptionPlans.length > 0}
+							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								{#each subscriptionPlans as plan (plan.product_id)}
+									<button
+										type="button"
+										onclick={() => handleCheckout(plan.product_id)}
+										disabled={checkoutLoading}
+										class="flex min-h-[200px] flex-col rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-200 hover:border-flit-primary/40 hover:bg-flit-canvas/70 hover:shadow-flit-sm focus:outline-none focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:hover:border-flit-muted/30 disabled:hover:bg-flit-canvas/50 disabled:hover:shadow-none"
+										aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
+									>
+										{#if plan.image}
+											<img
+												src={plan.image}
+												alt=""
+												class="mb-3 h-16 w-auto rounded object-contain"
+											/>
+										{/if}
+										<h3 class="text-base font-semibold text-flit-ink">
+											{plan.name ?? 'Subscription plan'}
+										</h3>
+										{#if plan.description}
+											<p class="mt-1 text-sm text-flit-muted">{plan.description}</p>
+										{/if}
+										<div class="mt-3">
+											<span class="text-lg font-medium text-flit-ink">
+												{formatPlanPrice(plan.price)}
+											</span>
+										</div>
+										{#if checkoutLoading}
+											<div class="mt-3 flex items-center text-sm text-flit-muted">
+												<svg
+													class="mr-2 h-4 w-4 animate-spin"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													aria-hidden="true"
+												>
+													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+												</svg>
+												Redirecting to checkout…
+											</div>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						{/if}
+					{/if}
+				{/if}
+			</div>
+
 			<!-- Profile Form -->
 			<form
 				class="space-y-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm"
@@ -922,7 +1122,7 @@
 
 					<!-- Color Scheme Preference -->
 					<div class="mb-4">
-						<label class="mb-2 block text-sm font-medium text-flit-ink"> Color Scheme </label>
+						<label for="color-scheme-light" class="mb-2 block text-sm font-medium text-flit-ink"> Color Scheme </label>
 						<p class="mb-3 text-xs text-flit-muted">
 							Choose your preferred color scheme for the interface
 						</p>
@@ -939,6 +1139,7 @@
 									: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
 							>
 								<input
+									id="color-scheme-light"
 									type="radio"
 									name="colorScheme"
 									value="light"
@@ -1089,153 +1290,6 @@
 								{formatDate($currentUser.updated_at)}
 							</p>
 						</div>
-					</div>
-
-					<!-- Billing / Checkout -->
-					<div class="border-t border-flit-muted/20 pt-6">
-						<h2 class="mb-2 text-lg font-semibold text-flit-ink">Billing</h2>
-						{#if subscriptionLoading}
-							<p class="mb-4 text-sm text-flit-muted">Loading subscription…</p>
-						{:else if subscriptionError}
-							<p class="mb-4 text-sm text-flit-muted">
-								Upgrade or manage your subscription via secure checkout.
-							</p>
-							<div
-								class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-								role="alert"
-							>
-								<p class="text-sm text-flit-ink">{subscriptionError}</p>
-							</div>
-							<button
-								type="button"
-								onclick={handleCheckout}
-								disabled={checkoutLoading}
-								class="btn btn-primary px-4 disabled:cursor-not-allowed"
-								aria-label="Go to checkout to upgrade or manage subscription"
-							>
-								{#if checkoutLoading}
-									<svg
-										class="mr-2 h-5 w-5 animate-spin"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										aria-hidden="true"
-									>
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-									</svg>
-									Redirecting…
-								{:else}
-									Subscribe
-								{/if}
-							</button>
-						{:else if subscriptionStatus?.status === 'active' || subscriptionStatus?.status === 'trialing'}
-							<p class="mb-2 text-sm text-flit-muted">You have an active subscription.</p>
-							{#if subscriptionStatus?.current_period_end}
-								<p class="mb-4 text-sm text-flit-muted">
-									Next billing date: {formatDate(subscriptionStatus.current_period_end)}
-								</p>
-							{/if}
-						{:else if subscriptionStatus?.status === null || subscriptionStatus === null}
-							<p class="mb-4 text-sm text-flit-muted">
-								Upgrade or manage your subscription via secure checkout.
-							</p>
-							{#if checkoutError}
-								<div
-									class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-									role="alert"
-								>
-									<div class="flex">
-										<div class="flex-shrink-0">
-											<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-												<path
-													fill-rule="evenodd"
-													d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-													clip-rule="evenodd"
-												/>
-											</svg>
-										</div>
-										<div class="ml-3">
-											<p class="text-sm text-flit-ink">{checkoutError}</p>
-										</div>
-									</div>
-								</div>
-							{/if}
-							<button
-								type="button"
-								onclick={handleCheckout}
-								disabled={checkoutLoading}
-								class="btn btn-primary px-4 disabled:cursor-not-allowed"
-								aria-label="Go to checkout to upgrade or manage subscription"
-							>
-								{#if checkoutLoading}
-									<svg
-										class="mr-2 h-5 w-5 animate-spin"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										aria-hidden="true"
-									>
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-									</svg>
-									Redirecting…
-								{:else}
-									Subscribe
-								{/if}
-							</button>
-						{:else}
-							<!-- past_due, on_hold, failed, canceled, expired -->
-							{@const status = subscriptionStatus?.status ?? ''}
-							{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
-							<p class="mb-4 text-sm text-flit-muted">
-								{isPaymentIssue ? 'Payment issue — update your payment method or resubscribe.' : 'Subscription canceled or expired. You can resubscribe below.'}
-							</p>
-							{#if checkoutError}
-								<div
-									class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-									role="alert"
-								>
-									<div class="flex">
-										<div class="flex-shrink-0">
-											<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-												<path
-													fill-rule="evenodd"
-													d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-													clip-rule="evenodd"
-												/>
-											</svg>
-										</div>
-										<div class="ml-3">
-											<p class="text-sm text-flit-ink">{checkoutError}</p>
-										</div>
-									</div>
-								</div>
-							{/if}
-							<button
-								type="button"
-								onclick={handleCheckout}
-								disabled={checkoutLoading}
-								class="btn btn-primary px-4 disabled:cursor-not-allowed"
-								aria-label="Go to checkout to resubscribe"
-							>
-								{#if checkoutLoading}
-									<svg
-										class="mr-2 h-5 w-5 animate-spin"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										aria-hidden="true"
-									>
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-									</svg>
-									Redirecting…
-								{:else}
-									Subscribe
-								{/if}
-							</button>
-						{/if}
 					</div>
 				</div>
 
@@ -1542,27 +1596,7 @@
 				</div>
 
 				<!-- General Error -->
-				{#if generalError}
-					<div
-						class="rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-						role="alert"
-					>
-						<div class="flex">
-							<div class="flex-shrink-0">
-								<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-									<path
-										fill-rule="evenodd"
-										d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-										clip-rule="evenodd"
-									/>
-								</svg>
-							</div>
-							<div class="ml-3">
-								<p class="text-sm text-flit-ink">{generalError}</p>
-							</div>
-						</div>
-					</div>
-				{/if}
+				<GeneralErrorAlert message={generalError} />
 
 				<!-- Submit Button -->
 				<div class="flex justify-end border-t border-flit-muted/20 pt-6">

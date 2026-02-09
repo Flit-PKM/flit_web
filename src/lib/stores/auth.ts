@@ -5,11 +5,13 @@
  * Provides centralized auth state and actions throughout the application.
  */
 
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { apiClient, HttpError } from '../api/client';
+import { isTokenExpired } from '../utils/auth';
+import { handleApiError, formatErrorForUser } from '../utils/error-handler';
 import type { AuthState, User, LoginFormData, RegisterFormData } from '../types/auth';
 
 // Storage keys
@@ -22,8 +24,7 @@ function initializeAuthState(): AuthState {
 		return {
 			token: null,
 			user: null,
-			isLoading: false,
-			isAuthenticated: false
+			isLoading: false
 		};
 	}
 
@@ -38,11 +39,19 @@ function initializeAuthState(): AuthState {
 		localStorage.removeItem(USER_KEY);
 	}
 
+	// Treat expired token as no auth so we never show authenticated UI or loading
+	if (token && isTokenExpired(token)) {
+		return {
+			token: null,
+			user: null,
+			isLoading: false
+		};
+	}
+
 	return {
 		token,
 		user,
-		isLoading: false,
-		isAuthenticated: !!(token && user)
+		isLoading: false
 	};
 }
 
@@ -68,8 +77,11 @@ authStore.subscribe((state) => {
 	}
 });
 
-// Derived stores for convenience
-export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticated);
+// Derived stores for convenience (isAuthenticated is derived from token + user only)
+export const isAuthenticated = derived(
+	authStore,
+	($auth) => !!($auth.token && $auth.user)
+);
 export const currentUser = derived(authStore, ($auth) => $auth.user);
 export const isLoading = derived(authStore, ($auth) => $auth.isLoading);
 export const authToken = derived(authStore, ($auth) => $auth.token);
@@ -91,34 +103,16 @@ export const authActions = {
 			authStore.set({
 				token: tokenResponse.access_token,
 				user: userData,
-				isLoading: false,
-				isAuthenticated: true
+				isLoading: false
 			});
 
 			return { success: true };
 		} catch (error) {
 			authStore.update((state) => ({
 				...state,
-				isLoading: false,
-				isAuthenticated: false
+				isLoading: false
 			}));
-
-			// Handle specific error cases
-			let errorMessage = 'Login failed. Please try again.';
-			if (error instanceof HttpError) {
-				if (error.status === 401) {
-					errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-				} else if (error.status === 422) {
-					errorMessage = 'Invalid login format. Please check your input and try again.';
-				} else if (error.status >= 500) {
-					errorMessage = 'Server error. Please try again later.';
-				} else {
-					errorMessage = error.message;
-				}
-			} else if (error instanceof Error) {
-				errorMessage = error.message;
-			}
-
+			const errorMessage = formatErrorForUser(handleApiError(error, { operation: 'login' }));
 			return { success: false, error: errorMessage };
 		}
 	},
@@ -138,15 +132,13 @@ export const authActions = {
 			authStore.set({
 				token: null, // Registration doesn't return a token
 				user: null, // Clear any existing user data
-				isLoading: false,
-				isAuthenticated: false
+				isLoading: false
 			});
 
 			return { success: true };
 		} catch (error) {
 			authStore.update((state) => ({ ...state, isLoading: false }));
-
-			const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+			const errorMessage = formatErrorForUser(handleApiError(error, { operation: 'register' }));
 			return { success: false, error: errorMessage };
 		}
 	},
@@ -158,8 +150,7 @@ export const authActions = {
 		authStore.set({
 			token: null,
 			user: null,
-			isLoading: false,
-			isAuthenticated: false
+			isLoading: false
 		});
 
 		// Navigate to login page
@@ -181,7 +172,7 @@ export const authActions = {
 	 */
 	requireAuth(): boolean {
 		const state = get(authStore);
-		if (!state.isAuthenticated) {
+		if (!state.token || !state.user) {
 			goto(resolve('/login'));
 			return false;
 		}
@@ -230,14 +221,6 @@ export const authActions = {
 		}
 	}
 };
-
-// Helper function to get current store value
-function get<T>(store: { subscribe: (fn: (value: T) => void) => () => void }): T {
-	let value: T;
-	const unsubscribe = store.subscribe((v) => (value = v));
-	unsubscribe();
-	return value!;
-}
 
 // Export the store itself for direct access when needed
 export const auth = authStore;

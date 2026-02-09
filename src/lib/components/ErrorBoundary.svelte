@@ -1,36 +1,42 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { errorLogger } from '$lib/utils/error-handler';
 
 	// This component catches unhandled errors in the application
 	let hasError = false;
-	let error = null;
-	let errorInfo = null;
+	let error: Error | null = null;
+	let errorInfo: string | null = null;
+
+	function toError(value: unknown): Error {
+		return value instanceof Error ? value : new Error(String(value));
+	}
 
 	// Set up global error handling
 	onMount(() => {
-		const handleError = (event) => {
-			errorLogger.logError(event.error, {
+		const handleError = (event: ErrorEvent) => {
+			const err = toError(event.error);
+			errorLogger.logError(err, {
 				component: 'GlobalErrorBoundary',
 				operation: 'uncaughtError',
 				url: window.location.href
 			});
 
 			hasError = true;
-			error = event.error;
-			errorInfo = event.error?.stack || 'No stack trace available';
+			error = err;
+			errorInfo = err.stack ?? 'No stack trace available';
 		};
 
-		const handlePromiseRejection = (event) => {
-			errorLogger.logError(event.reason, {
+		const handlePromiseRejection = (event: PromiseRejectionEvent) => {
+			const err = toError(event.reason);
+			errorLogger.logError(err, {
 				component: 'GlobalErrorBoundary',
 				operation: 'unhandledRejection',
 				url: window.location.href
 			});
 
 			hasError = true;
-			error = event.reason;
-			errorInfo = event.reason?.stack || 'No stack trace available';
+			error = err;
+			errorInfo = err.stack ?? 'No stack trace available';
 		};
 
 		window.addEventListener('error', handleError);
@@ -68,6 +74,4 @@
 	</div>
 {/if}
 
-<svelte:fragment>
-	<slot />
-</svelte:fragment>
+<slot />

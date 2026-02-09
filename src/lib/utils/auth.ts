@@ -7,46 +7,34 @@
 
 import type { FormErrors, LoginFormData, RegisterFormData, ProfileFormData } from '../types/auth';
 import { errorLogger } from './error-handler';
+import { validateField, validationRules } from './validation';
 
 /**
- * Email validation using RFC 5322 compliant regex
+ * Email validation (delegates to validation.ts)
  */
 export function isValidEmail(email: string): boolean {
-	const emailRegex =
-		/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-	return emailRegex.test(email);
+	return validateField(email, { required: true, rules: [validationRules.email()] }) === null;
 }
 
 /**
- * Password strength validation
- * Requires: 8+ chars, uppercase, lowercase, number, special char
+ * Password strength validation: 8+ chars, uppercase, lowercase, number, special char.
+ * Delegates to validation.ts.
  */
 export function isValidPassword(password: string): boolean {
-	if (password.length < 8) return false;
-
-	const hasUpperCase = /[A-Z]/.test(password);
-	const hasLowerCase = /[a-z]/.test(password);
-	const hasNumbers = /\d/.test(password);
-	const hasSpecialChar = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
-
-	return hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar;
+	return (
+		validateField(password, {
+			required: true,
+			rules: [validationRules.minLength(8), validationRules.password()]
+		}) === null
+	);
 }
 
 /**
- * Get password strength score (0-4)
+ * Get password strength score (0-4) based on length tiers.
  */
 export function getPasswordStrength(password: string): number {
 	if (password.length === 0) return 0;
-
-	let score = 0;
-
-	if (password.length >= 8) score++;
-	if (/[A-Z]/.test(password)) score++;
-	if (/[a-z]/.test(password)) score++;
-	if (/\d/.test(password)) score++;
-	if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
-
-	return Math.min(score, 4);
+	return Math.min(4, password.length);
 }
 
 /**
@@ -70,22 +58,15 @@ export function getPasswordStrengthLabel(strength: number): string {
 }
 
 /**
- * Validate login form data
+ * Validate login form data (uses validation.ts rules)
  */
 export function validateLoginForm(data: LoginFormData): FormErrors {
 	errorLogger.logDebug('Validating login form', { data });
 	const errors: FormErrors = {};
-
-	if (!data.email.trim()) {
-		errors.email = 'Email is required';
-	} else if (!isValidEmail(data.email)) {
-		errors.email = 'Please enter a valid email address';
-	}
-
-	if (!data.password.trim()) {
-		errors.password = 'Password is required';
-	}
-
+	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
+	if (emailErr) errors.email = emailErr;
+	const passwordErr = validateField(data.password, { required: true });
+	if (passwordErr) errors.password = passwordErr;
 	errorLogger.logDebug('Login form validation complete', {
 		errors,
 		isValid: Object.keys(errors).length === 0
@@ -94,31 +75,23 @@ export function validateLoginForm(data: LoginFormData): FormErrors {
 }
 
 /**
- * Validate registration form data
+ * Validate registration form data (uses validation.ts rules)
  */
 export function validateRegisterForm(data: RegisterFormData): FormErrors {
 	errorLogger.logDebug('Validating registration form', { data });
 	const errors: FormErrors = {};
-
-	if (!data.email.trim()) {
-		errors.email = 'Email is required';
-	} else if (!isValidEmail(data.email)) {
-		errors.email = 'Please enter a valid email address';
-	}
-
-	if (!data.password.trim()) {
-		errors.password = 'Password is required';
-	} else if (!isValidPassword(data.password)) {
-		errors.password =
-			'Password must be at least 8 characters and contain uppercase, lowercase, number, and special character';
-	}
-
-	if (!data.confirmPassword.trim()) {
-		errors.confirmPassword = 'Please confirm your password';
-	} else if (data.password !== data.confirmPassword) {
-		errors.confirmPassword = 'Passwords do not match';
-	}
-
+	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
+	if (emailErr) errors.email = emailErr;
+	const passwordErr = validateField(data.password, {
+		required: true,
+		rules: [validationRules.minLength(8), validationRules.password()]
+	});
+	if (passwordErr) errors.password = passwordErr;
+	const confirmErr = validateField(data.confirmPassword, {
+		required: true,
+		rules: [validationRules.match(data.password, 'Passwords do not match')]
+	});
+	if (confirmErr) errors.confirmPassword = confirmErr;
 	errorLogger.logDebug('Registration form validation complete', {
 		errors,
 		isValid: Object.keys(errors).length === 0
@@ -157,12 +130,9 @@ export function validateProfileForm(
 		errors.username = 'Username can only contain letters, numbers, underscores, and hyphens';
 	}
 
-	// Email validation
-	if (!data.email.trim()) {
-		errors.email = 'Email is required';
-	} else if (!isValidEmail(data.email)) {
-		errors.email = 'Please enter a valid email address';
-	}
+	// Email validation (uses validation.ts)
+	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
+	if (emailErr) errors.email = emailErr;
 
 	// Check if username or email changed (requires current password)
 	const usernameChanged = originalUser && data.username !== originalUser.username;
@@ -174,20 +144,18 @@ export function validateProfileForm(
 		errors.currentPassword = 'Current password is required to update your profile';
 	}
 
-	// Password change validation (only if user is actually changing password)
+	// Password change validation (only if user is actually changing password); uses validation.ts
 	if (passwordChanging) {
-		if (!data.newPassword?.trim()) {
-			errors.newPassword = 'New password is required';
-		} else if (!isValidPassword(data.newPassword)) {
-			errors.newPassword =
-				'New password must be at least 8 characters and contain uppercase, lowercase, number, and special character';
-		}
-
-		if (!data.confirmNewPassword?.trim()) {
-			errors.confirmNewPassword = 'Please confirm your new password';
-		} else if (data.newPassword !== data.confirmNewPassword) {
-			errors.confirmNewPassword = 'New passwords do not match';
-		}
+		const newPasswordErr = validateField(data.newPassword ?? '', {
+			required: true,
+			rules: [validationRules.minLength(8), validationRules.password()]
+		});
+		if (newPasswordErr) errors.newPassword = newPasswordErr;
+		const confirmNewErr = validateField(data.confirmNewPassword ?? '', {
+			required: true,
+			rules: [validationRules.match(data.newPassword ?? '', 'New passwords do not match')]
+		});
+		if (confirmNewErr) errors.confirmNewPassword = confirmNewErr;
 	}
 
 	errorLogger.logDebug('Profile form validation complete', {

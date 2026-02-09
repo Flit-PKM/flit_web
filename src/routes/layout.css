@@ -9,10 +9,15 @@
 	--color-green: oklch(0.63 0.2 142);
 	--color-red: oklch(0.63 0.2 31);
 	--color-blue: oklch(0.63 0.2 240);
-	--color-mid-grey: oklch(50% 0 0);
+	--color-mid-grey: oklch(50% 0.01 110);
 
-	--color-canvas: oklch(90% .005 76);
-	--color-ink: oklch(15% 0.005 176);
+	--canvas-dark: oklch(18% .002 176);
+	--canvas-light: oklch(93% .002 76);
+	--ink-dark: oklch(90% .002 76);
+	--ink-light: oklch(15% 0.002 176);
+
+	--color-canvas: var(--canvas-light);
+	--color-ink: var(--ink-light);
 	--color-link: color-mix(in oklab, var(--color-blue) 20%, var(--color-ink));
 	--color-ink-negative: color-mix(in oklab, var(--color-red) 50%, var(--color-ink) 50%);
 	--color-ink-positive: color-mix(in oklab, var(--color-green) 50%, var(--color-ink) 50%);
@@ -28,20 +33,20 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--color-canvas: oklch(18% .005 76);
-		--color-ink: oklch(90% .005 176);
+		--color-canvas: var(--canvas-dark);
+		--color-ink: var(--ink-dark);
 	}
 }
 
 /* User/session color scheme overrides (set by layout from profile preference) */
 [data-color-scheme="light"] {
-	--color-canvas: oklch(90% 0 76);
-	--color-ink: oklch(15% 0.005 176);
+	--color-canvas: var(--canvas-light);
+	--color-ink: var(--ink-light);
 }
 
 [data-color-scheme="dark"] {
-	--color-canvas: oklch(18% .005 76);
-	--color-ink: oklch(90% .005 176);
+	--color-canvas: var(--canvas-dark);
+	--color-ink: var(--ink-dark);
 }
 
 @theme {

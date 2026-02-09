@@ -13,24 +13,25 @@
 
 <div class="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
 	<div class="rounded-2xl bg-flit-card p-8 shadow-flit-sm backdrop-blur-sm">
-		<h1 class="text-3xl font-bold text-flit-ink sm:text-4xl">About Flit Web</h1>
+		<h1 class="text-3xl font-bold text-flit-ink sm:text-4xl">About Flit-PKM</h1>
 
 		<div class="mt-6 space-y-6 text-flit-ink">
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">What is Flit Web?</h2>
+				<h2 class="text-2xl font-semibold text-flit-ink">What is Flit?</h2>
 				<p class="mt-3 text-flit-muted">
-					Flit Web is a modern web application for personal knowledge management. It provides a
-					seamless interface to view, manage, and explore your notes and insights as an
-					interconnected knowledge graph.
+					Flit is a modern Personal Knowledge Management(PKM) ecosystem. It provides a seamless
+					blend between your personal notes, insights and knowledge; and powerfull AI analysis,
+					summarization and insight generation. Allowing you to find connections and ideas you never thought of.
 				</p>
 			</section>
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">Our Mission</h2>
 				<p class="mt-3 text-flit-muted">
-					We believe that knowledge should be connected, accessible, and easy to navigate. Flit Web
+					We believe that knowledge should be connected, accessible, and easy to navigate. Flit-PKM
 					empowers you to build your personal knowledge base with powerful tools for organizing,
-					linking, and discovering insights within your notes.
+					linking, and discovering insights within your notes. Connected apps; including Flit-App(Note taking),
+					Still(Meditation and Journaling), and more coming very soon; allow you to bridge the various parts of your life and knowledge.
 				</p>
 			</section>
 
@@ -51,7 +52,7 @@
 								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span>Secure authentication and user management</span>
+						<span>Secure authentication and Database Encryption</span>
 					</li>
 					<li class="flex items-start">
 						<svg
@@ -67,7 +68,7 @@
 								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span>Knowledge graph visualization</span>
+						<span>Knowledge graph building and visualization</span>
 					</li>
 					<li class="flex items-start">
 						<svg
@@ -83,7 +84,7 @@
 								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span>Note relationships and categories</span>
+						<span>AI relationship analysis, summarization and insight generation</span>	
 					</li>
 					<li class="flex items-start">
 						<svg
@@ -115,27 +116,12 @@
 								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span>Cross-platform app connectivity</span>
+						<span>App Sync and backup capabilities</span>
 					</li>
 				</ul>
 			</section>
 
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">Part of the Flit-PKM Ecosystem</h2>
-				<p class="mt-3 text-flit-muted">
-					Flit Web is part of the larger Flit-PKM (Personal Knowledge Management) ecosystem,
-					designed to work seamlessly with Flit Core and other Flit applications. Connect your
-					devices and access your knowledge from anywhere.
-				</p>
-			</section>
 
-			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">Technology</h2>
-				<p class="mt-3 text-flit-muted">
-					Built with modern web technologies including SvelteKit, TypeScript, and Tailwind CSS,
-					Flit Web delivers a fast, responsive, and beautiful user experience across all devices.
-				</p>
-			</section>
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">Contact</h2>
@@ -149,7 +135,13 @@
 					>
 						BMD-Studios
 					</a>
-					or reach out through our official channels.
+					or email
+					<a
+						href="mailto:admin@bmd-studios.com"
+						class="font-medium text-flit-link transition-opacity hover:opacity-80"
+					>
+						admin@bmd-studios.com
+					</a>.
 				</p>
 			</section>
 		</div>

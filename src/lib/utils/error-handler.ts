@@ -5,7 +5,7 @@
  * across the entire application.
  */
 
-import type { HttpError } from '$lib/api/client';
+import { HttpError } from '$lib/api/client';
 import { browser } from '$app/environment';
 
 /**
@@ -204,7 +204,7 @@ export function handleApiError(error: unknown, context?: ErrorContext): AppError
 	if (error instanceof Error) {
 		// Check if it's an HttpError from our API client
 		if (error instanceof HttpError) {
-			const apiError = new ApiError(error.message, error.status, error.body, context, error);
+			const apiError = new ApiError(error.message, error.status, undefined, context, error);
 			errorLogger.logError(apiError, context);
 			return apiError;
 		}
@@ -261,6 +261,15 @@ export function formatErrorForUser(error: unknown): string {
 
 	// For non-error values
 	return 'An unexpected error occurred.';
+}
+
+/**
+ * Handle API error, log it, and return a user-facing message.
+ * Use in catch blocks to avoid repeating handleApiError + formatErrorForUser + logError.
+ */
+export function captureApiError(err: unknown, context?: ErrorContext): string {
+	const handledError = handleApiError(err, context);
+	return formatErrorForUser(handledError);
 }
 
 /**

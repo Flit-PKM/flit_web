@@ -7,9 +7,8 @@ const config = {
 			fallback: 'index.html'
 		}),
 		paths: {
-			base: '/webapp',
+			base: '',
 			relative: false
-			// assets: '/webapp'  // only if assets are served from a different origin (e.g. CDN)
 		}
 	}
 };

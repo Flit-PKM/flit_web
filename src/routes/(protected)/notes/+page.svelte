@@ -3,13 +3,22 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { isAuthenticated } from '$lib/stores/auth';
-import { apiClient, HttpError } from '$lib/api/client';
-import { errorLogger, handleApiError, formatErrorForUser } from '$lib/utils/error-handler';
+import { apiClient } from '$lib/api/client';
+import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+import { markdownToSafeHtml } from '$lib/utils/markdown';
 import type { NoteRead, CategoryRead } from '$lib/types/note';
 
-	function firstThreeLines(content: string): string {
-		if (!content.trim()) return '';
-		return content.split('\n').slice(0, 3).join('\n');
+	const previewHtmlByNoteId = $derived.by(() => {
+		const m: Record<number, string> = {};
+		for (const n of notes) {
+			m[n.id] = markdownToSafeHtml(n.content ?? '', { maxLines: 3 });
+		}
+		return m;
+	});
+
+	function hasPreview(content: string): boolean {
+		if (!content?.trim()) return false;
+		return content.split('\n').slice(0, 3).join('\n').trim().length > 0;
 	}
 
 	let isLoading = $state(true);
@@ -31,13 +40,6 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 	// New note
 	let isCreatingNote = $state(false);
 
-	// Redirect if not authenticated (immediate check)
-	$effect(() => {
-		if (!$isAuthenticated) {
-			goto(resolve('/login'));
-		}
-	});
-
 	// Fetch notes with current filters
 	async function fetchNotes() {
 		if (!$isAuthenticated) return;
@@ -58,12 +60,12 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 			);
 			errorLogger.logDebug('Notes loaded successfully', { count: notes.length });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			error = captureApiError(err, {
 				component: 'NotesList',
-				operation: 'loadNotes'
+				operation: 'loadNotes',
+				search: searchQuery,
+				filter: selectedCategory
 			});
-			error = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { search: searchQuery, filter: selectedCategory });
 		} finally {
 			isLoading = false;
 		}
@@ -114,11 +116,7 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 			categories = rawCategories.filter((c) => !c.is_deleted);
 			errorLogger.logDebug('Categories loaded successfully', { count: categories.length });
 		} catch (err) {
-			const handledError = handleApiError(err, {
-				component: 'NotesList',
-				operation: 'loadCategories'
-			});
-			errorLogger.logError(handledError, { operation: 'loadCategories' });
+			captureApiError(err, { component: 'NotesList', operation: 'loadCategories' });
 			// Don't set error message for categories - it's not critical for note list
 		}
 	}
@@ -151,13 +149,11 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 			newCategoryName = '';
 			errorLogger.logDebug('Category created successfully', { categoryId: created.id });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			categoryError = captureApiError(err, {
 				component: 'NotesList',
 				operation: 'createCategory',
 				categoryName: name
 			});
-			categoryError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { operation: 'createCategory', categoryName: name });
 		} finally {
 			isCategoryBusy = false;
 		}
@@ -178,13 +174,11 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 			await fetchNotes();
 			errorLogger.logDebug('Category deleted successfully', { categoryId: id });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			categoryError = captureApiError(err, {
 				component: 'NotesList',
 				operation: 'deleteCategory',
 				categoryId: id
 			});
-			categoryError = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { operation: 'deleteCategory', categoryId: id });
 		} finally {
 			isCategoryBusy = false;
 		}
@@ -201,12 +195,10 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 			goto(resolve(`/notes/${created.id}?edit=1`));
 			errorLogger.logDebug('New note created successfully', { noteId: created.id });
 		} catch (err) {
-			const handledError = handleApiError(err, {
+			error = captureApiError(err, {
 				component: 'NotesList',
 				operation: 'createNote'
 			});
-			error = formatErrorForUser(handledError);
-			errorLogger.logError(handledError, { operation: 'createNote' });
 		} finally {
 			isCreatingNote = false;
 		}
@@ -440,11 +432,12 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 						class="block rounded-xl border border-flit-muted/20 bg-flit-card p-4 shadow-flit-sm transition-colors hover:border-flit-muted/40 hover:bg-flit-muted/5 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
 					>
 						<h2 class="font-semibold text-flit-ink">{note.title}</h2>
-						{#if firstThreeLines(note.content)}
-							<pre
-								class="mt-2 font-sans text-sm whitespace-pre-wrap text-flit-muted">{firstThreeLines(
-									note.content
-								)}</pre>
+						{#if hasPreview(note.content)}
+							<div
+								class="mt-2 prose prose-sm max-w-none prose-flit line-clamp-3 text-flit-muted"
+							>
+								{@html previewHtmlByNoteId[note.id] ?? ''}
+							</div>
 						{/if}
 					</a>
 				</li>

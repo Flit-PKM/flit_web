@@ -81,7 +81,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" type="image/svg+xml" href={asset('/images/flit_core_logo.svg')} />
+	<link rel="icon" type="image/svg+xml" href={asset('/images/flit_app_logo.svg')} />
 	<title>Flit Web</title>
 	<meta
 		name="description"
@@ -101,7 +101,7 @@
 							href={resolve('/')}
 							class="flex items-center gap-2 text-flit-ink transition-opacity hover:opacity-80"
 						>
-							<img src={asset('/images/flit_core_logo.svg')} alt="Flit" class="h-8 w-8" />
+							<img src={asset('/images/flit_app_logo.svg')} alt="Flit" class="h-8 w-8" />
 							<span class="text-xl font-bold">Flit Web</span>
 						</a>
 					</div>
@@ -126,7 +126,7 @@
 					{#if $isAuthenticated && $currentUser}
 						<div class="flex items-center space-x-4">
 							<span class="text-sm text-flit-ink">
-								Welcome, <span class="font-medium">{$currentUser.email}</span>
+								Welcome, <span class="font-medium">{$currentUser.username}</span>
 							</span>
 							<button
 								onclick={handleLogout}

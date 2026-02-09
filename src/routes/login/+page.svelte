@@ -6,6 +6,7 @@
 	import { authActions, isAuthenticated, isLoading } from '$lib/stores/auth';
 	import { validateLoginForm, loginRateLimiter, sanitizeInput } from '$lib/utils/auth';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
+	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import type { LoginFormData, FormErrors } from '$lib/types/auth';
 
 	// Form state
@@ -87,9 +88,13 @@
 		const result = await authActions.login(formData);
 
 		if (result.success) {
-			// Redirect to intended page or profile
-			const redirectTo = $page.url.searchParams.get('redirect') || '/profile';
-			goto(resolve(redirectTo));
+			// Redirect to intended page or profile (allowlist for type-safe goto)
+			const ALLOWED_REDIRECTS = ['/profile', '/notes', '/', '/about', '/terms'] as const;
+			const requested = $page.url.searchParams.get('redirect') || '/profile';
+			const path = ALLOWED_REDIRECTS.includes(requested as (typeof ALLOWED_REDIRECTS)[number])
+				? (requested as (typeof ALLOWED_REDIRECTS)[number])
+				: '/profile';
+			goto(resolve(path) as Parameters<typeof goto>[0]);
 		} else {
 			generalError = result.error || 'Login failed. Please try again.';
 		}
@@ -230,26 +235,7 @@
 			</div>
 
 			<!-- General Error -->
-			{#if generalError}
-				<div class="rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4" role="alert">
-					<div class="flex">
-						<div class="flex-shrink-0">
-							<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-								<path
-									fill-rule="evenodd"
-									d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-									clip-rule="evenodd"
-								/>
-							</svg>
-						</div>
-						<div class="ml-3">
-							<p class="text-sm text-flit-ink">
-								{generalError}
-							</p>
-						</div>
-					</div>
-				</div>
-			{/if}
+			<GeneralErrorAlert message={generalError} />
 
 			<!-- Submit Button -->
 			<div>

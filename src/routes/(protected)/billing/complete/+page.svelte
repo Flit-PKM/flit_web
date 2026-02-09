@@ -13,13 +13,6 @@
 	let phase = $state<'polling' | 'success' | 'pending' | 'error'>('polling');
 	let pollError = $state('');
 
-	// Redirect if not authenticated
-	$effect(() => {
-		if (!$isAuthenticated) {
-			goto(resolve('/login') + '?redirect=' + encodeURIComponent('/billing/complete'));
-		}
-	});
-
 	onMount(() => {
 		if (!$isAuthenticated) return;
 
