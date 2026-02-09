@@ -21,10 +21,7 @@ function escapeHtml(raw: string): string {
  * @param options - Optional { maxLines } to limit preview length
  * @returns Sanitized HTML string, or escaped plain text on parse error
  */
-export function markdownToSafeHtml(
-	raw: string,
-	options?: { maxLines?: number }
-): string {
+export function markdownToSafeHtml(raw: string, options?: { maxLines?: number }): string {
 	const trimmed = raw?.trim() ?? '';
 	if (!trimmed) return '';
 

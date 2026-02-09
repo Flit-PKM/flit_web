@@ -11,9 +11,9 @@
 	--color-blue: oklch(0.63 0.2 240);
 	--color-mid-grey: oklch(50% 0.01 110);
 
-	--canvas-dark: oklch(18% .002 176);
-	--canvas-light: oklch(93% .002 76);
-	--ink-dark: oklch(90% .002 76);
+	--canvas-dark: oklch(18% 0.002 176);
+	--canvas-light: oklch(93% 0.002 76);
+	--ink-dark: oklch(90% 0.002 76);
 	--ink-light: oklch(15% 0.002 176);
 
 	--color-canvas: var(--canvas-light);
@@ -39,12 +39,12 @@
 }
 
 /* User/session color scheme overrides (set by layout from profile preference) */
-[data-color-scheme="light"] {
+[data-color-scheme='light'] {
 	--color-canvas: var(--canvas-light);
 	--color-ink: var(--ink-light);
 }
 
-[data-color-scheme="dark"] {
+[data-color-scheme='dark'] {
 	--color-canvas: var(--canvas-dark);
 	--color-ink: var(--ink-dark);
 }

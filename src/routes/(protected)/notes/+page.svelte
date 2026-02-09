@@ -3,10 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { isAuthenticated } from '$lib/stores/auth';
-import { apiClient } from '$lib/api/client';
-import { errorLogger, captureApiError } from '$lib/utils/error-handler';
-import { markdownToSafeHtml } from '$lib/utils/markdown';
-import type { NoteRead, CategoryRead } from '$lib/types/note';
+	import { apiClient } from '$lib/api/client';
+	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+	import { markdownToSafeHtml } from '$lib/utils/markdown';
+	import type { NoteRead, CategoryRead } from '$lib/types/note';
 
 	const previewHtmlByNoteId = $derived.by(() => {
 		const m: Record<number, string> = {};
@@ -433,9 +433,7 @@ import type { NoteRead, CategoryRead } from '$lib/types/note';
 					>
 						<h2 class="font-semibold text-flit-ink">{note.title}</h2>
 						{#if hasPreview(note.content)}
-							<div
-								class="mt-2 prose prose-sm max-w-none prose-flit line-clamp-3 text-flit-muted"
-							>
+							<div class="prose prose-sm mt-2 line-clamp-3 max-w-none text-flit-muted prose-flit">
 								{@html previewHtmlByNoteId[note.id] ?? ''}
 							</div>
 						{/if}

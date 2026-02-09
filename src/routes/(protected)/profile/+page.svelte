@@ -55,8 +55,10 @@
 	let plansError = $state('');
 	// Derived: active subscription from user (prefer) or from GET /billing/subscription
 	let hasActiveSubscription = $derived(
-		$currentUser?.subscription?.status === 'active' || $currentUser?.subscription?.status === 'trialing' ||
-		subscriptionStatus?.status === 'active' || subscriptionStatus?.status === 'trialing'
+		$currentUser?.subscription?.status === 'active' ||
+			$currentUser?.subscription?.status === 'trialing' ||
+			subscriptionStatus?.status === 'active' ||
+			subscriptionStatus?.status === 'trialing'
 	);
 	let currentPlanProductId = $derived($currentUser?.subscription?.product_id ?? null);
 	let currentPeriodEnd = $derived(
@@ -538,7 +540,9 @@
 		try {
 			errorLogger.logDebug('Creating checkout session', { productId });
 			const returnUrl =
-				typeof window !== 'undefined' ? `${window.location.origin}${base}/billing/complete` : undefined;
+				typeof window !== 'undefined'
+					? `${window.location.origin}${base}/billing/complete`
+					: undefined;
 			const data = await apiClient.createCheckoutSession({
 				product_id: productId,
 				return_url: returnUrl ?? undefined
@@ -915,7 +919,9 @@
 					>
 						<p class="text-sm font-medium text-flit-ink">You have an active subscription.</p>
 						{#if currentPlanProductId && subscriptionPlans.length > 0}
-							{@const currentPlan = subscriptionPlans.find((p) => p.product_id === currentPlanProductId)}
+							{@const currentPlan = subscriptionPlans.find(
+								(p) => p.product_id === currentPlanProductId
+							)}
 							{#if currentPlan?.name}
 								<p class="mt-1 text-sm text-flit-muted">Your plan: {currentPlan.name}</p>
 							{/if}
@@ -941,8 +947,19 @@
 										viewBox="0 0 24 24"
 										aria-hidden="true"
 									>
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
 									</svg>
 									Redirecting…
 								{:else}
@@ -1009,7 +1026,7 @@
 										type="button"
 										onclick={() => handleCheckout(plan.product_id)}
 										disabled={checkoutLoading}
-										class="flex min-h-[200px] flex-col rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-200 hover:border-flit-primary/40 hover:bg-flit-canvas/70 hover:shadow-flit-sm focus:outline-none focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:hover:border-flit-muted/30 disabled:hover:bg-flit-canvas/50 disabled:hover:shadow-none"
+										class="flex min-h-[200px] flex-col rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-200 hover:border-flit-primary/40 hover:bg-flit-canvas/70 hover:shadow-flit-sm focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:hover:border-flit-muted/30 disabled:hover:bg-flit-canvas/50 disabled:hover:shadow-none"
 										aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
 									>
 										{#if plan.image}
@@ -1039,8 +1056,19 @@
 													viewBox="0 0 24 24"
 													aria-hidden="true"
 												>
-													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+													<circle
+														class="opacity-25"
+														cx="12"
+														cy="12"
+														r="10"
+														stroke="currentColor"
+														stroke-width="4"
+													></circle>
+													<path
+														class="opacity-75"
+														fill="currentColor"
+														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+													></path>
 												</svg>
 												Redirecting to checkout…
 											</div>
@@ -1122,7 +1150,9 @@
 
 					<!-- Color Scheme Preference -->
 					<div class="mb-4">
-						<label for="color-scheme-light" class="mb-2 block text-sm font-medium text-flit-ink"> Color Scheme </label>
+						<label for="color-scheme-light" class="mb-2 block text-sm font-medium text-flit-ink">
+							Color Scheme
+						</label>
 						<p class="mb-3 text-xs text-flit-muted">
 							Choose your preferred color scheme for the interface
 						</p>

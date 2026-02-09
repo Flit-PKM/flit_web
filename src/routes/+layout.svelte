@@ -19,8 +19,7 @@
 	$effect(() => {
 		if (!browser) return;
 
-		const scheme =
-			$pendingColorScheme ?? $currentUser?.color_scheme ?? 'default';
+		const scheme = $pendingColorScheme ?? $currentUser?.color_scheme ?? 'default';
 		const effective =
 			scheme === 'light' || scheme === 'dark'
 				? scheme
@@ -34,10 +33,7 @@
 		if (scheme !== 'light' && scheme !== 'dark') {
 			const mq = window.matchMedia('(prefers-color-scheme: dark)');
 			const listener = () => {
-				document.documentElement.setAttribute(
-					'data-color-scheme',
-					mq.matches ? 'dark' : 'light'
-				);
+				document.documentElement.setAttribute('data-color-scheme', mq.matches ? 'dark' : 'light');
 			};
 			mq.addEventListener('change', listener);
 			return () => mq.removeEventListener('change', listener);
@@ -70,7 +66,10 @@
 			return true;
 		}
 		// /notes is active for /notes and /notes/[id]
-		if (href === '/notes' && ($page.url.pathname === '/notes' || $page.url.pathname.startsWith('/notes/'))) {
+		if (
+			href === '/notes' &&
+			($page.url.pathname === '/notes' || $page.url.pathname.startsWith('/notes/'))
+		) {
 			return true;
 		}
 		if (href !== '/' && href !== '/notes' && $page.url.pathname.startsWith(href)) {
@@ -89,7 +88,7 @@
 	/>
 </svelte:head>
 
-<div class="min-h-screen bg-flit-canvas overflow-x-hidden">
+<div class="min-h-screen overflow-x-hidden bg-flit-canvas">
 	<!-- Navigation -->
 	<nav class="border-b border-flit-muted/20 bg-flit-footer shadow-flit-sm">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -128,12 +127,7 @@
 							<span class="text-sm text-flit-ink">
 								Welcome, <span class="font-medium">{$currentUser.username}</span>
 							</span>
-							<button
-								onclick={handleLogout}
-								class="btn btn-secondary"
-							>
-								Sign out
-							</button>
+							<button onclick={handleLogout} class="btn btn-secondary"> Sign out </button>
 						</div>
 					{:else}
 						<div class="flex items-center space-x-4">
@@ -143,12 +137,7 @@
 							>
 								Sign in
 							</a>
-							<a
-								href={resolve('/register')}
-								class="btn btn-primary px-4"
-							>
-								Sign up
-							</a>
+							<a href={resolve('/register')} class="btn btn-primary px-4"> Sign up </a>
 						</div>
 					{/if}
 				</div>

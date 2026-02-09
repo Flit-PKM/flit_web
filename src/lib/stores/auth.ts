@@ -78,10 +78,7 @@ authStore.subscribe((state) => {
 });
 
 // Derived stores for convenience (isAuthenticated is derived from token + user only)
-export const isAuthenticated = derived(
-	authStore,
-	($auth) => !!($auth.token && $auth.user)
-);
+export const isAuthenticated = derived(authStore, ($auth) => !!($auth.token && $auth.user));
 export const currentUser = derived(authStore, ($auth) => $auth.user);
 export const isLoading = derived(authStore, ($auth) => $auth.isLoading);
 export const authToken = derived(authStore, ($auth) => $auth.token);
@@ -192,7 +189,7 @@ export const authActions = {
 			authStore.update((state) => ({ ...state, user }));
 		} catch (error) {
 			console.error('Failed to refresh user data:', error);
-			
+
 			// Only logout on 401 (unauthorized) - token is invalid/expired
 			if (error instanceof HttpError && error.status === 401) {
 				this.logout();

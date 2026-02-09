@@ -60,62 +60,62 @@
 </svelte:head>
 
 {#if $isAuthenticated}
-<div class="px-4 py-12 sm:px-6 lg:px-8">
-	<div class="mx-auto max-w-xl">
-		<div class="rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-			{#if phase === 'polling'}
-				<h1 class="text-xl font-bold text-flit-ink">Setting up your subscription…</h1>
-				<p class="mt-2 text-sm text-flit-muted">
-					We're confirming your payment. This usually takes a few seconds.
-				</p>
-				<div class="mt-6 flex justify-center">
-					<svg
-						class="h-10 w-10 animate-spin text-flit-primary"
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						aria-hidden="true"
-					>
-						<circle
-							class="opacity-25"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-						></circle>
-						<path
-							class="opacity-75"
-							fill="currentColor"
-							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-						></path>
-					</svg>
-				</div>
-			{:else if phase === 'success'}
-				<h1 class="text-xl font-bold text-flit-ink">Subscription active</h1>
-				<p class="mt-2 text-sm text-flit-muted">
-					Your subscription is now active. You can manage your account from your profile.
-				</p>
-				<div class="mt-6">
-					<a href={resolve('/profile')} class="btn btn-primary px-4">View profile</a>
-				</div>
-			{:else if phase === 'pending'}
-				<h1 class="text-xl font-bold text-flit-ink">Almost there</h1>
-				<p class="mt-2 text-sm text-flit-muted">
-					If you just subscribed, your plan will appear shortly. You can check your profile in a
-					moment.
-				</p>
-				<div class="mt-6">
-					<a href={resolve('/profile')} class="btn btn-primary px-4">Go to profile</a>
-				</div>
-			{:else if phase === 'error'}
-				<h1 class="text-xl font-bold text-flit-ink">Something went wrong</h1>
-				<p class="mt-2 text-sm text-flit-muted">{pollError}</p>
-				<div class="mt-6">
-					<a href={resolve('/profile')} class="btn btn-primary px-4">Back to profile</a>
-				</div>
-			{/if}
+	<div class="px-4 py-12 sm:px-6 lg:px-8">
+		<div class="mx-auto max-w-xl">
+			<div class="rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
+				{#if phase === 'polling'}
+					<h1 class="text-xl font-bold text-flit-ink">Setting up your subscription…</h1>
+					<p class="mt-2 text-sm text-flit-muted">
+						We're confirming your payment. This usually takes a few seconds.
+					</p>
+					<div class="mt-6 flex justify-center">
+						<svg
+							class="h-10 w-10 animate-spin text-flit-primary"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							aria-hidden="true"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
+						</svg>
+					</div>
+				{:else if phase === 'success'}
+					<h1 class="text-xl font-bold text-flit-ink">Subscription active</h1>
+					<p class="mt-2 text-sm text-flit-muted">
+						Your subscription is now active. You can manage your account from your profile.
+					</p>
+					<div class="mt-6">
+						<a href={resolve('/profile')} class="btn btn-primary px-4">View profile</a>
+					</div>
+				{:else if phase === 'pending'}
+					<h1 class="text-xl font-bold text-flit-ink">Almost there</h1>
+					<p class="mt-2 text-sm text-flit-muted">
+						If you just subscribed, your plan will appear shortly. You can check your profile in a
+						moment.
+					</p>
+					<div class="mt-6">
+						<a href={resolve('/profile')} class="btn btn-primary px-4">Go to profile</a>
+					</div>
+				{:else if phase === 'error'}
+					<h1 class="text-xl font-bold text-flit-ink">Something went wrong</h1>
+					<p class="mt-2 text-sm text-flit-muted">{pollError}</p>
+					<div class="mt-6">
+						<a href={resolve('/profile')} class="btn btn-primary px-4">Back to profile</a>
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
-</div>
 {/if}

@@ -21,7 +21,8 @@
 				<p class="mt-3 text-flit-muted">
 					Flit is a modern Personal Knowledge Management(PKM) ecosystem. It provides a seamless
 					blend between your personal notes, insights and knowledge; and powerfull AI analysis,
-					summarization and insight generation. Allowing you to find connections and ideas you never thought of.
+					summarization and insight generation. Allowing you to find connections and ideas you never
+					thought of.
 				</p>
 			</section>
 
@@ -30,8 +31,9 @@
 				<p class="mt-3 text-flit-muted">
 					We believe that knowledge should be connected, accessible, and easy to navigate. Flit-PKM
 					empowers you to build your personal knowledge base with powerful tools for organizing,
-					linking, and discovering insights within your notes. Connected apps; including Flit-App(Note taking),
-					Still(Meditation and Journaling), and more coming very soon; allow you to bridge the various parts of your life and knowledge.
+					linking, and discovering insights within your notes. Connected apps; including
+					Flit-App(Note taking), Still(Meditation and Journaling), and more coming very soon; allow
+					you to bridge the various parts of your life and knowledge.
 				</p>
 			</section>
 
@@ -40,7 +42,7 @@
 				<ul class="mt-3 space-y-2 text-flit-muted">
 					<li class="flex items-start">
 						<svg
-							class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-flit-primary"
+							class="mt-1 mr-2 h-5 w-5 flex-shrink-0 text-flit-primary"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -56,7 +58,7 @@
 					</li>
 					<li class="flex items-start">
 						<svg
-							class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-flit-primary"
+							class="mt-1 mr-2 h-5 w-5 flex-shrink-0 text-flit-primary"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -72,7 +74,7 @@
 					</li>
 					<li class="flex items-start">
 						<svg
-							class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-flit-primary"
+							class="mt-1 mr-2 h-5 w-5 flex-shrink-0 text-flit-primary"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -84,11 +86,11 @@
 								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span>AI relationship analysis, summarization and insight generation</span>	
+						<span>AI relationship analysis, summarization and insight generation</span>
 					</li>
 					<li class="flex items-start">
 						<svg
-							class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-flit-primary"
+							class="mt-1 mr-2 h-5 w-5 flex-shrink-0 text-flit-primary"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -104,7 +106,7 @@
 					</li>
 					<li class="flex items-start">
 						<svg
-							class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-flit-primary"
+							class="mt-1 mr-2 h-5 w-5 flex-shrink-0 text-flit-primary"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -120,8 +122,6 @@
 					</li>
 				</ul>
 			</section>
-
-
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">Contact</h2>

@@ -98,7 +98,11 @@
 			generalError = ''; // Clear any errors
 			// Note: Registration doesn't log the user in automatically
 			// They need to verify their email or login manually
-			goto(resolve('/login') + '?message=' + encodeURIComponent('Registration successful! Please sign in.'));
+			goto(
+				resolve('/login') +
+					'?message=' +
+					encodeURIComponent('Registration successful! Please sign in.')
+			);
 		} else {
 			generalError = result.error || 'Registration failed. Please try again.';
 		}
@@ -401,7 +405,10 @@
 			<div class="text-center">
 				<p class="text-sm text-flit-muted">
 					Already have an account?
-					<a href={resolve('/login')} class="font-medium text-flit-link transition-opacity hover:opacity-80">
+					<a
+						href={resolve('/login')}
+						class="font-medium text-flit-link transition-opacity hover:opacity-80"
+					>
 						Sign in here
 					</a>
 				</p>

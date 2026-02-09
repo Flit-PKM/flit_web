@@ -52,7 +52,8 @@ src/
 4. **State**: Use `$state` for local, `authStore` for global auth state
 5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
 6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI
-7. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
+7. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`)
+8. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
 
 ## Critical Rules
 

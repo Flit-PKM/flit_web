@@ -19,13 +19,13 @@
 		<p class="mt-4 text-flit-ink">
 			Welcome to Flit! We're delighted you've found your way to our privacy-first personal knowledge
 			management ecosystem. These Terms of Service ("Terms") are a straightforward agreement between
-			you and the operator of Flit ("we," "us," or "our")—a sole developer building tools to help you
-			capture, connect, and reflect on your thoughts securely.
+			you and the operator of Flit ("we," "us," or "our")—a sole developer building tools to help
+			you capture, connect, and reflect on your thoughts securely.
 		</p>
 		<p class="mt-3 text-flit-muted">
-			By joining the waitlist, creating an account, or using any part of Flit (the "Service"—including
-			the mobile apps, web dashboard, Core sync, and AI features), you agree to these Terms. If you
-			don't agree, please don't use the Service.
+			By joining the waitlist, creating an account, or using any part of Flit (the
+			"Service"—including the mobile apps, web dashboard, Core sync, and AI features), you agree to
+			these Terms. If you don't agree, please don't use the Service.
 		</p>
 
 		<div class="mt-6 space-y-6 text-flit-ink">
@@ -36,7 +36,10 @@
 						You need an account to use most features (currently via waitlist email; full accounts
 						will use OAuth with JWT and upcoming SSO).
 					</li>
-					<li>You're responsible for keeping your login details secure and for all activity on your account.</li>
+					<li>
+						You're responsible for keeping your login details secure and for all activity on your
+						account.
+					</li>
 					<li>
 						The Service is offered as-is during its early stages. Access may be limited, features
 						may change, and we may pause or restrict accounts if needed to protect the system.
@@ -56,14 +59,20 @@
 						Payments will be processed via a third-party provider (e.g., Stripe). We do not store
 						your full payment card details; they are handled securely by the provider.
 					</li>
-					<li>Subscriptions auto-renew unless cancelled. No refunds for partial periods except where required by law.</li>
+					<li>
+						Subscriptions auto-renew unless cancelled. No refunds for partial periods except where
+						required by law.
+					</li>
 				</ul>
 			</section>
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">3. Your Content and Privacy</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>You own all your notes, voice recordings, journal entries, and any other content you create ("Your Content").</li>
+					<li>
+						You own all your notes, voice recordings, journal entries, and any other content you
+						create ("Your Content").
+					</li>
 					<li>
 						In the Flit apps, transcription and AI processing happen 100% on-device—nothing leaves
 						your phone unless you explicitly opt into Core off-device processing.
@@ -73,15 +82,18 @@
 						revocable license to process that audio solely to provide the transcription service. We
 						delete the audio immediately after processing.
 					</li>
-					<li>We will never sell, share for advertising, or use your personal content for training public AI models.</li>
+					<li>
+						We will never sell, share for advertising, or use your personal content for training
+						public AI models.
+					</li>
 				</ul>
 			</section>
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">4. Acceptable Use</h2>
 				<p class="mt-3 text-flit-muted">
-					While we don't impose unusual restrictions, you agree to use Flit only for lawful, personal
-					purposes and not to:
+					While we don't impose unusual restrictions, you agree to use Flit only for lawful,
+					personal purposes and not to:
 				</p>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
 					<li>interfere with the Service or other users,</li>
@@ -95,23 +107,31 @@
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">5. Intellectual Property</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>Flit (code, design, branding) belongs to us. You get a limited, non-transferable license to use the Service for personal knowledge management.</li>
+					<li>
+						Flit (code, design, branding) belongs to us. You get a limited, non-transferable license
+						to use the Service for personal knowledge management.
+					</li>
 					<li>You keep full rights to Your Content and any insights you generate.</li>
 				</ul>
 			</section>
 
 			<section>
-				<h2 class="text-2xl font-semibold text-flit-ink">6. Disclaimers and Limitation of Liability</h2>
+				<h2 class="text-2xl font-semibold text-flit-ink">
+					6. Disclaimers and Limitation of Liability
+				</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>Flit is provided "as is" without warranties. We're in active development—things might break, change, or be temporarily unavailable.</li>
+					<li>
+						Flit is provided "as is" without warranties. We're in active development—things might
+						break, change, or be temporarily unavailable.
+					</li>
 					<li>
 						AI transcriptions and insights are helpful tools, not perfect or professional advice
 						(especially for wellness features). Always verify important information yourself.
 					</li>
 					<li>
 						To the fullest extent permitted by law, we are not liable for indirect, incidental, or
-						consequential damages. Total liability is capped at the amount you paid us in the last 12
-						months (or ZAR 1,000 if you paid nothing).
+						consequential damages. Total liability is capped at the amount you paid us in the last
+						12 months (or ZAR 1,000 if you paid nothing).
 					</li>
 				</ul>
 			</section>
@@ -120,7 +140,10 @@
 				<h2 class="text-2xl font-semibold text-flit-ink">7. Termination</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
 					<li>You can stop using Flit and delete your account anytime.</li>
-					<li>We may suspend or terminate access if you breach these Terms or if we discontinue the Service.</li>
+					<li>
+						We may suspend or terminate access if you breach these Terms or if we discontinue the
+						Service.
+					</li>
 				</ul>
 			</section>
 
@@ -153,7 +176,8 @@
 					(or the contact form on our site).
 				</p>
 				<p class="mt-3 text-flit-muted">
-					Thank you for trusting Flit with your thoughts—we're building this with privacy and care at the heart.
+					Thank you for trusting Flit with your thoughts—we're building this with privacy and care
+					at the heart.
 				</p>
 			</section>
 		</div>
@@ -173,18 +197,35 @@
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">1. Data We Collect</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li><strong class="text-flit-ink">Account data:</strong> Email address (for waitlist and login), and any profile details you add.</li>
-					<li><strong class="text-flit-ink">Usage data:</strong> Anonymous analytics about which features you use (to improve the apps—no personal identifiers).</li>
-					<li><strong class="text-flit-ink">Content:</strong> Your notes, voice recordings, journals—processed primarily on-device.</li>
-					<li><strong class="text-flit-ink">Payment data:</strong> If you subscribe, billing info is handled securely by our payment processor (we only receive confirmation and subscription status).</li>
-					<li><strong class="text-flit-ink">Off-device audio:</strong> Only if you explicitly enable Core off-device speech-to-text; deleted immediately after transcription.</li>
+					<li>
+						<strong class="text-flit-ink">Account data:</strong> Email address (for waitlist and login),
+						and any profile details you add.
+					</li>
+					<li>
+						<strong class="text-flit-ink">Usage data:</strong> Anonymous analytics about which features
+						you use (to improve the apps—no personal identifiers).
+					</li>
+					<li>
+						<strong class="text-flit-ink">Content:</strong> Your notes, voice recordings, journals—processed
+						primarily on-device.
+					</li>
+					<li>
+						<strong class="text-flit-ink">Payment data:</strong> If you subscribe, billing info is handled
+						securely by our payment processor (we only receive confirmation and subscription status).
+					</li>
+					<li>
+						<strong class="text-flit-ink">Off-device audio:</strong> Only if you explicitly enable Core
+						off-device speech-to-text; deleted immediately after transcription.
+					</li>
 				</ul>
 			</section>
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">2. How We Use Your Data</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>To provide and improve the Service (account management, sync, optional transcription).</li>
+					<li>
+						To provide and improve the Service (account management, sync, optional transcription).
+					</li>
 					<li>To communicate updates, feature announcements, or support responses.</li>
 					<li>To process payments and manage subscriptions.</li>
 					<li>For legal compliance if required.</li>
@@ -201,7 +242,10 @@
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">3. Data Storage and Security</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li>Your encrypted content (when using Core sync) is stored on secure servers in the United States (via Render, US East region).</li>
+					<li>
+						Your encrypted content (when using Core sync) is stored on secure servers in the United
+						States (via Render, US East region).
+					</li>
 					<li>We use industry-standard encryption in transit and at rest.</li>
 					<li>On-device processing means most sensitive data never leaves your phone.</li>
 				</ul>
@@ -217,9 +261,7 @@
 
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">5. Your Rights</h2>
-				<p class="mt-3 text-flit-muted">
-					Under POPIA and applicable laws, you may:
-				</p>
+				<p class="mt-3 text-flit-muted">Under POPIA and applicable laws, you may:</p>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
 					<li>Access, correct, or delete your personal data.</li>
 					<li>Object to or restrict certain processing.</li>
@@ -240,9 +282,17 @@
 			<section>
 				<h2 class="text-2xl font-semibold text-flit-ink">6. Data Retention</h2>
 				<ul class="mt-3 ml-6 list-disc space-y-2 text-flit-muted">
-					<li><strong class="text-flit-ink">Account data:</strong> Kept while your account is active; deleted on request or after prolonged inactivity.</li>
-					<li><strong class="text-flit-ink">Content:</strong> Deleted when you delete it or your account.</li>
-					<li><strong class="text-flit-ink">Transaction records:</strong> Kept as required for tax/legal purposes.</li>
+					<li>
+						<strong class="text-flit-ink">Account data:</strong> Kept while your account is active; deleted
+						on request or after prolonged inactivity.
+					</li>
+					<li>
+						<strong class="text-flit-ink">Content:</strong> Deleted when you delete it or your account.
+					</li>
+					<li>
+						<strong class="text-flit-ink">Transaction records:</strong> Kept as required for tax/legal
+						purposes.
+					</li>
 				</ul>
 			</section>
 

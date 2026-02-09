@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
 	import { isAuthenticated, currentUser } from '$lib/stores/auth';
 
 	// When logged in, root URL redirects to Notes
 	$effect(() => {
 		if ($isAuthenticated) {
 			goto(resolve('/notes'));
+			return;
+		}
+		const target = $page.url.searchParams.get('redirect')?.toLowerCase();
+		if (target === 'login') {
+			goto(resolve('/login'));
+		} else if (target === 'register') {
+			goto(resolve('/register'));
 		}
 	});
 </script>
@@ -28,7 +36,8 @@
 			Butterfly on the web of consciousness, Flutter.
 		</p>
 		<p class="mx-auto mt-6 max-w-2xl text-flit-ink">
-			Welcome to the Flit-PKM ecosystem. Build your personal knowledge base here; with powerful AI relationship analysis, summarization and insight generation.
+			Welcome to the Flit-PKM ecosystem. Build your personal knowledge base here; with powerful AI
+			relationship analysis, summarization and insight generation.
 		</p>
 	</header>
 
@@ -60,12 +69,7 @@
 				</h3>
 				<p class="mt-2 text-sm text-flit-muted">You are successfully signed in to your account.</p>
 				<div class="mt-6">
-					<a
-						href={resolve('/profile')}
-						class="btn btn-primary px-4"
-					>
-						View Profile
-					</a>
+					<a href={resolve('/profile')} class="btn btn-primary px-4"> View Profile </a>
 				</div>
 			</div>
 		{:else}
@@ -98,10 +102,7 @@
 					>
 						Create Account
 					</a>
-					<a
-						href={resolve('/login')}
-						class="btn btn-secondary w-full justify-center px-4"
-					>
+					<a href={resolve('/login')} class="btn btn-secondary w-full justify-center px-4">
 						Sign In
 					</a>
 				</div>
@@ -124,7 +125,9 @@
 					/>
 				</svg>
 			</div>
-			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Secure Authentication and Database Encryption</h3>
+			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">
+				Secure Authentication and Database Encryption
+			</h3>
 			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
 				Industry-standard security and resting encryption of your data.
 			</p>
@@ -145,10 +148,9 @@
 			</div>
 			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Knowledge Graph</h3>
 			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				Build your personal knowledge base; create/edit/delete notes,
-				 joint them together with 2-way relationships, categorize them 
-				 for easy navigation and summariation, and find new connections
-				  and insights with AI.
+				Build your personal knowledge base; create/edit/delete notes, joint them together with 2-way
+				relationships, categorize them for easy navigation and summariation, and find new
+				connections and insights with AI.
 			</p>
 		</div>
 
