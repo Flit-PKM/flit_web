@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { base, resolve } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { authActions, isAuthenticated, isLoading } from '$lib/stores/auth';
 	import { validateLoginForm, loginRateLimiter, sanitizeInput } from '$lib/utils/auth';
@@ -89,7 +89,14 @@
 
 		if (result.success) {
 			// Redirect to intended page or profile (allowlist for type-safe goto)
-			const ALLOWED_REDIRECTS = ['/profile', '/notes', '/', '/about', '/terms'] as const;
+			const ALLOWED_REDIRECTS = [
+				'/profile',
+				'/notes',
+				'/dashboard',
+				'/',
+				'/about',
+				'/terms'
+			] as const;
 			const requested = $page.url.searchParams.get('redirect') || '/profile';
 			const path = ALLOWED_REDIRECTS.includes(requested as (typeof ALLOWED_REDIRECTS)[number])
 				? (requested as (typeof ALLOWED_REDIRECTS)[number])
@@ -139,6 +146,15 @@
 			onsubmit={handleSubmit}
 			novalidate
 		>
+			{#if $page.url.searchParams.get('password_reset') === 'success'}
+				<div
+					class="rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
+					role="status"
+				>
+					<p class="text-sm text-flit-ink">Password updated. Please sign in.</p>
+				</div>
+			{/if}
+
 			<!-- Email Field -->
 			<div>
 				<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
@@ -285,7 +301,7 @@
 				</p>
 				<p class="text-sm text-flit-muted">
 					<a
-						href={base + '/forgot-password'}
+						href={resolve('/forgot-password')}
 						class="font-medium text-flit-link transition-opacity hover:opacity-80"
 					>
 						Forgot your password?

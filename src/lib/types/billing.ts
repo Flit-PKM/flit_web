@@ -102,3 +102,21 @@ export interface SubscriptionStatusResponse {
 	current_period_end: string | null;
 	dodo_subscription_id: string | null;
 }
+
+/**
+ * Request body for POST /billing/complete.
+ * Frontend reports subscription success after redirect from payment provider.
+ */
+export interface BillingCompleteRequest {
+	subscription_id: string;
+	status: string;
+}
+
+/**
+ * Response from POST /billing/complete.
+ */
+export interface BillingCompleteResponse {
+	ok: boolean;
+	subscription_id: string | null;
+	status: string | null;
+}

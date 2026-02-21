@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -51,6 +52,9 @@
 	// Markdown-rendered HTML (detail view only, client-side)
 	let markdownHtml = $state('');
 
+	// Titles for related notes (id -> title) so we show name instead of "Note #id"
+	let relatedNoteTitles = $state<Map<number, string>>(new Map());
+
 	// Debounced note search when popup is open
 	$effect(() => {
 		if (!showNoteSearchPopup) return;
@@ -87,54 +91,90 @@
 		markdownHtml = markdownToSafeHtml(note.content ?? '');
 	});
 
-	async function loadNote(noteId: number) {
+	async function loadNote(noteId: number): Promise<{
+		data: NoteDetail | null;
+		error: string;
+		relatedTitles: Map<number, string>;
+	}> {
+		const empty = {
+			data: null as NoteDetail | null,
+			error: '',
+			relatedTitles: new Map<number, string>()
+		};
 		try {
-			note = await apiClient.getNote(noteId);
-			error = '';
+			const noteData = await apiClient.getNote(noteId);
+			const relatedTitles = new Map<number, string>();
+			const rels = noteData.relationships?.filter((r) => !r.is_deleted) ?? [];
+			if (rels.length > 0) {
+				const otherIds = [...new Set(rels.map((r) => otherNoteId(r, noteId)))];
+				const results = await Promise.allSettled(
+					otherIds.map((id) => apiClient.getNote(id).then((n) => ({ id, title: n.title })))
+				);
+				for (const r of results) {
+					if (r.status === 'fulfilled') relatedTitles.set(r.value.id, r.value.title);
+				}
+			}
+			return { data: noteData, error: '', relatedTitles };
 		} catch (err) {
 			if (err instanceof HttpError && err.status === 404) {
-				error = 'Note not found.';
-			} else {
-				error = err instanceof HttpError ? err.message : 'Failed to load note. Please try again.';
+				return { ...empty, error: 'Note not found.' };
 			}
-			note = null;
+			return {
+				...empty,
+				error: err instanceof HttpError ? err.message : 'Failed to load note. Please try again.'
+			};
 		}
 	}
+
+	// Load note when route param or auth changes; ignore stale responses when navigating quickly
+	$effect(() => {
+		const id = $page.params.id;
+		const auth = $isAuthenticated;
+		if (!auth) {
+			isLoading = false;
+			return;
+		}
+		const noteId = Number(id);
+		if (!Number.isInteger(noteId) || noteId < 1) {
+			error = 'Invalid note.';
+			note = null;
+			isLoading = false;
+			return;
+		}
+		isLoading = true;
+		error = '';
+		note = null;
+		relatedNoteTitles = new Map();
+		loadNote(noteId)
+			.then((r) => {
+				const current = get(page);
+				if (current.params.id !== String(noteId)) return;
+				note = r.data;
+				error = r.error;
+				relatedNoteTitles = r.relatedTitles;
+				if (
+					r.data &&
+					(current.url.searchParams.get('edit') === '1' ||
+						current.url.searchParams.get('edit') === 'true')
+				) {
+					startEditing();
+				}
+			})
+			.finally(() => {
+				if (get(page).params.id === String(noteId)) isLoading = false;
+			});
+	});
 
 	onMount(async () => {
 		if (!$isAuthenticated) {
 			isLoading = false;
 			return;
 		}
-		const id = $page.params.id;
-		const noteId = Number(id);
-		if (!Number.isInteger(noteId) || noteId < 1) {
-			error = 'Invalid note.';
-			isLoading = false;
-			return;
-		}
-		isLoading = true;
 		try {
-			const [noteData, categoriesData] = await Promise.all([
-				apiClient.getNote(noteId),
-				apiClient.getCategories({ limit: 1000 })
-			]);
-			note = noteData;
+			const categoriesData = await apiClient.getCategories({ limit: 1000 });
 			categories = categoriesData.filter((c) => !c.is_deleted);
-			error = '';
-			const editParam = $page.url.searchParams.get('edit');
-			if (editParam === '1' || editParam === 'true') {
-				startEditing();
-			}
-		} catch (err) {
-			if (err instanceof HttpError && err.status === 404) {
-				error = 'Note not found.';
-			} else {
-				error = err instanceof HttpError ? err.message : 'Failed to load note. Please try again.';
-			}
-			note = null;
-		} finally {
-			isLoading = false;
+		} catch {
+			// Non-blocking; note detail can still show
 		}
 	});
 
@@ -155,6 +195,13 @@
 			.replace(/_/g, ' ')
 			.toLowerCase()
 			.replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function formatRelationshipTypeLabel(rel: RelationshipRead, currentNoteId: number): string {
+		if (rel.type === 'FOLLOWS_ON') {
+			return currentNoteId === rel.note_a_id ? 'Follows from' : 'Follows to';
+		}
+		return formatRelationshipType(rel.type);
 	}
 
 	function startEditing() {
@@ -250,7 +297,11 @@
 		saveError = '';
 		try {
 			await apiClient.addCategoryToNote(note.id, categoryId);
-			await loadNote(note.id);
+			const r = await loadNote(note.id);
+			if (r.data) {
+				note = r.data;
+				relatedNoteTitles = r.relatedTitles;
+			}
 			addCategoryId = '';
 		} catch (err) {
 			saveError = captureApiError(err, {
@@ -271,7 +322,11 @@
 		try {
 			errorLogger.logDebug('Removing category from note', { noteId: note.id, categoryId });
 			await apiClient.removeCategoryFromNote(note.id, categoryId);
-			await loadNote(note.id);
+			const r = await loadNote(note.id);
+			if (r.data) {
+				note = r.data;
+				relatedNoteTitles = r.relatedTitles;
+			}
 			errorLogger.logDebug('Category removed successfully', { noteId: note.id, categoryId });
 		} catch (err) {
 			saveError = captureApiError(err, {
@@ -300,12 +355,15 @@
 				note_b_id: otherId,
 				type: addRelType
 			});
-			// Update local note immediately so the new relationship shows without waiting for refetch
+			// Update local note and related titles so the new relationship shows without waiting for refetch
 			const existing = (note.relationships ?? []).filter((r) => !r.is_deleted);
 			note = {
 				...note,
 				relationships: [...existing, newRel]
 			};
+			if (addRelNoteTitle) {
+				relatedNoteTitles = new Map(relatedNoteTitles).set(otherId, addRelNoteTitle);
+			}
 			addRelNoteId = '';
 			addRelNoteTitle = '';
 			addRelType = 'RELATED_TO';
@@ -330,7 +388,11 @@
 				relId: `${rel.note_a_id}-${rel.note_b_id}-${rel.type}`
 			});
 			await apiClient.deleteRelationship(rel.note_a_id, rel.note_b_id);
-			await loadNote(note.id);
+			const r = await loadNote(note.id);
+			if (r.data) {
+				note = r.data;
+				relatedNoteTitles = r.relatedTitles;
+			}
 			errorLogger.logDebug('Relationship removed successfully', { noteId: note.id });
 		} catch (err) {
 			saveError = captureApiError(err, {
@@ -437,7 +499,9 @@
 							</div>
 						</div>
 					{:else}
-						<h1 class="text-2xl font-bold text-flit-ink sm:text-3xl">{note.title}</h1>
+						<div class="min-w-0 flex-1">
+							<h1 class="text-center text-2xl font-bold text-flit-ink sm:text-3xl">{note.title}</h1>
+						</div>
 						<div class="flex items-center gap-2">
 							<button type="button" onclick={startEditing} class="btn btn-secondary"> Edit </button>
 							<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
@@ -513,11 +577,12 @@
 					<ul class="mt-2 flex flex-wrap gap-2">
 						{#each note.categories.filter((c) => !c.is_deleted) as category (category.id)}
 							<li>
-								<span
-									class="inline-flex rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-ink"
+								<a
+									href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
+									class="inline-flex rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-link hover:bg-flit-muted/30 hover:underline focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
 								>
 									{category.name}
-								</span>
+								</a>
 							</li>
 						{/each}
 					</ul>
@@ -538,13 +603,14 @@
 									<span
 										class="inline-flex rounded-md bg-flit-primary/20 px-2 py-1 text-xs font-medium text-flit-primary"
 									>
-										{formatRelationshipType(rel.type)}
+										{formatRelationshipTypeLabel(rel, note.id)}
 									</span>
 									<a
 										href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}
 										class="text-sm text-flit-link hover:underline"
 									>
-										Note #{otherNoteId(rel, note.id)}
+										{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
+											`Note #${otherNoteId(rel, note.id)}`}
 									</a>
 								</div>
 								<button
@@ -610,9 +676,12 @@
 										<span
 											class="inline-flex rounded-md bg-flit-primary/20 px-2 py-1 text-xs font-medium text-flit-primary"
 										>
-											{formatRelationshipType(rel.type)}
+											{formatRelationshipTypeLabel(rel, note.id)}
 										</span>
-										<span class="text-sm text-flit-ink">Note #{otherNoteId(rel, note.id)}</span>
+										<span class="text-sm text-flit-ink"
+											>{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
+												`Note #${otherNoteId(rel, note.id)}`}</span
+										>
 									</div>
 									<svg
 										class="h-5 w-5 text-flit-muted transition-transform group-hover:translate-x-1"

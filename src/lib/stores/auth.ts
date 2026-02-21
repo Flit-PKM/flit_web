@@ -123,7 +123,10 @@ export const authActions = {
 		try {
 			await apiClient.register({
 				email: userData.email,
-				password: userData.password
+				password: userData.password,
+				...(userData.cf_turnstile_response && {
+					cf_turnstile_response: userData.cf_turnstile_response
+				})
 			});
 
 			authStore.set({

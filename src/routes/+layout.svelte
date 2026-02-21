@@ -4,7 +4,7 @@
 	import { browser } from '$app/environment';
 	import { resolve, asset } from '$app/paths';
 	import { page } from '$app/stores';
-	import { authActions, isAuthenticated, currentUser } from '$lib/stores/auth';
+	import { authActions, currentUser, isAuthenticated } from '$lib/stores/auth';
 	import { pendingColorScheme } from '$lib/stores/theme';
 
 	let { children } = $props();
@@ -45,14 +45,19 @@
 		authActions.logout();
 	}
 
-	// Navigation items - only show tabs when authenticated
-	const authenticatedNavItems: { href: '/notes' | '/profile'; label: string }[] = [
+	// Navigation items - only show when authenticated; Dashboard only when superuser (to the right of Profile)
+	type NavHref = '/notes' | '/profile' | '/dashboard';
+	const baseNavItems: { href: NavHref; label: string }[] = [
 		{ href: '/notes', label: 'Notes' },
 		{ href: '/profile', label: 'Profile' }
 	];
-
-	// Get current navigation items (empty when not authenticated)
-	let navItems = $derived($isAuthenticated ? authenticatedNavItems : []);
+	let navItems = $derived(
+		$isAuthenticated
+			? $currentUser?.is_superuser
+				? [...baseNavItems, { href: '/dashboard' as NavHref, label: 'Dashboard' }]
+				: baseNavItems
+			: []
+	);
 
 	// Close mobile menu when route changes
 	$effect(() => {
@@ -70,6 +75,9 @@
 			href === '/notes' &&
 			($page.url.pathname === '/notes' || $page.url.pathname.startsWith('/notes/'))
 		) {
+			return true;
+		}
+		if (href === '/dashboard' && $page.url.pathname.startsWith('/dashboard')) {
 			return true;
 		}
 		if (href !== '/' && href !== '/notes' && $page.url.pathname.startsWith(href)) {
@@ -261,6 +269,10 @@
 						Terms
 					</a>
 				</nav>
+				<p class="text-md text-flit-muted">
+					"But seek first the kingdom of God and His righteousness, and all these things shall be
+					added to you." - Matthew 6:33
+				</p>
 				<p class="text-sm text-flit-muted">
 					&copy; 2026 Flit-PKM and all related apps are brought to you by
 					<a

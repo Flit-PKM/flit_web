@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient } from '$lib/api/client';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
@@ -211,6 +212,10 @@
 		}
 
 		await fetchCategories();
+		const categoryParam = $page.url.searchParams.get('category');
+		if (categoryParam) {
+			selectedCategory = decodeURIComponent(categoryParam);
+		}
 		await fetchNotes();
 	});
 </script>
@@ -268,24 +273,26 @@
 						<option value={category.name}>{category.name}</option>
 					{/each}
 				</select>
-				<button
-					type="button"
-					onclick={openCreateCategory}
-					disabled={isCategoryBusy}
-					class="btn btn-secondary"
-					title="Create category"
-				>
-					+Category
-				</button>
-				<button
-					type="button"
-					onclick={deleteSelectedCategory}
-					disabled={selectedCategoryId === undefined || isCategoryBusy}
-					class="btn btn-secondary"
-					title="Delete selected category"
-				>
-					-Category
-				</button>
+				<div class="flex min-w-0 flex-1 justify-end gap-2">
+					<button
+						type="button"
+						onclick={openCreateCategory}
+						disabled={isCategoryBusy}
+						class="btn btn-secondary"
+						title="Create category"
+					>
+						+
+					</button>
+					<button
+						type="button"
+						onclick={deleteSelectedCategory}
+						disabled={selectedCategoryId === undefined || isCategoryBusy}
+						class="btn btn-secondary"
+						title="Delete selected category"
+					>
+						-
+					</button>
+				</div>
 			</div>
 
 			<!-- Clear Filters Button -->
@@ -366,7 +373,7 @@
 			disabled={isCreatingNote}
 			class="btn btn-primary px-4"
 		>
-			+New Note
+			+ New Note
 		</button>
 	</div>
 
@@ -431,7 +438,8 @@
 						href={resolve(`/notes/${note.id}`)}
 						class="block rounded-xl border border-flit-muted/20 bg-flit-card p-4 shadow-flit-sm transition-colors hover:border-flit-muted/40 hover:bg-flit-muted/5 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
 					>
-						<h2 class="font-semibold text-flit-ink">{note.title}</h2>
+						<h2 class="text-center font-semibold text-flit-ink">{note.title}</h2>
+						<hr class="my-2 border-flit-muted/20" />
 						{#if hasPreview(note.content)}
 							<div class="prose prose-sm mt-2 line-clamp-3 max-w-none text-flit-muted prose-flit">
 								{@html previewHtmlByNoteId[note.id] ?? ''}

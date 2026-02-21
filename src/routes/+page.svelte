@@ -3,19 +3,56 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { isAuthenticated, currentUser } from '$lib/stores/auth';
+	import { apiClient, HttpError } from '$lib/api/client';
 
-	// When logged in, root URL redirects to Notes
+	let billingCompleteStarted = false;
+
+	// Billing return: if subscription_id and status are in URL, POST to backend then redirect. Otherwise normal root redirects.
 	$effect(() => {
-		if ($isAuthenticated) {
-			goto(resolve('/notes'));
+		const params = $page.url.searchParams;
+		const subscriptionId = params.get('subscription_id');
+		const status = params.get('status');
+		const hasBillingParams = Boolean(subscriptionId && status);
+
+		if (hasBillingParams && $isAuthenticated && !billingCompleteStarted) {
+			billingCompleteStarted = true;
+			const returnPath = $page.url.pathname + $page.url.search;
+			(async () => {
+				try {
+					await apiClient.postBillingComplete({
+						subscription_id: subscriptionId!,
+						status: status!
+					});
+					goto(resolve('/profile') + '?subscription=success');
+				} catch (err) {
+					if (err instanceof HttpError && err.status === 401) {
+						goto(resolve('/login') + '?redirect=' + encodeURIComponent(returnPath));
+					} else {
+						goto(resolve('/profile') + '?subscription=error');
+					}
+				}
+			})();
 			return;
 		}
-		const target = $page.url.searchParams.get('redirect')?.toLowerCase();
-		if (target === 'login') {
-			goto(resolve('/login'));
-		} else if (target === 'register') {
-			goto(resolve('/register'));
+
+		if (hasBillingParams && !$isAuthenticated) {
+			const returnPath = $page.url.pathname + $page.url.search;
+			goto(resolve('/login') + '?redirect=' + encodeURIComponent(returnPath));
+			return;
 		}
+
+		if (!$isAuthenticated) {
+			const target = params.get('redirect')?.toLowerCase();
+			if (target === 'login') {
+				goto(resolve('/login'));
+			} else if (target === 'register') {
+				goto(resolve('/register'));
+			}
+			return;
+		}
+
+		// Logged in, no billing params: go to Notes
+		goto(resolve('/notes'));
 	});
 </script>
 

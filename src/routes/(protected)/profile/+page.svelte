@@ -44,6 +44,23 @@
 	let connectedAppsLoading = $state(false);
 	let connectedAppsError = $state('');
 
+	// Access code state
+	let accessCodeInput = $state('');
+	let accessCodeActivating = $state(false);
+	let accessCodeError = $state('');
+	let accessCodeSuccess = $state('');
+
+	// Verify email state
+	let verifyEmailLoading = $state(false);
+	let verifyEmailSuccess = $state('');
+	let verifyEmailError = $state('');
+
+	// Feedback state
+	let feedbackContent = $state('');
+	let feedbackSubmitting = $state(false);
+	let feedbackError = $state('');
+	let feedbackSuccess = $state('');
+
 	// Billing / checkout state
 	let checkoutLoading = $state(false);
 	let checkoutError = $state('');
@@ -510,6 +527,82 @@
 		}
 	}
 
+	// Access code: activate code for current user
+	async function handleActivateAccessCode() {
+		const code = accessCodeInput.trim();
+		accessCodeError = '';
+		accessCodeSuccess = '';
+		if (code.length !== 8) {
+			accessCodeError = 'Please enter an 8-character code.';
+			return;
+		}
+		accessCodeActivating = true;
+		try {
+			await apiClient.activateAccessCode({ code });
+			accessCodeInput = '';
+			accessCodeSuccess = 'Access code activated.';
+			await authActions.refreshUser();
+			setTimeout(() => (accessCodeSuccess = ''), 4000);
+		} catch (err) {
+			accessCodeError = captureApiError(err, {
+				component: 'Profile',
+				operation: 'activateAccessCode'
+			});
+		} finally {
+			accessCodeActivating = false;
+		}
+	}
+
+	async function handleVerifyEmail() {
+		verifyEmailSuccess = '';
+		verifyEmailError = '';
+		verifyEmailLoading = true;
+		try {
+			const res = await apiClient.sendVerificationEmail();
+			if (res.sent) {
+				verifyEmailSuccess = 'Verification email sent. Check your inbox.';
+				setTimeout(() => (verifyEmailSuccess = ''), 4000);
+			} else {
+				verifyEmailError = res.detail || 'Failed to send verification email.';
+			}
+		} catch (err) {
+			verifyEmailError = captureApiError(err, {
+				component: 'Profile',
+				operation: 'sendVerificationEmail'
+			});
+		} finally {
+			verifyEmailLoading = false;
+		}
+	}
+
+	async function handleSubmitFeedback(event?: Event) {
+		event?.preventDefault();
+		const content = feedbackContent.trim();
+		if (!content) return;
+		feedbackError = '';
+		feedbackSuccess = '';
+		feedbackSubmitting = true;
+		try {
+			const context: Record<string, unknown> = {
+				id: $currentUser?.id,
+				email: $currentUser?.email,
+				username: $currentUser?.username,
+				platform: 'web'
+			};
+			await apiClient.submitFeedback({ content, context });
+			feedbackContent = '';
+			feedbackSuccess = 'Thank you for your feedback!';
+			setTimeout(() => (feedbackSuccess = ''), 4000);
+		} catch (err) {
+			feedbackError = captureApiError(err, {
+				component: 'Profile',
+				operation: 'submitFeedback'
+			});
+		} finally {
+			feedbackSubmitting = false;
+		}
+	}
+
 	// Billing: user-facing message for checkout errors (503, 502, or generic)
 	function getCheckoutErrorMessage(err: unknown): string {
 		if (err instanceof HttpError) {
@@ -540,9 +633,7 @@
 		try {
 			errorLogger.logDebug('Creating checkout session', { productId });
 			const returnUrl =
-				typeof window !== 'undefined'
-					? `${window.location.origin}${base}/billing/complete`
-					: undefined;
+				typeof window !== 'undefined' ? `${window.location.origin}${base}/` : undefined;
 			const data = await apiClient.createCheckoutSession({
 				product_id: productId,
 				return_url: returnUrl ?? undefined
@@ -896,6 +987,76 @@
 				{/if}
 			</div>
 
+			<!-- Access Code -->
+			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
+				<h2 class="mb-4 text-lg font-semibold text-flit-ink">Access Code</h2>
+				{#if $currentUser?.access_grant}
+					<div
+						class="rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
+						role="status"
+					>
+						<p class="text-sm font-medium text-flit-ink">
+							Access active until {formatDate($currentUser.access_grant.expires_at)}
+						</p>
+						<p class="mt-1 text-sm text-flit-muted">
+							Includes encryption: {$currentUser.access_grant.includes_encryption ? 'Yes' : 'No'}
+						</p>
+					</div>
+				{:else}
+					<p class="mb-3 text-sm text-flit-muted">
+						Enter an 8-character access code to activate time-limited access.
+					</p>
+					{#if accessCodeError}
+						<div
+							class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
+							role="alert"
+						>
+							<p class="text-sm text-flit-ink">{accessCodeError}</p>
+						</div>
+					{/if}
+					{#if accessCodeSuccess}
+						<div
+							class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
+							role="alert"
+						>
+							<p class="text-sm text-flit-ink">{accessCodeSuccess}</p>
+						</div>
+					{/if}
+					<form
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleActivateAccessCode();
+						}}
+						class="flex flex-wrap items-end gap-3"
+					>
+						<div>
+							<label for="access-code-input" class="sr-only">Access code</label>
+							<input
+								id="access-code-input"
+								type="text"
+								maxlength="8"
+								placeholder="Enter 8-character code"
+								bind:value={accessCodeInput}
+								disabled={accessCodeActivating}
+								class="input w-48 font-mono tracking-wider"
+								autocomplete="off"
+							/>
+						</div>
+						<button
+							type="submit"
+							class="btn btn-primary"
+							disabled={accessCodeActivating || accessCodeInput.trim().length !== 8}
+						>
+							{#if accessCodeActivating}
+								Activating…
+							{:else}
+								Activate
+							{/if}
+						</button>
+					</form>
+				{/if}
+			</div>
+
 			<!-- Billing -->
 			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
 				<h2 class="mb-2 text-lg font-semibold text-flit-ink">Billing</h2>
@@ -1082,587 +1243,690 @@
 			</div>
 
 			<!-- Profile Form -->
-			<form
-				class="space-y-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm"
-				onsubmit={(e) => {
-					console.log('[Profile] Form onsubmit event fired');
-					handleSubmit(e);
-				}}
-				novalidate
-			>
-				<!-- Account Information Section -->
-				<div>
-					<h2 class="mb-4 text-lg font-semibold text-flit-ink">Account Information</h2>
+			<div>
+				<form
+					class="space-y-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm"
+					onsubmit={(e) => {
+						console.log('[Profile] Form onsubmit event fired');
+						handleSubmit(e);
+					}}
+					novalidate
+				>
+					<!-- Account Information Section -->
+					<div>
+						<h2 class="mb-4 text-lg font-semibold text-flit-ink">Account Information</h2>
 
-					<!-- Username Field -->
-					<div class="mb-4">
-						<label for="username" class="mb-2 block text-sm font-medium text-flit-ink">
-							Username
-						</label>
-						<input
-							id="username"
-							name="username"
-							type="text"
-							required
-							disabled={isSaving}
-							class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-							class:border-flit-negative={errors.username}
-							class:focus:ring-flit-negative={errors.username}
-							class:focus:border-flit-negative={errors.username}
-							bind:value={formData.username}
-							oninput={(e) => handleFieldChange('username', e.currentTarget.value)}
-							aria-describedby={errors.username ? 'username-error' : undefined}
-							aria-invalid={!!errors.username}
-						/>
-						{#if errors.username}
-							<p id="username-error" class="mt-1 text-sm text-flit-negative" role="alert">
-								{errors.username}
-							</p>
-						{/if}
-					</div>
-
-					<!-- Email Field -->
-					<div class="mb-4">
-						<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
-							Email address
-						</label>
-						<input
-							id="email"
-							name="email"
-							type="email"
-							required
-							disabled={isSaving}
-							class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-							class:border-flit-negative={errors.email}
-							class:focus:ring-flit-negative={errors.email}
-							class:focus:border-flit-negative={errors.email}
-							bind:value={formData.email}
-							oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
-							aria-describedby={errors.email ? 'email-error' : undefined}
-							aria-invalid={!!errors.email}
-						/>
-						{#if errors.email}
-							<p id="email-error" class="mt-1 text-sm text-flit-negative" role="alert">
-								{errors.email}
-							</p>
-						{/if}
-					</div>
-
-					<!-- Color Scheme Preference -->
-					<div class="mb-4">
-						<label for="color-scheme-light" class="mb-2 block text-sm font-medium text-flit-ink">
-							Color Scheme
-						</label>
-						<p class="mb-3 text-xs text-flit-muted">
-							Choose your preferred color scheme for the interface
-						</p>
-						{#if colorSchemeChanged && !formData.currentPassword}
-							<p class="mb-3 text-xs text-flit-primary">
-								Enter your current password below and click Save to apply.
-							</p>
-						{/if}
-						<div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
-							<label
-								class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
-								'light'
-									? 'border-flit-primary bg-flit-primary/10'
-									: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
-							>
-								<input
-									id="color-scheme-light"
-									type="radio"
-									name="colorScheme"
-									value="light"
-									bind:group={formData.colorScheme}
-									disabled={isSaving}
-									class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
-								/>
-								<div class="ml-3 flex-1">
-									<div class="flex items-center gap-2">
-										<svg
-											class="h-5 w-5 text-flit-ink"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-											/>
-										</svg>
-										<span class="text-sm font-medium text-flit-ink">Light</span>
-									</div>
-									<p class="mt-1 text-xs text-flit-muted">Bright and clear</p>
-								</div>
+						<!-- Username Field -->
+						<div class="mb-4">
+							<label for="username" class="mb-2 block text-sm font-medium text-flit-ink">
+								Username
 							</label>
-
-							<label
-								class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
-								'dark'
-									? 'border-flit-primary bg-flit-primary/10'
-									: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
-							>
-								<input
-									type="radio"
-									name="colorScheme"
-									value="dark"
-									bind:group={formData.colorScheme}
-									disabled={isSaving}
-									class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
-								/>
-								<div class="ml-3 flex-1">
-									<div class="flex items-center gap-2">
-										<svg
-											class="h-5 w-5 text-flit-ink"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-											/>
-										</svg>
-										<span class="text-sm font-medium text-flit-ink">Dark</span>
-									</div>
-									<p class="mt-1 text-xs text-flit-muted">Easy on the eyes</p>
-								</div>
-							</label>
-
-							<label
-								class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
-								'default'
-									? 'border-flit-primary bg-flit-primary/10'
-									: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
-							>
-								<input
-									type="radio"
-									name="colorScheme"
-									value="default"
-									bind:group={formData.colorScheme}
-									disabled={isSaving}
-									class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
-								/>
-								<div class="ml-3 flex-1">
-									<div class="flex items-center gap-2">
-										<svg
-											class="h-5 w-5 text-flit-ink"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-											/>
-										</svg>
-										<span class="text-sm font-medium text-flit-ink">Auto</span>
-									</div>
-									<p class="mt-1 text-xs text-flit-muted">Follow system</p>
-								</div>
-							</label>
+							<input
+								id="username"
+								name="username"
+								type="text"
+								required
+								disabled={isSaving}
+								class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
+								class:border-flit-negative={errors.username}
+								class:focus:ring-flit-negative={errors.username}
+								class:focus:border-flit-negative={errors.username}
+								bind:value={formData.username}
+								oninput={(e) => handleFieldChange('username', e.currentTarget.value)}
+								aria-describedby={errors.username ? 'username-error' : undefined}
+								aria-invalid={!!errors.username}
+							/>
+							{#if errors.username}
+								<p id="username-error" class="mt-1 text-sm text-flit-negative" role="alert">
+									{errors.username}
+								</p>
+							{/if}
 						</div>
-					</div>
 
-					<!-- Account Status -->
-					<div class="mb-4 grid grid-cols-2 gap-4">
-						<div>
-							<div class="mb-2 block text-sm font-medium text-flit-ink">Account Status</div>
-							<div class="flex items-center">
-								<span
-									class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-										$currentUser.is_active
-											? 'bg-flit-positive/20 text-flit-positive'
-											: 'bg-flit-negative/20 text-flit-negative'
-									}`}
-									role="status"
-									aria-label="Account status"
+						<!-- Email Field -->
+						<div class="mb-4">
+							<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
+								Email address
+							</label>
+							<input
+								id="email"
+								name="email"
+								type="email"
+								required
+								disabled={isSaving}
+								class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
+								class:border-flit-negative={errors.email}
+								class:focus:ring-flit-negative={errors.email}
+								class:focus:border-flit-negative={errors.email}
+								bind:value={formData.email}
+								oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
+								aria-describedby={errors.email ? 'email-error' : undefined}
+								aria-invalid={!!errors.email}
+							/>
+							{#if errors.email}
+								<p id="email-error" class="mt-1 text-sm text-flit-negative" role="alert">
+									{errors.email}
+								</p>
+							{/if}
+						</div>
+
+						<!-- Color Scheme Preference -->
+						<div class="mb-4">
+							<label for="color-scheme-light" class="mb-2 block text-sm font-medium text-flit-ink">
+								Color Scheme
+							</label>
+							<p class="mb-3 text-xs text-flit-muted">
+								Choose your preferred color scheme for the interface
+							</p>
+							{#if colorSchemeChanged && !formData.currentPassword}
+								<p class="mb-3 text-xs text-flit-primary">
+									Enter your current password below and click Save to apply.
+								</p>
+							{/if}
+							<div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
+								<label
+									class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
+									'light'
+										? 'border-flit-primary bg-flit-primary/10'
+										: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
 								>
-									{$currentUser.is_active ? 'Active' : 'Inactive'}
-								</span>
+									<input
+										id="color-scheme-light"
+										type="radio"
+										name="colorScheme"
+										value="light"
+										bind:group={formData.colorScheme}
+										disabled={isSaving}
+										class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
+									/>
+									<div class="ml-3 flex-1">
+										<div class="flex items-center gap-2">
+											<svg
+												class="h-5 w-5 text-flit-ink"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+												/>
+											</svg>
+											<span class="text-sm font-medium text-flit-ink">Light</span>
+										</div>
+										<p class="mt-1 text-xs text-flit-muted">Bright and clear</p>
+									</div>
+								</label>
+
+								<label
+									class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
+									'dark'
+										? 'border-flit-primary bg-flit-primary/10'
+										: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
+								>
+									<input
+										type="radio"
+										name="colorScheme"
+										value="dark"
+										bind:group={formData.colorScheme}
+										disabled={isSaving}
+										class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
+									/>
+									<div class="ml-3 flex-1">
+										<div class="flex items-center gap-2">
+											<svg
+												class="h-5 w-5 text-flit-ink"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+												/>
+											</svg>
+											<span class="text-sm font-medium text-flit-ink">Dark</span>
+										</div>
+										<p class="mt-1 text-xs text-flit-muted">Easy on the eyes</p>
+									</div>
+								</label>
+
+								<label
+									class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
+									'default'
+										? 'border-flit-primary bg-flit-primary/10'
+										: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
+								>
+									<input
+										type="radio"
+										name="colorScheme"
+										value="default"
+										bind:group={formData.colorScheme}
+										disabled={isSaving}
+										class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
+									/>
+									<div class="ml-3 flex-1">
+										<div class="flex items-center gap-2">
+											<svg
+												class="h-5 w-5 text-flit-ink"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+												/>
+											</svg>
+											<span class="text-sm font-medium text-flit-ink">Auto</span>
+										</div>
+										<p class="mt-1 text-xs text-flit-muted">Follow system</p>
+									</div>
+								</label>
 							</div>
 						</div>
-						<div>
-							<div class="mb-2 block text-sm font-medium text-flit-ink">Account Verified</div>
-							<div class="flex items-center">
-								<span
-									class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-										$currentUser.is_verified
-											? 'bg-flit-positive/20 text-flit-positive'
-											: 'bg-amber-500/20 text-amber-600'
-									}`}
-									role="status"
-									aria-label="Email verification status"
-								>
-									{$currentUser.is_verified ? 'Verified' : 'Unverified'}
-								</span>
+
+						<!-- Account Status (entitlement: subscription or access-code grant) -->
+						<div class="mb-4 grid grid-cols-2 gap-4">
+							<div>
+								<div class="mb-2 block text-sm font-medium text-flit-ink">Account Status</div>
+								<div class="flex items-center">
+									<span
+										class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+											($currentUser?.entitlement_active ?? false)
+												? 'bg-flit-positive/20 text-flit-positive'
+												: 'bg-flit-negative/20 text-flit-negative'
+										}`}
+										role="status"
+										aria-label="Account status"
+									>
+										{($currentUser?.entitlement_active ?? false) ? 'Active' : 'Inactive'}
+									</span>
+								</div>
+							</div>
+							<div>
+								<div class="mb-2 block text-sm font-medium text-flit-ink">Email Verified</div>
+								<div class="flex flex-wrap items-center gap-2">
+									<span
+										class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+											$currentUser.is_verified
+												? 'bg-flit-positive/20 text-flit-positive'
+												: 'bg-amber-500/20 text-amber-600'
+										}`}
+										role="status"
+										aria-label="Email verification status"
+									>
+										{$currentUser.is_verified ? 'Verified' : 'Unverified'}
+									</span>
+									{#if !$currentUser.is_verified}
+										<button
+											type="button"
+											onclick={handleVerifyEmail}
+											disabled={verifyEmailLoading}
+											class="btn btn-secondary px-3 py-1 text-xs disabled:cursor-not-allowed"
+											aria-label="Send verification email"
+										>
+											{#if verifyEmailLoading}
+												<svg
+													class="mr-2 inline-block h-4 w-4 animate-spin"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													aria-hidden="true"
+												>
+													<circle
+														class="opacity-25"
+														cx="12"
+														cy="12"
+														r="10"
+														stroke="currentColor"
+														stroke-width="4"
+													></circle>
+													<path
+														class="opacity-75"
+														fill="currentColor"
+														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+													></path>
+												</svg>
+												Sending…
+											{:else}
+												Verify Email
+											{/if}
+										</button>
+									{/if}
+								</div>
+								{#if verifyEmailSuccess}
+									<p class="mt-1 text-sm text-flit-positive" role="status">{verifyEmailSuccess}</p>
+								{/if}
+								{#if verifyEmailError}
+									<p class="mt-1 text-sm text-flit-negative" role="alert">{verifyEmailError}</p>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Account Dates -->
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<div class="mb-2 block text-sm font-medium text-flit-ink">Member Since</div>
+								<p class="text-sm text-flit-muted" aria-label="Account creation date">
+									{formatDate($currentUser.created_at)}
+								</p>
+							</div>
+							<div>
+								<div class="mb-2 block text-sm font-medium text-flit-ink">Last Updated</div>
+								<p class="text-sm text-flit-muted" aria-label="Account last updated date">
+									{formatDate($currentUser.updated_at)}
+								</p>
 							</div>
 						</div>
 					</div>
 
-					<!-- Account Dates -->
-					<div class="grid grid-cols-2 gap-4">
-						<div>
-							<div class="mb-2 block text-sm font-medium text-flit-ink">Member Since</div>
-							<p class="text-sm text-flit-muted" aria-label="Account creation date">
-								{formatDate($currentUser.created_at)}
-							</p>
+					<!-- Password Change Section -->
+					<div class="border-t border-flit-muted/20 pt-6">
+						<div class="mb-6 flex items-center justify-between">
+							<h2 class="text-lg font-semibold text-flit-ink">Change Password</h2>
+							<button type="button" onclick={togglePasswordChange} class="btn btn-secondary px-4">
+								{showPasswordChange ? 'Cancel' : 'Change password'}
+							</button>
 						</div>
-						<div>
-							<div class="mb-2 block text-sm font-medium text-flit-ink">Last Updated</div>
-							<p class="text-sm text-flit-muted" aria-label="Account last updated date">
-								{formatDate($currentUser.updated_at)}
-							</p>
-						</div>
-					</div>
-				</div>
 
-				<!-- Password Change Section -->
-				<div class="border-t border-flit-muted/20 pt-6">
-					<div class="mb-6 flex items-center justify-between">
-						<h2 class="text-lg font-semibold text-flit-ink">Change Password</h2>
-						<button type="button" onclick={togglePasswordChange} class="btn btn-secondary px-4">
-							{showPasswordChange ? 'Cancel' : 'Change password'}
+						{#if (usernameChanged || emailChanged || colorSchemeChanged) && !showPasswordChange}
+							<!-- Current Password (required to save changes) -->
+							<div class="mb-4">
+								<label
+									for="currentPasswordForChange"
+									class="mb-2 block text-sm font-medium text-flit-ink"
+								>
+									Current password
+									<span class="text-flit-muted">(required to save changes)</span>
+								</label>
+								<div class="relative">
+									<input
+										id="currentPasswordForChange"
+										name="currentPasswordForChange"
+										type={showCurrentPassword ? 'text' : 'password'}
+										disabled={isSaving}
+										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
+										class:border-flit-negative={errors.currentPassword}
+										class:focus:ring-flit-negative={errors.currentPassword}
+										class:focus:border-flit-negative={errors.currentPassword}
+										placeholder="Enter current password"
+										bind:value={formData.currentPassword}
+										oninput={(e) => handleFieldChange('currentPassword', e.currentTarget.value)}
+										aria-describedby={errors.currentPassword
+											? 'current-password-error-change'
+											: undefined}
+										aria-invalid={!!errors.currentPassword}
+									/>
+									<button
+										type="button"
+										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
+										onclick={() => (showCurrentPassword = !showCurrentPassword)}
+										disabled={isSaving}
+										aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+									>
+										{#if showCurrentPassword}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+												/>
+											</svg>
+										{:else}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+												/>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+												/>
+											</svg>
+										{/if}
+									</button>
+								</div>
+								{#if errors.currentPassword}
+									<p
+										id="current-password-error-change"
+										class="mt-1 text-sm text-flit-negative"
+										role="alert"
+									>
+										{errors.currentPassword}
+									</p>
+								{/if}
+							</div>
+						{/if}
+
+						{#if showPasswordChange}
+							<!-- Current Password -->
+							<div class="mb-4">
+								<label for="currentPassword" class="mb-2 block text-sm font-medium text-flit-ink">
+									Current password
+								</label>
+								<div class="relative">
+									<input
+										id="currentPassword"
+										name="currentPassword"
+										type={showCurrentPassword ? 'text' : 'password'}
+										disabled={isSaving}
+										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
+										class:border-flit-negative={errors.currentPassword}
+										class:focus:ring-flit-negative={errors.currentPassword}
+										class:focus:border-flit-negative={errors.currentPassword}
+										placeholder="Enter current password"
+										bind:value={formData.currentPassword}
+										oninput={(e) => handleFieldChange('currentPassword', e.currentTarget.value)}
+										aria-describedby={errors.currentPassword ? 'current-password-error' : undefined}
+										aria-invalid={!!errors.currentPassword}
+									/>
+									<button
+										type="button"
+										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
+										onclick={() => (showCurrentPassword = !showCurrentPassword)}
+										disabled={isSaving}
+										aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+									>
+										{#if showCurrentPassword}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+												/>
+											</svg>
+										{:else}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+												/>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+												/>
+											</svg>
+										{/if}
+									</button>
+								</div>
+								{#if errors.currentPassword}
+									<p
+										id="current-password-error"
+										class="mt-1 text-sm text-flit-negative"
+										role="alert"
+									>
+										{errors.currentPassword}
+									</p>
+								{/if}
+							</div>
+
+							<!-- New Password -->
+							<div class="mb-4">
+								<label for="newPassword" class="mb-2 block text-sm font-medium text-flit-ink">
+									New password
+								</label>
+								<div class="relative">
+									<input
+										id="newPassword"
+										name="newPassword"
+										type={showNewPassword ? 'text' : 'password'}
+										disabled={isSaving}
+										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
+										class:border-flit-negative={errors.newPassword}
+										class:focus:ring-flit-negative={errors.newPassword}
+										class:focus:border-flit-negative={errors.newPassword}
+										placeholder="Enter new password"
+										bind:value={formData.newPassword}
+										oninput={(e) => handleFieldChange('newPassword', e.currentTarget.value)}
+										aria-describedby={errors.newPassword
+											? 'new-password-error'
+											: 'password-strength'}
+										aria-invalid={!!errors.newPassword}
+									/>
+									<button
+										type="button"
+										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
+										onclick={() => (showNewPassword = !showNewPassword)}
+										disabled={isSaving}
+										aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+									>
+										{#if showNewPassword}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+												/>
+											</svg>
+										{:else}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+												/>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+												/>
+											</svg>
+										{/if}
+									</button>
+								</div>
+
+								<!-- Password Strength Indicator -->
+								{#if formData.newPassword}
+									<div class="mt-2">
+										<div class="flex items-center space-x-2">
+											<div class="h-2 flex-1 rounded-full bg-flit-muted/20">
+												<div
+													class="h-2 rounded-full transition-all duration-300 {getStrengthColor(
+														newPasswordStrength
+													)}"
+													style="width: {(newPasswordStrength / 4) * 100}%"
+												></div>
+											</div>
+											<span class="text-xs font-medium {getStrengthTextColor(newPasswordStrength)}">
+												{newPasswordStrengthLabel}
+											</span>
+										</div>
+										<p id="password-strength" class="mt-1 text-xs text-flit-muted">
+											Use at least 8 characters with uppercase, lowercase, number, and special
+											character.
+										</p>
+									</div>
+								{/if}
+
+								{#if errors.newPassword}
+									<p id="new-password-error" class="mt-1 text-sm text-flit-negative" role="alert">
+										{errors.newPassword}
+									</p>
+								{/if}
+							</div>
+
+							<!-- Confirm New Password -->
+							<div class="mb-4">
+								<label
+									for="confirmNewPassword"
+									class="mb-2 block text-sm font-medium text-flit-ink"
+								>
+									Confirm new password
+								</label>
+								<div class="relative">
+									<input
+										id="confirmNewPassword"
+										name="confirmNewPassword"
+										type={showConfirmPassword ? 'text' : 'password'}
+										disabled={isSaving}
+										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
+										class:border-flit-negative={errors.confirmNewPassword}
+										class:focus:ring-flit-negative={errors.confirmNewPassword}
+										class:focus:border-flit-negative={errors.confirmNewPassword}
+										placeholder="Confirm new password"
+										bind:value={formData.confirmNewPassword}
+										oninput={(e) => handleFieldChange('confirmNewPassword', e.currentTarget.value)}
+										aria-describedby={errors.confirmNewPassword
+											? 'confirm-new-password-error'
+											: undefined}
+										aria-invalid={!!errors.confirmNewPassword}
+									/>
+									<button
+										type="button"
+										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
+										onclick={() => (showConfirmPassword = !showConfirmPassword)}
+										disabled={isSaving}
+										aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+									>
+										{#if showConfirmPassword}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+												/>
+											</svg>
+										{:else}
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+												/>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+												/>
+											</svg>
+										{/if}
+									</button>
+								</div>
+								{#if errors.confirmNewPassword}
+									<p
+										id="confirm-new-password-error"
+										class="mt-1 text-sm text-flit-negative"
+										role="alert"
+									>
+										{errors.confirmNewPassword}
+									</p>
+								{/if}
+							</div>
+						{/if}
+					</div>
+
+					<!-- General Error -->
+					<GeneralErrorAlert message={generalError} />
+
+					<!-- Submit Button -->
+					<div class="flex justify-end border-t border-flit-muted/20 pt-6">
+						<button
+							type="submit"
+							disabled={isSaving}
+							class="btn btn-primary px-6 py-3 text-base disabled:cursor-not-allowed"
+						>
+							{#if isSaving}
+								<svg
+									class="mr-3 -ml-1 h-5 w-5 animate-spin text-white"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+								>
+									<circle
+										class="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+								Saving...
+							{:else}
+								Save Changes
+							{/if}
 						</button>
 					</div>
-
-					{#if (usernameChanged || emailChanged || colorSchemeChanged) && !showPasswordChange}
-						<!-- Current Password (required to save changes) -->
-						<div class="mb-4">
-							<label
-								for="currentPasswordForChange"
-								class="mb-2 block text-sm font-medium text-flit-ink"
-							>
-								Current password
-								<span class="text-flit-muted">(required to save changes)</span>
-							</label>
-							<div class="relative">
-								<input
-									id="currentPasswordForChange"
-									name="currentPasswordForChange"
-									type={showCurrentPassword ? 'text' : 'password'}
-									disabled={isSaving}
-									class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-									class:border-flit-negative={errors.currentPassword}
-									class:focus:ring-flit-negative={errors.currentPassword}
-									class:focus:border-flit-negative={errors.currentPassword}
-									placeholder="Enter current password"
-									bind:value={formData.currentPassword}
-									oninput={(e) => handleFieldChange('currentPassword', e.currentTarget.value)}
-									aria-describedby={errors.currentPassword
-										? 'current-password-error-change'
-										: undefined}
-									aria-invalid={!!errors.currentPassword}
-								/>
-								<button
-									type="button"
-									class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-									onclick={() => (showCurrentPassword = !showCurrentPassword)}
-									disabled={isSaving}
-									aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-								>
-									{#if showCurrentPassword}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-											/>
-										</svg>
-									{:else}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-											/>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-											/>
-										</svg>
-									{/if}
-								</button>
-							</div>
-							{#if errors.currentPassword}
-								<p
-									id="current-password-error-change"
-									class="mt-1 text-sm text-flit-negative"
-									role="alert"
-								>
-									{errors.currentPassword}
-								</p>
-							{/if}
-						</div>
-					{/if}
-
-					{#if showPasswordChange}
-						<!-- Current Password -->
-						<div class="mb-4">
-							<label for="currentPassword" class="mb-2 block text-sm font-medium text-flit-ink">
-								Current password
-							</label>
-							<div class="relative">
-								<input
-									id="currentPassword"
-									name="currentPassword"
-									type={showCurrentPassword ? 'text' : 'password'}
-									disabled={isSaving}
-									class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-									class:border-flit-negative={errors.currentPassword}
-									class:focus:ring-flit-negative={errors.currentPassword}
-									class:focus:border-flit-negative={errors.currentPassword}
-									placeholder="Enter current password"
-									bind:value={formData.currentPassword}
-									oninput={(e) => handleFieldChange('currentPassword', e.currentTarget.value)}
-									aria-describedby={errors.currentPassword ? 'current-password-error' : undefined}
-									aria-invalid={!!errors.currentPassword}
-								/>
-								<button
-									type="button"
-									class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-									onclick={() => (showCurrentPassword = !showCurrentPassword)}
-									disabled={isSaving}
-									aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-								>
-									{#if showCurrentPassword}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-											/>
-										</svg>
-									{:else}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-											/>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-											/>
-										</svg>
-									{/if}
-								</button>
-							</div>
-							{#if errors.currentPassword}
-								<p id="current-password-error" class="mt-1 text-sm text-flit-negative" role="alert">
-									{errors.currentPassword}
-								</p>
-							{/if}
-						</div>
-
-						<!-- New Password -->
-						<div class="mb-4">
-							<label for="newPassword" class="mb-2 block text-sm font-medium text-flit-ink">
-								New password
-							</label>
-							<div class="relative">
-								<input
-									id="newPassword"
-									name="newPassword"
-									type={showNewPassword ? 'text' : 'password'}
-									disabled={isSaving}
-									class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-									class:border-flit-negative={errors.newPassword}
-									class:focus:ring-flit-negative={errors.newPassword}
-									class:focus:border-flit-negative={errors.newPassword}
-									placeholder="Enter new password"
-									bind:value={formData.newPassword}
-									oninput={(e) => handleFieldChange('newPassword', e.currentTarget.value)}
-									aria-describedby={errors.newPassword ? 'new-password-error' : 'password-strength'}
-									aria-invalid={!!errors.newPassword}
-								/>
-								<button
-									type="button"
-									class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-									onclick={() => (showNewPassword = !showNewPassword)}
-									disabled={isSaving}
-									aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-								>
-									{#if showNewPassword}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-											/>
-										</svg>
-									{:else}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-											/>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-											/>
-										</svg>
-									{/if}
-								</button>
-							</div>
-
-							<!-- Password Strength Indicator -->
-							{#if formData.newPassword}
-								<div class="mt-2">
-									<div class="flex items-center space-x-2">
-										<div class="h-2 flex-1 rounded-full bg-flit-muted/20">
-											<div
-												class="h-2 rounded-full transition-all duration-300 {getStrengthColor(
-													newPasswordStrength
-												)}"
-												style="width: {(newPasswordStrength / 4) * 100}%"
-											></div>
-										</div>
-										<span class="text-xs font-medium {getStrengthTextColor(newPasswordStrength)}">
-											{newPasswordStrengthLabel}
-										</span>
-									</div>
-									<p id="password-strength" class="mt-1 text-xs text-flit-muted">
-										Use at least 8 characters with uppercase, lowercase, number, and special
-										character.
-									</p>
-								</div>
-							{/if}
-
-							{#if errors.newPassword}
-								<p id="new-password-error" class="mt-1 text-sm text-flit-negative" role="alert">
-									{errors.newPassword}
-								</p>
-							{/if}
-						</div>
-
-						<!-- Confirm New Password -->
-						<div class="mb-4">
-							<label for="confirmNewPassword" class="mb-2 block text-sm font-medium text-flit-ink">
-								Confirm new password
-							</label>
-							<div class="relative">
-								<input
-									id="confirmNewPassword"
-									name="confirmNewPassword"
-									type={showConfirmPassword ? 'text' : 'password'}
-									disabled={isSaving}
-									class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-									class:border-flit-negative={errors.confirmNewPassword}
-									class:focus:ring-flit-negative={errors.confirmNewPassword}
-									class:focus:border-flit-negative={errors.confirmNewPassword}
-									placeholder="Confirm new password"
-									bind:value={formData.confirmNewPassword}
-									oninput={(e) => handleFieldChange('confirmNewPassword', e.currentTarget.value)}
-									aria-describedby={errors.confirmNewPassword
-										? 'confirm-new-password-error'
-										: undefined}
-									aria-invalid={!!errors.confirmNewPassword}
-								/>
-								<button
-									type="button"
-									class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-									onclick={() => (showConfirmPassword = !showConfirmPassword)}
-									disabled={isSaving}
-									aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-								>
-									{#if showConfirmPassword}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-											/>
-										</svg>
-									{:else}
-										<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-											/>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-											/>
-										</svg>
-									{/if}
-								</button>
-							</div>
-							{#if errors.confirmNewPassword}
-								<p
-									id="confirm-new-password-error"
-									class="mt-1 text-sm text-flit-negative"
-									role="alert"
-								>
-									{errors.confirmNewPassword}
-								</p>
-							{/if}
-						</div>
-					{/if}
-				</div>
-
-				<!-- General Error -->
-				<GeneralErrorAlert message={generalError} />
-
-				<!-- Submit Button -->
-				<div class="flex justify-end border-t border-flit-muted/20 pt-6">
-					<button
-						type="submit"
-						disabled={isSaving}
-						class="btn btn-primary px-6 py-3 text-base disabled:cursor-not-allowed"
+				</form>
+			</div>
+			<br />
+			<!-- Feedback -->
+			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
+				<h2 class="mb-4 text-lg font-semibold text-flit-ink">Feedback</h2>
+				<p class="mb-3 text-sm text-flit-muted">
+					Share your love, hate and everything in between! Your feedback helps us improve.
+				</p>
+				{#if feedbackError}
+					<div
+						class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
+						role="alert"
 					>
-						{#if isSaving}
-							<svg
-								class="mr-3 -ml-1 h-5 w-5 animate-spin text-white"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="4"
-								></circle>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-								></path>
-							</svg>
-							Saving...
+						<p class="text-sm text-flit-ink">{feedbackError}</p>
+					</div>
+				{/if}
+				{#if feedbackSuccess}
+					<div
+						class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
+						role="alert"
+					>
+						<p class="text-sm text-flit-ink">{feedbackSuccess}</p>
+					</div>
+				{/if}
+				<div class="space-y-3">
+					<div>
+						<label for="feedback-content" class="sr-only">Your feedback</label>
+						<textarea
+							id="feedback-content"
+							placeholder="Your feedback..."
+							bind:value={feedbackContent}
+							disabled={feedbackSubmitting}
+							rows="4"
+							class="input w-full resize-y backdrop-blur-sm disabled:cursor-not-allowed"
+							aria-label="Feedback message"
+						></textarea>
+					</div>
+					<button
+						type="button"
+						class="btn btn-primary"
+						disabled={feedbackSubmitting || !feedbackContent.trim()}
+						onclick={handleSubmitFeedback}
+					>
+						{#if feedbackSubmitting}
+							Submitting…
 						{:else}
-							Save Changes
+							Submit
 						{/if}
 					</button>
 				</div>
-			</form>
+			</div>
 		</div>
 	</div>
 {:else}

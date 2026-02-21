@@ -28,6 +28,9 @@
 	let passwordStrength = $state(0);
 	let passwordStrengthLabel = $state('Very Weak');
 
+	const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+	let turnstileReady = $state(!turnstileSiteKey);
+
 	// Form validator
 	let validator: FormValidator<RegisterFormData>;
 	let debouncedValidator: ReturnType<typeof createDebouncedValidator>;
@@ -90,14 +93,22 @@
 			return;
 		}
 
+		const form = event.target as HTMLFormElement;
+		const cfTurnstileResponse = form.querySelector<HTMLInputElement>(
+			'[name="cf-turnstile-response"]'
+		)?.value;
+
 		// Attempt registration
-		const result = await authActions.register(formData);
+		const result = await authActions.register({
+			...formData,
+			cf_turnstile_response: cfTurnstileResponse || null
+		});
 
 		if (result.success) {
-			// Show success message and redirect to login
-			generalError = ''; // Clear any errors
-			// Note: Registration doesn't log the user in automatically
-			// They need to verify their email or login manually
+			generalError = '';
+			if (typeof turnstile !== 'undefined' && turnstile?.reset) {
+				turnstile.reset('register-widget');
+			}
 			goto(
 				resolve('/login') +
 					'?message=' +
@@ -123,8 +134,25 @@
 	let emailInput: HTMLInputElement;
 
 	onMount(() => {
-		// Auto-focus email field
 		emailInput?.focus();
+
+		if (turnstileSiteKey) {
+			(window as Window & { onTurnstileSuccess?: () => void }).onTurnstileSuccess = () => {
+				turnstileReady = true;
+			};
+			(window as Window & { onTurnstileError?: (code?: string) => void }).onTurnstileError = (
+				code
+			) => {
+				console.error('Turnstile error:', code);
+			};
+		}
+
+		return () => {
+			if (turnstileSiteKey) {
+				delete (window as Window & { onTurnstileSuccess?: () => void }).onTurnstileSuccess;
+				delete (window as Window & { onTurnstileError?: (code?: string) => void }).onTurnstileError;
+			}
+		};
 	});
 
 	// Password strength color classes (flit tokens)
@@ -166,6 +194,9 @@
 <svelte:head>
 	<title>Sign Up - Flit Web</title>
 	<meta name="description" content="Create your Flit Web account to access your knowledge graph." />
+	{#if turnstileSiteKey}
+		<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+	{/if}
 </svelte:head>
 
 <div class="flex min-h-[calc(100vh-12rem)] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
@@ -366,11 +397,24 @@
 			<!-- General Error -->
 			<GeneralErrorAlert message={generalError} />
 
+			{#if turnstileSiteKey}
+				<div
+					class="cf-turnstile"
+					data-sitekey={turnstileSiteKey}
+					data-theme="auto"
+					data-size="compact"
+					data-action="register"
+					data-callback="onTurnstileSuccess"
+					data-error-callback="onTurnstileError"
+					data-widget-id="register-widget"
+				></div>
+			{/if}
+
 			<!-- Submit Button -->
 			<div>
 				<button
 					type="submit"
-					disabled={isSubmitting}
+					disabled={!turnstileReady || isSubmitting}
 					class="btn btn-primary w-full justify-center py-3 disabled:cursor-not-allowed"
 				>
 					{#if isSubmitting}

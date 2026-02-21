@@ -100,6 +100,39 @@ export function validateRegisterForm(data: RegisterFormData): FormErrors {
 }
 
 /**
+ * Validate forgot password form (email only).
+ */
+export function validateForgotPasswordForm(data: { email: string }): FormErrors {
+	const errors: FormErrors = {};
+	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
+	if (emailErr) errors.email = emailErr;
+	return errors;
+}
+
+/**
+ * Validate reset password form (new password min 8 chars, confirmation must match if provided).
+ */
+export function validateResetPasswordForm(data: {
+	newPassword: string;
+	confirmPassword?: string;
+}): FormErrors {
+	const errors: FormErrors = {};
+	const newPasswordErr = validateField(data.newPassword, {
+		required: true,
+		rules: [validationRules.minLength(8), validationRules.password()]
+	});
+	if (newPasswordErr) errors.newPassword = newPasswordErr;
+	if (data.confirmPassword !== undefined && data.confirmPassword !== '') {
+		const confirmErr = validateField(data.confirmPassword, {
+			required: true,
+			rules: [validationRules.match(data.newPassword, 'Passwords do not match')]
+		});
+		if (confirmErr) errors.confirmPassword = confirmErr;
+	}
+	return errors;
+}
+
+/**
  * Username validation: 3-50 chars, alphanumeric + underscore/hyphen
  */
 export function isValidUsername(username: string): boolean {

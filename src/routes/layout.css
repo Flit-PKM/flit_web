@@ -9,12 +9,12 @@
 	--color-green: oklch(0.63 0.2 142);
 	--color-red: oklch(0.63 0.2 31);
 	--color-blue: oklch(0.63 0.2 240);
-	--color-mid-grey: oklch(50% 0.01 110);
+	--color-mid-grey: oklch(50% 0 0);
 
-	--canvas-dark: oklch(18% 0.002 176);
-	--canvas-light: oklch(93% 0.002 76);
-	--ink-dark: oklch(90% 0.002 76);
-	--ink-light: oklch(15% 0.002 176);
+	--canvas-dark: oklch(18% 0.01 176);
+	--canvas-light: oklch(93% 0.01 90);
+	--ink-dark: oklch(90% 0.02 90);
+	--ink-light: oklch(15% 0.02 176);
 
 	--color-canvas: var(--canvas-light);
 	--color-ink: var(--ink-light);

@@ -22,6 +22,14 @@ export interface UserSubscriptionRead {
 }
 
 /**
+ * Active access-code grant on UserRead (time-limited access without subscription).
+ */
+export interface UserAccessGrantRead {
+	expires_at: string; // ISO 8601
+	includes_encryption: boolean;
+}
+
+/**
  * User model as returned by the API
  */
 export interface User {
@@ -35,6 +43,31 @@ export interface User {
 	readonly created_at: string; // ISO 8601 datetime string
 	readonly updated_at: string; // ISO 8601 datetime string
 	subscription?: UserSubscriptionRead | null;
+	access_grant?: UserAccessGrantRead | null;
+	entitlement_active?: boolean;
+}
+
+/**
+ * Request body for POST /access-codes/activate.
+ */
+export interface AccessCodeActivateRequest {
+	code: string;
+}
+
+/**
+ * Response when a user successfully activates an access code.
+ */
+export interface AccessCodeActivateResponse {
+	expires_at: string;
+	includes_encryption: boolean;
+}
+
+/**
+ * Response for GET /verify (send verification email).
+ */
+export interface VerifySendResponse {
+	sent: boolean;
+	detail?: string | null;
 }
 
 /**
@@ -43,6 +76,7 @@ export interface User {
 export interface UserCreate {
 	email: string;
 	password: string;
+	cf_turnstile_response?: string | null;
 	is_active?: boolean;
 	is_superuser?: boolean;
 	is_verified?: boolean;
@@ -71,6 +105,38 @@ export interface AuthToken {
 }
 
 /**
+ * Request body for POST /password-reset/request.
+ */
+export interface PasswordResetRequest {
+	email: string;
+	cf_turnstile_response?: string | null;
+}
+
+/**
+ * Response for POST /password-reset/request.
+ */
+export interface PasswordResetRequestResponse {
+	sent: boolean;
+	detail?: string | null;
+}
+
+/**
+ * Request body for POST /password-reset/confirm.
+ */
+export interface PasswordResetConfirm {
+	token: string;
+	new_password: string;
+}
+
+/**
+ * Response for POST /password-reset/confirm.
+ */
+export interface PasswordResetConfirmResponse {
+	success: boolean;
+	detail?: string | null;
+}
+
+/**
  * Login form data
  */
 export interface LoginFormData extends Record<string, unknown> {
@@ -85,6 +151,7 @@ export interface RegisterFormData extends Record<string, unknown> {
 	email: string;
 	password: string;
 	confirmPassword: string;
+	cf_turnstile_response?: string | null;
 }
 
 /**

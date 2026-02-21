@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and Tailwind CSS 4.x. It provides a client-side interface for a FastAPI backend, handling authentication, notes and category management, billing/subscription, profile, and connected apps.
+**Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and Tailwind CSS 4.x. It provides a client-side interface for a FastAPI backend, handling authentication, notes and category management, billing/subscription, profile, connected apps, and a superuser-only dashboard (users, newsletter subscriptions, access codes).
 
 ## Tech Stack
 
@@ -41,7 +41,7 @@ src/
 │   ├── types/      # TypeScript definitions
 │   └── utils/      # Helper functions (auth, validation, error-handler)
 └── routes/         # SvelteKit pages/layouts
-    └── (protected)/ # Auth guard layout; profile, notes, billing live here
+    └── (protected)/ # Auth guard layout; profile, notes, dashboard (superuser-only) live here
 ```
 
 ## Essential Workflows
@@ -51,7 +51,7 @@ src/
 3. **API Usage**: Always use `apiClient` methods (no raw fetch)
 4. **State**: Use `$state` for local, `authStore` for global auth state
 5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
-6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI
+6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI. The dashboard (`/dashboard`) is superuser-only: its layout redirects non-superusers to `/profile`; nav shows "Dashboard" only when `currentUser.is_superuser` is true.
 7. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`)
 8. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
 

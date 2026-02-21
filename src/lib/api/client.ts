@@ -6,6 +6,8 @@
  */
 
 import type {
+	AccessCodeActivateRequest,
+	AccessCodeActivateResponse,
 	ApiConfig,
 	ApiResponse,
 	RequestOptions,
@@ -13,7 +15,11 @@ import type {
 	UserCreate,
 	UserUpdate,
 	AuthToken,
-	PaginatedResponse
+	PaginatedResponse,
+	VerifySendResponse,
+	PasswordResetRequestResponse,
+	PasswordResetConfirm,
+	PasswordResetConfirmResponse
 } from '../types/auth';
 import type { ConnectRequestCodeResponse, ConnectedApp } from '../types/connect';
 import type {
@@ -27,18 +33,22 @@ import type {
 	RelationshipRead
 } from '../types/note';
 import type {
+	BillingCompleteRequest,
+	BillingCompleteResponse,
 	CheckoutSessionRequest,
 	CheckoutSessionResponse,
 	PlanDetailResponse,
 	SubscriptionStatusResponse
 } from '../types/billing';
+import type { AccessCodeCreateResponse, SubscriptionRead } from '../types/admin';
+import type { FeedbackCreate, FeedbackRead } from '../types/feedback';
 import { errorLogger, handleApiError } from '$lib/utils/error-handler';
 
 /**
  * Build query string from params (omits undefined and empty string).
  * Returns the query string without leading "?" (e.g. "skip=0&limit=10").
  */
-function buildQueryString(params: Record<string, string | number | undefined>): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const searchParams = new URLSearchParams();
 	for (const [key, value] of Object.entries(params)) {
 		if (value !== undefined && value !== '') {
@@ -53,7 +63,7 @@ function buildQueryString(params: Record<string, string | number | undefined>): 
  */
 function endpointWithQuery(
 	path: string,
-	params: Record<string, string | number | undefined>
+	params: Record<string, string | number | boolean | undefined>
 ): string {
 	const query = buildQueryString(params);
 	return query ? `${path}?${query}` : path;
@@ -61,12 +71,14 @@ function endpointWithQuery(
 
 /**
  * Resolve API base URL: same origin in production (browser), else dev env or localhost.
+ * Backend is mounted at /api, so all requests go to baseUrl + endpoint (e.g. /api/auth/login-json).
  */
 function getApiBaseUrl(): string {
-	if (typeof window !== 'undefined' && import.meta.env.PROD) {
-		return window.location.origin;
-	}
-	return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+	const base =
+		typeof window !== 'undefined' && import.meta.env.PROD
+			? window.location.origin
+			: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+	return base.replace(/\/$/, '') + '/api';
 }
 
 export class ApiClient {
@@ -317,12 +329,109 @@ export class ApiClient {
 	}
 
 	/**
+	 * Grant superuser privilege to a user. POST /users/{user_id}/superuser. Superuser only.
+	 */
+	async grantSuperuser(userId: number): Promise<User> {
+		const response = await this.request<User>(`/users/${userId}/superuser`, {
+			method: 'POST'
+		});
+		return response.data;
+	}
+
+	/**
+	 * Revoke superuser privilege from a user. DELETE /users/{user_id}/superuser. Superuser only.
+	 */
+	async revokeSuperuser(userId: number): Promise<User> {
+		const response = await this.request<User>(`/users/${userId}/superuser`, {
+			method: 'DELETE'
+		});
+		return response.data;
+	}
+
+	/**
+	 * List newsletter subscriptions. GET /subscriptions/?skip=&limit=. Superuser only.
+	 */
+	async getSubscriptions(
+		params: { skip?: number; limit?: number } = {}
+	): Promise<SubscriptionRead[]> {
+		const endpoint = endpointWithQuery('/subscriptions/', params);
+		const response = await this.request<SubscriptionRead[]>(endpoint, { method: 'GET' });
+		return response.data;
+	}
+
+	/**
+	 * Create a single-use access code. GET /access-codes/create?period_weeks=&includes_encryption=. Superuser only.
+	 */
+	async createAccessCode(params: {
+		period_weeks: number;
+		includes_encryption: boolean;
+	}): Promise<AccessCodeCreateResponse> {
+		const endpoint = endpointWithQuery('/access-codes/create', {
+			period_weeks: params.period_weeks,
+			includes_encryption: params.includes_encryption
+		});
+		const response = await this.request<AccessCodeCreateResponse>(endpoint, { method: 'GET' });
+		return response.data;
+	}
+
+	/**
+	 * Activate an access code for the current user. POST /access-codes/activate. Requires Bearer auth.
+	 */
+	async activateAccessCode(body: AccessCodeActivateRequest): Promise<AccessCodeActivateResponse> {
+		const response = await this.request<AccessCodeActivateResponse>('/access-codes/activate', {
+			method: 'POST',
+			body
+		});
+		return response.data;
+	}
+
+	/**
 	 * Request a connection code for linking an app to Flit Core.
 	 * POST /connect/request-code with no body. Requires Bearer auth.
 	 */
 	async requestConnectCode(): Promise<ConnectRequestCodeResponse> {
 		const response = await this.request<ConnectRequestCodeResponse>('/connect/request-code', {
 			method: 'POST'
+		});
+		return response.data;
+	}
+
+	/**
+	 * Send verification email to the current user.
+	 * GET /verify. Requires Bearer auth.
+	 */
+	async sendVerificationEmail(): Promise<VerifySendResponse> {
+		const response = await this.request<VerifySendResponse>('/verify', {
+			method: 'GET'
+		});
+		return response.data;
+	}
+
+	/**
+	 * Request password reset email. POST /password-reset/request. Public.
+	 */
+	async requestPasswordReset(
+		email: string,
+		cfTurnstileResponse?: string | null
+	): Promise<PasswordResetRequestResponse> {
+		const body: { email: string; cf_turnstile_response?: string | null } = { email };
+		if (cfTurnstileResponse) {
+			body.cf_turnstile_response = cfTurnstileResponse;
+		}
+		const response = await this.request<PasswordResetRequestResponse>('/password-reset/request', {
+			method: 'POST',
+			body
+		});
+		return response.data;
+	}
+
+	/**
+	 * Confirm password reset with token. POST /password-reset/confirm. Public.
+	 */
+	async confirmPasswordReset(body: PasswordResetConfirm): Promise<PasswordResetConfirmResponse> {
+		const response = await this.request<PasswordResetConfirmResponse>('/password-reset/confirm', {
+			method: 'POST',
+			body
 		});
 		return response.data;
 	}
@@ -380,6 +489,47 @@ export class ApiClient {
 			method: 'GET'
 		});
 		return response.data;
+	}
+
+	/**
+	 * Notify backend of subscription success after redirect from payment provider.
+	 * POST /billing/complete. Requires Bearer auth.
+	 */
+	async postBillingComplete(body: BillingCompleteRequest): Promise<BillingCompleteResponse> {
+		const response = await this.request<BillingCompleteResponse>('/billing/complete', {
+			method: 'POST',
+			body
+		});
+		return response.data;
+	}
+
+	/**
+	 * Submit feedback. POST /feedback. Public; no auth required.
+	 */
+	async submitFeedback(body: FeedbackCreate): Promise<FeedbackRead> {
+		const response = await this.request<FeedbackRead>('/feedback', {
+			method: 'POST',
+			body
+		});
+		return response.data;
+	}
+
+	/**
+	 * List feedback. GET /feedback. Superuser only.
+	 */
+	async listFeedback(params: { skip?: number; limit?: number } = {}): Promise<FeedbackRead[]> {
+		const endpoint = endpointWithQuery('/feedback', params);
+		const response = await this.request<FeedbackRead[]>(endpoint, { method: 'GET' });
+		return response.data;
+	}
+
+	/**
+	 * Delete feedback. DELETE /feedback/{id}. Superuser only.
+	 */
+	async deleteFeedback(feedbackId: number): Promise<void> {
+		await this.request<void>(`/feedback/${feedbackId}`, {
+			method: 'DELETE'
+		});
 	}
 
 	/**
