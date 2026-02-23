@@ -10,6 +10,8 @@
 	let { children } = $props();
 	let showMobileMenu = $state(false);
 
+	let isLoggedIn = $derived($isAuthenticated && $currentUser);
+
 	// Initialize auth state on app start
 	onMount(() => {
 		authActions.initialize();
@@ -130,10 +132,10 @@
 
 				<!-- Desktop Auth Section -->
 				<div class="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
-					{#if $isAuthenticated && $currentUser}
+					{#if isLoggedIn}
 						<div class="flex items-center space-x-4">
 							<span class="text-sm text-flit-ink">
-								Welcome, <span class="font-medium">{$currentUser.username}</span>
+								Welcome, <span class="font-medium">{$currentUser?.username}</span>
 							</span>
 							<button onclick={handleLogout} class="btn btn-secondary"> Sign out </button>
 						</div>
@@ -200,20 +202,20 @@
 					</div>
 				{/if}
 				<div class="border-t border-flit-muted/20 pt-4 pb-3">
-					{#if $isAuthenticated && $currentUser}
+					{#if isLoggedIn}
 						<div class="flex items-center px-4">
 							<div class="flex-shrink-0">
 								<div
 									class="flex h-10 w-10 items-center justify-center rounded-full bg-flit-primary"
 								>
 									<span class="text-sm font-medium text-white">
-										{$currentUser.email.charAt(0).toUpperCase()}
+										{($currentUser?.email ?? '').charAt(0).toUpperCase()}
 									</span>
 								</div>
 							</div>
 							<div class="ml-3">
 								<div class="text-base font-medium text-flit-ink">
-									{$currentUser.email}
+									{$currentUser?.email}
 								</div>
 							</div>
 						</div>

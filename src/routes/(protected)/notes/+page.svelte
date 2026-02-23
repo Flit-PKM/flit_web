@@ -5,6 +5,7 @@
 	import { page } from '$app/stores';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient } from '$lib/api/client';
+	import { filterNotDeleted } from '$lib/utils/filter';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
 	import { markdownToSafeHtml } from '$lib/utils/markdown';
 	import type { NoteRead, CategoryRead } from '$lib/types/note';
@@ -41,6 +42,9 @@
 	// New note
 	let isCreatingNote = $state(false);
 
+	// Per-note actions
+	let isAppendingNoteId = $state<number | null>(null);
+
 	// Fetch notes with current filters
 	async function fetchNotes() {
 		if (!$isAuthenticated) return;
@@ -55,7 +59,7 @@
 				search: searchQuery || undefined,
 				filter: selectedCategory || undefined
 			});
-			const filtered = raw.filter((n) => !n.is_deleted);
+			const filtered = filterNotDeleted(raw);
 			notes = filtered.sort(
 				(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
 			);
@@ -114,7 +118,7 @@
 		try {
 			errorLogger.logDebug('Loading categories');
 			const rawCategories = await apiClient.getCategories({ limit: 1000 });
-			categories = rawCategories.filter((c) => !c.is_deleted);
+			categories = filterNotDeleted(rawCategories);
 			errorLogger.logDebug('Categories loaded successfully', { count: categories.length });
 		} catch (err) {
 			captureApiError(err, { component: 'NotesList', operation: 'loadCategories' });
@@ -145,7 +149,7 @@
 		try {
 			errorLogger.logDebug('Creating category', { name });
 			const created = await apiClient.createCategory({ name });
-			categories = [...categories.filter((c) => !c.is_deleted), created];
+			categories = [...filterNotDeleted(categories), created];
 			showCreateCategory = false;
 			newCategoryName = '';
 			errorLogger.logDebug('Category created successfully', { categoryId: created.id });
@@ -202,6 +206,52 @@
 			});
 		} finally {
 			isCreatingNote = false;
+		}
+	}
+
+	async function appendNote(oldNoteId: number) {
+		if (!$isAuthenticated || isAppendingNoteId != null) return;
+		isAppendingNoteId = oldNoteId;
+		error = '';
+		try {
+			errorLogger.logDebug('Appending note', { appendFromNoteId: oldNoteId });
+			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
+			await new Promise((r) => setTimeout(r, 100));
+			goto(resolve(`/notes/${created.id}?edit=1&append=${oldNoteId}`));
+			errorLogger.logDebug('Append note created successfully', {
+				sourceNoteId: oldNoteId,
+				newNoteId: created.id
+			});
+		} catch (err) {
+			error = captureApiError(err, {
+				component: 'NotesList',
+				operation: 'appendNote',
+				sourceNoteId: oldNoteId
+			});
+		} finally {
+			isAppendingNoteId = null;
+		}
+	}
+
+	function navigateToEdit(noteId: number) {
+		goto(resolve(`/notes/${noteId}?edit=1`));
+	}
+
+	async function deleteNote(noteId: number, noteTitle: string) {
+		if (!$isAuthenticated) return;
+		if (!confirm(`Delete note "${noteTitle}"? This cannot be undone.`)) return;
+		error = '';
+		try {
+			errorLogger.logDebug('Deleting note', { noteId });
+			await apiClient.deleteNote(noteId);
+			notes = notes.filter((n) => n.id !== noteId);
+			errorLogger.logDebug('Note deleted successfully', { noteId });
+		} catch (err) {
+			error = captureApiError(err, {
+				component: 'NotesList',
+				operation: 'deleteNote',
+				noteId
+			});
 		}
 	}
 
@@ -431,12 +481,12 @@
 		<p class="mt-4 text-sm text-flit-muted">
 			{notes.length} note{notes.length === 1 ? '' : 's'} found
 		</p>
-		<ul class="mt-4 space-y-4">
+		<ul class="mt-4 space-y-8">
 			{#each notes as note (note.id)}
-				<li>
+				<li class="relative">
 					<a
 						href={resolve(`/notes/${note.id}`)}
-						class="block rounded-xl border border-flit-muted/20 bg-flit-card p-4 shadow-flit-sm transition-colors hover:border-flit-muted/40 hover:bg-flit-muted/5 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
+						class="block rounded-xl border border-flit-muted/20 bg-flit-card p-4 pb-14 shadow-flit-sm transition-colors hover:border-flit-muted/40 hover:bg-flit-muted/5 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
 					>
 						<h2 class="text-center font-semibold text-flit-ink">{note.title}</h2>
 						<hr class="my-2 border-flit-muted/20" />
@@ -446,6 +496,85 @@
 							</div>
 						{/if}
 					</a>
+					<div
+						class="absolute right-0 bottom-0 left-0 z-10 mr-[2ch] flex translate-y-1/2 flex-row justify-end gap-2"
+						role="group"
+						aria-label="Note actions"
+					>
+						<button
+							type="button"
+							title="Append note"
+							disabled={isAppendingNoteId === note.id}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								appendNote(note.id);
+							}}
+							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-flit-canvas bg-flit-card-opaque shadow-flit-sm transition-colors hover:border-flit-primary/50 hover:bg-flit-muted/10 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none disabled:opacity-50"
+						>
+							<svg
+								class="h-5 w-5 text-flit-ink"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 4v16m8-8H4"
+								/>
+							</svg>
+						</button>
+						<button
+							type="button"
+							title="Edit note"
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								navigateToEdit(note.id);
+							}}
+							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-flit-canvas bg-flit-card-opaque shadow-flit-sm transition-colors hover:border-flit-primary/50 hover:bg-flit-muted/10 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
+						>
+							<svg
+								class="h-5 w-5 text-flit-ink"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+								/>
+							</svg>
+						</button>
+						<button
+							type="button"
+							title="Delete note"
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								deleteNote(note.id, note.title);
+							}}
+							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-flit-canvas bg-flit-card-opaque shadow-flit-sm transition-colors hover:border-flit-negative/50 hover:bg-flit-negative/10 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
+						>
+							<svg
+								class="h-5 w-5 text-flit-ink"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+								/>
+							</svg>
+						</button>
+					</div>
 				</li>
 			{/each}
 		</ul>

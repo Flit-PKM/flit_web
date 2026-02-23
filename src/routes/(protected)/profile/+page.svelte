@@ -15,6 +15,7 @@
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import CurrentPasswordInput from '$lib/components/CurrentPasswordInput.svelte';
 	import type { ProfileFormData, FormErrors, UserUpdate } from '$lib/types/auth';
 	import type { ConnectedApp } from '$lib/types/connect';
 	import type {
@@ -100,6 +101,14 @@
 			return 0;
 		});
 	});
+
+	// Subscription section: derived flags for clearer branching
+	let showSubscriptionLoaded = $derived(!subscriptionLoading);
+	let showActivePlan = $derived(showSubscriptionLoaded && !!hasActiveSubscription);
+	let showPlansSection = $derived(showSubscriptionLoaded && !plansLoading && !plansError);
+	let showPlansList = $derived(
+		showPlansSection && !hasActiveSubscription && subscriptionPlans.length > 0
+	);
 
 	// Form data
 	let formData: ProfileFormData = $state({
@@ -877,7 +886,7 @@
 							{/each}
 						</div>
 					</div>
-				{:else if !connectedAppsLoading}
+				{:else}
 					<div class="mb-6 text-sm text-flit-muted">
 						No connected apps yet. Connect an app to get started.
 					</div>
@@ -1073,7 +1082,7 @@
 					</div>
 				{/if}
 
-				{#if !subscriptionLoading && hasActiveSubscription}
+				{#if showActivePlan}
 					<div
 						class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
 						role="status"
@@ -1131,7 +1140,7 @@
 					</div>
 				{/if}
 
-				{#if !subscriptionLoading}
+				{#if showSubscriptionLoaded}
 					{#if checkoutError}
 						<div
 							class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
@@ -1178,66 +1187,60 @@
 						</div>
 					{:else if plans.length === 0}
 						<p class="text-sm text-flit-muted">No plans available at the moment.</p>
-					{:else if !hasActiveSubscription}
+					{:else if showPlansList}
 						<!-- Subscription plans: click card to go to checkout -->
-						{#if subscriptionPlans.length > 0}
-							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-								{#each subscriptionPlans as plan (plan.product_id)}
-									<button
-										type="button"
-										onclick={() => handleCheckout(plan.product_id)}
-										disabled={checkoutLoading}
-										class="flex min-h-[200px] flex-col rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-200 hover:border-flit-primary/40 hover:bg-flit-canvas/70 hover:shadow-flit-sm focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:hover:border-flit-muted/30 disabled:hover:bg-flit-canvas/50 disabled:hover:shadow-none"
-										aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
-									>
-										{#if plan.image}
-											<img
-												src={plan.image}
-												alt=""
-												class="mb-3 h-16 w-auto rounded object-contain"
-											/>
-										{/if}
-										<h3 class="text-base font-semibold text-flit-ink">
-											{plan.name ?? 'Subscription plan'}
-										</h3>
-										{#if plan.description}
-											<p class="mt-1 text-sm text-flit-muted">{plan.description}</p>
-										{/if}
-										<div class="mt-3">
-											<span class="text-lg font-medium text-flit-ink">
-												{formatPlanPrice(plan.price)}
-											</span>
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							{#each subscriptionPlans as plan (plan.product_id)}
+								<button
+									type="button"
+									onclick={() => handleCheckout(plan.product_id)}
+									disabled={checkoutLoading}
+									class="flex min-h-[200px] flex-col rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-200 hover:border-flit-primary/40 hover:bg-flit-canvas/70 hover:shadow-flit-sm focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:hover:border-flit-muted/30 disabled:hover:bg-flit-canvas/50 disabled:hover:shadow-none"
+									aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
+								>
+									{#if plan.image}
+										<img src={plan.image} alt="" class="mb-3 h-16 w-auto rounded object-contain" />
+									{/if}
+									<h3 class="text-base font-semibold text-flit-ink">
+										{plan.name ?? 'Subscription plan'}
+									</h3>
+									{#if plan.description}
+										<p class="mt-1 text-sm text-flit-muted">{plan.description}</p>
+									{/if}
+									<div class="mt-3">
+										<span class="text-lg font-medium text-flit-ink">
+											{formatPlanPrice(plan.price)}
+										</span>
+									</div>
+									{#if checkoutLoading}
+										<div class="mt-3 flex items-center text-sm text-flit-muted">
+											<svg
+												class="mr-2 h-4 w-4 animate-spin"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												aria-hidden="true"
+											>
+												<circle
+													class="opacity-25"
+													cx="12"
+													cy="12"
+													r="10"
+													stroke="currentColor"
+													stroke-width="4"
+												></circle>
+												<path
+													class="opacity-75"
+													fill="currentColor"
+													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+												></path>
+											</svg>
+											Redirecting to checkout…
 										</div>
-										{#if checkoutLoading}
-											<div class="mt-3 flex items-center text-sm text-flit-muted">
-												<svg
-													class="mr-2 h-4 w-4 animate-spin"
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-													aria-hidden="true"
-												>
-													<circle
-														class="opacity-25"
-														cx="12"
-														cy="12"
-														r="10"
-														stroke="currentColor"
-														stroke-width="4"
-													></circle>
-													<path
-														class="opacity-75"
-														fill="currentColor"
-														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-													></path>
-												</svg>
-												Redirecting to checkout…
-											</div>
-										{/if}
-									</button>
-								{/each}
-							</div>
-						{/if}
+									{/if}
+								</button>
+							{/each}
+						</div>
 					{/if}
 				{/if}
 			</div>
@@ -1537,145 +1540,30 @@
 						</div>
 
 						{#if (usernameChanged || emailChanged || colorSchemeChanged) && !showPasswordChange}
-							<!-- Current Password (required to save changes) -->
-							<div class="mb-4">
-								<label
-									for="currentPasswordForChange"
-									class="mb-2 block text-sm font-medium text-flit-ink"
-								>
-									Current password
-									<span class="text-flit-muted">(required to save changes)</span>
-								</label>
-								<div class="relative">
-									<input
-										id="currentPasswordForChange"
-										name="currentPasswordForChange"
-										type={showCurrentPassword ? 'text' : 'password'}
-										disabled={isSaving}
-										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-										class:border-flit-negative={errors.currentPassword}
-										class:focus:ring-flit-negative={errors.currentPassword}
-										class:focus:border-flit-negative={errors.currentPassword}
-										placeholder="Enter current password"
-										bind:value={formData.currentPassword}
-										oninput={(e) => handleFieldChange('currentPassword', e.currentTarget.value)}
-										aria-describedby={errors.currentPassword
-											? 'current-password-error-change'
-											: undefined}
-										aria-invalid={!!errors.currentPassword}
-									/>
-									<button
-										type="button"
-										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-										onclick={() => (showCurrentPassword = !showCurrentPassword)}
-										disabled={isSaving}
-										aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-									>
-										{#if showCurrentPassword}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-												/>
-											</svg>
-										{:else}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-												/>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-												/>
-											</svg>
-										{/if}
-									</button>
-								</div>
-								{#if errors.currentPassword}
-									<p
-										id="current-password-error-change"
-										class="mt-1 text-sm text-flit-negative"
-										role="alert"
-									>
-										{errors.currentPassword}
-									</p>
-								{/if}
-							</div>
+							<CurrentPasswordInput
+								id="currentPasswordForChange"
+								name="currentPasswordForChange"
+								requiredToSave={true}
+								value={formData.currentPassword}
+								oninput={(v) => handleFieldChange('currentPassword', v)}
+								error={errors.currentPassword}
+								disabled={isSaving}
+								bind:showPassword={showCurrentPassword}
+								errorId="current-password-error-change"
+							/>
 						{/if}
 
 						{#if showPasswordChange}
-							<!-- Current Password -->
-							<div class="mb-4">
-								<label for="currentPassword" class="mb-2 block text-sm font-medium text-flit-ink">
-									Current password
-								</label>
-								<div class="relative">
-									<input
-										id="currentPassword"
-										name="currentPassword"
-										type={showCurrentPassword ? 'text' : 'password'}
-										disabled={isSaving}
-										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-										class:border-flit-negative={errors.currentPassword}
-										class:focus:ring-flit-negative={errors.currentPassword}
-										class:focus:border-flit-negative={errors.currentPassword}
-										placeholder="Enter current password"
-										bind:value={formData.currentPassword}
-										oninput={(e) => handleFieldChange('currentPassword', e.currentTarget.value)}
-										aria-describedby={errors.currentPassword ? 'current-password-error' : undefined}
-										aria-invalid={!!errors.currentPassword}
-									/>
-									<button
-										type="button"
-										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-										onclick={() => (showCurrentPassword = !showCurrentPassword)}
-										disabled={isSaving}
-										aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-									>
-										{#if showCurrentPassword}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-												/>
-											</svg>
-										{:else}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-												/>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-												/>
-											</svg>
-										{/if}
-									</button>
-								</div>
-								{#if errors.currentPassword}
-									<p
-										id="current-password-error"
-										class="mt-1 text-sm text-flit-negative"
-										role="alert"
-									>
-										{errors.currentPassword}
-									</p>
-								{/if}
-							</div>
+							<CurrentPasswordInput
+								id="currentPassword"
+								name="currentPassword"
+								value={formData.currentPassword}
+								oninput={(v) => handleFieldChange('currentPassword', v)}
+								error={errors.currentPassword}
+								disabled={isSaving}
+								bind:showPassword={showCurrentPassword}
+								errorId="current-password-error"
+							/>
 
 							<!-- New Password -->
 							<div class="mb-4">

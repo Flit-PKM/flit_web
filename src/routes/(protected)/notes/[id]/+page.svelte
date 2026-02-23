@@ -8,6 +8,7 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient, HttpError } from '$lib/api/client';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+	import { filterNotDeleted } from '$lib/utils/filter';
 	import { markdownToSafeHtml } from '$lib/utils/markdown';
 	import type {
 		NoteDetail,
@@ -67,8 +68,8 @@
 				const raw = await apiClient.getNotes(
 					q.trim() ? { search: q.trim(), limit: 50 } : { limit: 20 }
 				);
-				noteSearchResults = raw.filter(
-					(n) => !n.is_deleted && (currentNoteId == null || n.id !== currentNoteId)
+				noteSearchResults = filterNotDeleted(raw).filter(
+					(n) => currentNoteId == null || n.id !== currentNoteId
 				);
 			} catch {
 				noteSearchResults = [];
@@ -104,7 +105,7 @@
 		try {
 			const noteData = await apiClient.getNote(noteId);
 			const relatedTitles = new Map<number, string>();
-			const rels = noteData.relationships?.filter((r) => !r.is_deleted) ?? [];
+			const rels = filterNotDeleted(noteData.relationships);
 			if (rels.length > 0) {
 				const otherIds = [...new Set(rels.map((r) => otherNoteId(r, noteId)))];
 				const results = await Promise.allSettled(
@@ -146,7 +147,7 @@
 		note = null;
 		relatedNoteTitles = new Map();
 		loadNote(noteId)
-			.then((r) => {
+			.then(async (r) => {
 				const current = get(page);
 				if (current.params.id !== String(noteId)) return;
 				note = r.data;
@@ -158,6 +159,30 @@
 						current.url.searchParams.get('edit') === 'true')
 				) {
 					startEditing();
+					const appendParam = current.url.searchParams.get('append');
+					const appendId = appendParam ? Number(appendParam) : NaN;
+					if (Number.isInteger(appendId) && appendId !== noteId) {
+						try {
+							await apiClient.createRelationship({
+								note_a_id: appendId,
+								note_b_id: noteId,
+								type: 'FOLLOWS_ON'
+							});
+							const refreshed = await loadNote(noteId);
+							if (get(page).params.id === String(noteId) && refreshed.data) {
+								note = refreshed.data;
+								relatedNoteTitles = refreshed.relatedTitles;
+							}
+						} catch (err) {
+							saveError = captureApiError(err, {
+								component: 'NoteDetail',
+								operation: 'appendRelationship',
+								appendFromNoteId: appendId,
+								noteId
+							});
+						}
+						goto(resolve(`/notes/${noteId}?edit=1`), { replaceState: true });
+					}
 				}
 			})
 			.finally(() => {
@@ -172,7 +197,7 @@
 		}
 		try {
 			const categoriesData = await apiClient.getCategories({ limit: 1000 });
-			categories = categoriesData.filter((c) => !c.is_deleted);
+			categories = filterNotDeleted(categoriesData);
 		} catch {
 			// Non-blocking; note detail can still show
 		}
@@ -230,9 +255,10 @@
 		noteSearchResults = [];
 	}
 
-	function selectNoteFromSearch(selected: NoteRead) {
+	async function selectNoteFromSearch(selected: NoteRead) {
 		addRelNoteId = String(selected.id);
 		addRelNoteTitle = selected.title;
+		await addRelationship();
 		closeNoteSearchPopup();
 	}
 
@@ -356,7 +382,7 @@
 				type: addRelType
 			});
 			// Update local note and related titles so the new relationship shows without waiting for refetch
-			const existing = (note.relationships ?? []).filter((r) => !r.is_deleted);
+			const existing = filterNotDeleted(note.relationships);
 			note = {
 				...note,
 				relationships: [...existing, newRel]
@@ -425,11 +451,13 @@
 		}
 	}
 
+	// Filtered note collections (exclude deleted)
+	let filteredCategories = $derived(filterNotDeleted(note?.categories));
+	let filteredRelationships = $derived(filterNotDeleted(note?.relationships));
+
 	// Categories not already on the note (for Add dropdown)
 	let availableCategories = $derived(
-		note
-			? categories.filter((c) => !note!.categories?.some((nc) => !nc.is_deleted && nc.id === c.id))
-			: []
+		note ? categories.filter((c) => !filteredCategories.some((fc) => fc.id === c.id)) : []
 	);
 </script>
 
@@ -457,9 +485,10 @@
 		</div>
 	{:else if note}
 		<article class="card mt-6">
-			<header class="border-b border-flit-muted/20 pb-4">
-				<div class="flex flex-wrap items-start justify-between gap-2">
-					{#if isEditing}
+			{#if isEditing}
+				<!-- Edit mode -->
+				<header class="border-b border-flit-muted/20 pb-4">
+					<div class="flex flex-wrap items-start justify-between gap-2">
 						<div class="min-w-0 flex-1">
 							<input
 								type="text"
@@ -498,48 +527,26 @@
 								</button>
 							</div>
 						</div>
-					{:else}
-						<div class="min-w-0 flex-1">
-							<h1 class="text-center text-2xl font-bold text-flit-ink sm:text-3xl">{note.title}</h1>
-						</div>
-						<div class="flex items-center gap-2">
-							<button type="button" onclick={startEditing} class="btn btn-secondary"> Edit </button>
-							<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
-								Delete
-							</button>
-						</div>
-					{/if}
-				</div>
-				{#if isEditing}{/if}
-				<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-flit-muted">
-					<span>Type: {note.type}</span>
-					<span>Updated: {formatDate(note.updated_at)}</span>
-					<span>Created: {formatDate(note.created_at)}</span>
-				</div>
-			</header>
-			<div class="mt-4">
-				{#if isEditing}
+					</div>
+					<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-flit-muted">
+						<span>Type: {note.type}</span>
+						<span>Updated: {formatDate(note.updated_at)}</span>
+						<span>Created: {formatDate(note.created_at)}</span>
+					</div>
+				</header>
+				<div class="mt-4">
 					<textarea
 						bind:value={draftContent}
 						rows={12}
 						class="input font-sans whitespace-pre-wrap"
 						placeholder="Content"
 					></textarea>
-				{:else if markdownHtml}
-					<div class="prose max-w-none prose-flit">{@html markdownHtml}</div>
-				{:else}
-					<pre class="font-sans whitespace-pre-wrap text-flit-ink">{note.content}</pre>
-				{/if}
-			</div>
-			{#if saveError}
-				<p class="mt-2 text-sm text-flit-negative">{saveError}</p>
-			{/if}
+				</div>
 
-			<section class="mt-6 border-t border-flit-muted/20 pt-4">
-				<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">Categories</h2>
-				{#if isEditing}
+				<section class="mt-6 border-t border-flit-muted/20 pt-4">
+					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">Categories</h2>
 					<ul class="mt-2 flex flex-wrap gap-2">
-						{#each note.categories?.filter((c) => !c.is_deleted) ?? [] as category (category.id)}
+						{#each filteredCategories as category (category.id)}
 							<li
 								class="inline-flex items-center gap-1 rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-ink"
 							>
@@ -558,44 +565,26 @@
 						{/each}
 					</ul>
 					<div class="mt-2 flex flex-wrap items-center gap-2">
-						<select bind:value={addCategoryId} class="input w-auto min-w-0 text-sm">
+						<select
+							bind:value={addCategoryId}
+							onchange={() => addCategoryId && addCategory()}
+							disabled={isSaving}
+							class="input w-[40ch] text-sm"
+						>
 							<option value="">Add category…</option>
 							{#each availableCategories as cat (cat.id)}
 								<option value={cat.id}>{cat.name}</option>
 							{/each}
 						</select>
-						<button
-							type="button"
-							onclick={addCategory}
-							disabled={isSaving || !addCategoryId}
-							class="btn btn-secondary"
-						>
-							Add
-						</button>
 					</div>
-				{:else if note.categories && note.categories.filter((c) => !c.is_deleted).length > 0}
-					<ul class="mt-2 flex flex-wrap gap-2">
-						{#each note.categories.filter((c) => !c.is_deleted) as category (category.id)}
-							<li>
-								<a
-									href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
-									class="inline-flex rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-link hover:bg-flit-muted/30 hover:underline focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-								>
-									{category.name}
-								</a>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="mt-2 text-sm text-flit-muted">No categories</p>
-				{/if}
-			</section>
+				</section>
 
-			<section class="mt-6 border-t border-flit-muted/20 pt-4">
-				<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">Relationships</h2>
-				{#if isEditing}
+				<section class="mt-6 border-t border-flit-muted/20 pt-4">
+					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">
+						Relationships
+					</h2>
 					<ul class="mt-2 space-y-2">
-						{#each note.relationships?.filter((r) => !r.is_deleted) ?? [] as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
+						{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
 							<li
 								class="flex items-center justify-between gap-2 rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-4 py-3 shadow-flit-sm"
 							>
@@ -624,86 +613,144 @@
 							</li>
 						{/each}
 					</ul>
-					<div class="mt-2 flex flex-wrap items-center gap-2">
-						{#if addRelNoteId}
-							<span
-								class="inline-flex items-center gap-2 rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-3 py-2 text-sm text-flit-ink"
-							>
-								Note #{addRelNoteId}: {addRelNoteTitle || '…'}
-								<button
-									type="button"
-									onclick={openNoteSearchPopup}
-									class="rounded px-1.5 py-0.5 text-flit-link hover:bg-flit-muted/20 focus:ring-2 focus:ring-flit-primary focus:outline-none"
-								>
-									Change
-								</button>
-								<button
-									type="button"
-									onclick={clearRelNoteSelection}
-									class="rounded px-1.5 py-0.5 text-flit-muted hover:bg-flit-negative/20 hover:text-flit-negative focus:ring-2 focus:ring-flit-primary focus:outline-none"
-								>
-									Clear
-								</button>
-							</span>
-						{:else}
-							<button type="button" onclick={openNoteSearchPopup} class="btn btn-secondary">
-								Select note…
-							</button>
-						{/if}
-						<select bind:value={addRelType} class="input w-auto min-w-0 text-sm">
+					<div class="mt-2 flex flex-col gap-2">
+						<select bind:value={addRelType} class="input w-[40ch] text-sm">
 							{#each RELATIONSHIP_TYPES as t}
 								<option value={t}>{formatRelationshipType(t)}</option>
 							{/each}
 						</select>
+						<div class="flex flex-wrap items-center gap-2">
+							<button
+								type="button"
+								onclick={openNoteSearchPopup}
+								disabled={isSaving}
+								class="btn btn-secondary"
+							>
+								Select note…
+							</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="mt-6 border-t border-flit-muted/20 pt-4">
+					<div class="mt-6 flex items-center justify-center gap-2">
 						<button
 							type="button"
-							onclick={addRelationship}
-							disabled={isSaving || !addRelNoteId.trim()}
+							onclick={saveNoteFields}
+							disabled={isSaving}
+							class="btn btn-primary"
+						>
+							Save
+						</button>
+						<button
+							type="button"
+							onclick={cancelEditing}
+							disabled={isSaving}
 							class="btn btn-secondary"
 						>
-							Add
+							Cancel
 						</button>
 					</div>
-				{:else if note.relationships && note.relationships.filter((r) => !r.is_deleted).length > 0}
-					<ul class="mt-2 space-y-2">
-						{#each note.relationships.filter((r) => !r.is_deleted) as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
-							<li>
-								<a
-									href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}
-									class="flex items-center justify-between rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-4 py-3 shadow-flit-sm backdrop-blur-sm transition-all hover:border-flit-primary/50 hover:bg-flit-muted/5 hover:shadow-md focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-								>
-									<div class="flex items-center gap-3">
-										<span
-											class="inline-flex rounded-md bg-flit-primary/20 px-2 py-1 text-xs font-medium text-flit-primary"
-										>
-											{formatRelationshipTypeLabel(rel, note.id)}
-										</span>
-										<span class="text-sm text-flit-ink"
-											>{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
-												`Note #${otherNoteId(rel, note.id)}`}</span
-										>
-									</div>
-									<svg
-										class="h-5 w-5 text-flit-muted transition-transform group-hover:translate-x-1"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
+				</section>
+
+			{:else}
+				<!-- View mode -->
+				<header class="border-b border-flit-muted/20 pb-4">
+					<div class="flex flex-wrap items-start justify-between gap-2">
+						<div class="min-w-0 flex-1">
+							<h1 class="text-center text-2xl font-bold text-flit-ink sm:text-3xl">{note.title}</h1>
+						</div>
+						<div class="flex items-center gap-2">
+							<button type="button" onclick={startEditing} class="btn btn-secondary"> Edit </button>
+							<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
+								Delete
+							</button>
+						</div>
+					</div>
+					<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-flit-muted">
+						<span>Type: {note.type}</span>
+						<span>Updated: {formatDate(note.updated_at)}</span>
+						<span>Created: {formatDate(note.created_at)}</span>
+					</div>
+				</header>
+
+				<div class="mt-4">
+					{#if markdownHtml}
+					<div class="prose max-w-none prose-flit">{@html markdownHtml}</div>
+					{:else}
+					<pre class="font-sans whitespace-pre-wrap text-flit-ink">{note.content}</pre>
+					{/if}
+				</div>
+				
+				<section class="mt-6 border-t border-flit-muted/20 pt-4">
+					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">Categories</h2>
+					{#if filteredCategories.length > 0}
+						<ul class="mt-2 flex flex-wrap gap-2">
+							{#each filteredCategories as category (category.id)}
+								<li>
+									<a
+										href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
+										class="inline-flex rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-link hover:bg-flit-muted/30 hover:underline focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M9 5l7 7-7 7"
-										/>
-									</svg>
-								</a>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="mt-2 text-sm text-flit-muted">No relationships</p>
-				{/if}
-			</section>
+										{category.name}
+									</a>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="mt-2 text-sm text-flit-muted">No categories</p>
+					{/if}
+				</section>
+
+				<section class="mt-6 border-t border-flit-muted/20 pt-4">
+					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">
+						Relationships
+					</h2>
+					{#if filteredRelationships.length > 0}
+						<ul class="mt-2 space-y-2">
+							{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
+								<li>
+									<a
+										href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}
+										class="flex items-center justify-between rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-4 py-3 shadow-flit-sm backdrop-blur-sm transition-all hover:border-flit-primary/50 hover:bg-flit-muted/5 hover:shadow-md focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
+									>
+										<div class="flex items-center gap-3">
+											<span
+												class="inline-flex rounded-md bg-flit-primary/20 px-2 py-1 text-xs font-medium text-flit-primary"
+											>
+												{formatRelationshipTypeLabel(rel, note.id)}
+											</span>
+											<span class="text-sm text-flit-ink"
+												>{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
+													`Note #${otherNoteId(rel, note.id)}`}</span
+											>
+										</div>
+										<svg
+											class="h-5 w-5 text-flit-muted transition-transform group-hover:translate-x-1"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M9 5l7 7-7 7"
+											/>
+										</svg>
+									</a>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="mt-2 text-sm text-flit-muted">No relationships</p>
+					{/if}
+				</section>
+
+			{/if}
+			{#if saveError}
+				<p class="mt-2 text-sm text-flit-negative">{saveError}</p>
+			{/if}
 		</article>
 	{/if}
 
