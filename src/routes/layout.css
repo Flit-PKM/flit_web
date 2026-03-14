@@ -12,8 +12,8 @@
 	--color-mid-grey: oklch(50% 0 0);
 
 	--canvas-dark: oklch(18% 0.01 176);
-	--canvas-light: oklch(90% 0.005 90);
-	--ink-dark: oklch(90% 0.02 90);
+	--canvas-light: oklch(90% 0.02 100);
+	--ink-dark: oklch(90% 0.02 100);
 	--ink-light: oklch(15% 0.02 176);
 
 	--color-canvas: var(--canvas-light);

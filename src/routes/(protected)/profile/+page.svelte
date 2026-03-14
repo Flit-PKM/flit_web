@@ -686,15 +686,18 @@
 	/>
 </svelte:head>
 
-{#if isLoading}
-	<!-- Loading State -->
-	<div class="flex min-h-[calc(100vh-12rem)] items-center justify-center">
-		<div class="text-center">
+<!-- Protected page layout: mx-auto max-w-* px-4 py-8 sm:px-6 lg:px-8 -->
+<div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+	<h1 class="text-2xl font-bold text-flit-ink sm:text-3xl">Your Profile</h1>
+
+	{#if isLoading}
+		<div class="mt-6 flex items-center justify-center py-8">
 			<svg
-				class="mx-auto h-12 w-12 animate-spin text-flit-primary"
+				class="h-8 w-8 animate-spin text-flit-primary"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"
+				aria-hidden="true"
 			>
 				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
 				></circle>
@@ -704,33 +707,26 @@
 					d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 				></path>
 			</svg>
-			<p class="mt-4 text-flit-muted">Loading your profile...</p>
+			<span class="ml-2 text-flit-muted">Loading your profile...</span>
 		</div>
-	</div>
-{:else if $currentUser}
-	<!-- Profile Content -->
-	<div class="px-4 py-12 sm:px-6 lg:px-8">
-		<div class="mx-auto max-w-2xl">
-			<!-- Header -->
-			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-				<div class="flex flex-wrap items-center justify-between gap-4">
-					<div>
-						<h1 class="text-2xl font-bold text-flit-ink">Your Profile</h1>
-						<p class="mt-1 text-flit-muted">Manage your account information</p>
-					</div>
-					<button onclick={handleLogout} class="btn btn-secondary px-4">
-						<svg class="mr-2 -ml-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-							/>
-						</svg>
-						Sign out
-					</button>
-				</div>
+	{:else if $currentUser}
+		<!-- Header: subtitle + Sign out -->
+		<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
+			<div class="flex flex-wrap items-center justify-between gap-4">
+				<p class="text-flit-muted">Manage your account information</p>
+				<button onclick={handleLogout} class="btn btn-secondary px-4">
+					<svg class="mr-2 -ml-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+						/>
+					</svg>
+					Sign out
+				</button>
 			</div>
+		</div>
 
 			<!-- Success Message -->
 			{#if successMessage}
@@ -1205,7 +1201,11 @@
 										{plan.name ?? 'Subscription plan'}
 									</h3>
 									{#if plan.description}
-										<p class="mt-1 text-sm text-flit-muted">{plan.description}</p>
+										<div class="mt-1 text-sm text-flit-muted">
+											{#each plan.description.split(/\n/).filter(Boolean) as paragraph}
+												<p>{paragraph}</p>
+											{/each}
+										</div>
 									{/if}
 									<div class="mt-3">
 										<span class="text-lg font-medium text-flit-ink">
@@ -1815,15 +1815,12 @@
 					</button>
 				</div>
 			</div>
-		</div>
-	</div>
-{:else}
-	<!-- Not authenticated -->
-	<div class="flex min-h-[calc(100vh-12rem)] items-center justify-center">
-		<div class="text-center">
-			<h1 class="mb-4 text-2xl font-bold text-flit-ink">Access Denied</h1>
+	{:else}
+		<!-- Not authenticated -->
+		<div class="mt-6 text-center">
+			<p class="mb-2 font-semibold text-flit-ink">Access Denied</p>
 			<p class="mb-6 text-flit-muted">You need to sign in to access your profile.</p>
 			<a href={resolve('/login')} class="btn btn-primary px-6 py-3 text-base"> Sign In </a>
 		</div>
-	</div>
-{/if}
+	{/if}
+</div>

@@ -766,7 +766,7 @@
 			onclick={(e) => e.target === e.currentTarget && closeNoteSearchPopup()}
 		>
 			<div
-				class="w-full max-w-md rounded-xl border border-flit-muted/20 bg-flit-card p-4 shadow-flit-sm"
+				class="w-full max-w-md rounded-xl border border-flit-muted/20 bg-flit-card-opaque p-4 shadow-flit-sm"
 				role="document"
 			>
 				<h2

@@ -42,7 +42,7 @@
 	// Redirect if already authenticated
 	$effect(() => {
 		if ($isAuthenticated) {
-			goto(resolve('/profile'));
+			goto(resolve('/notes'));
 		}
 	});
 
@@ -88,7 +88,7 @@
 		const result = await authActions.login(formData);
 
 		if (result.success) {
-			// Redirect to intended page or profile (allowlist for type-safe goto)
+			// Redirect to intended page or notes (allowlist for type-safe goto)
 			const ALLOWED_REDIRECTS = [
 				'/profile',
 				'/notes',
@@ -97,10 +97,10 @@
 				'/about',
 				'/terms'
 			] as const;
-			const requested = $page.url.searchParams.get('redirect') || '/profile';
+			const requested = $page.url.searchParams.get('redirect') || '/notes';
 			const path = ALLOWED_REDIRECTS.includes(requested as (typeof ALLOWED_REDIRECTS)[number])
 				? (requested as (typeof ALLOWED_REDIRECTS)[number])
-				: '/profile';
+				: '/notes';
 			goto(resolve(path) as Parameters<typeof goto>[0]);
 		} else {
 			generalError = result.error || 'Login failed. Please try again.';
