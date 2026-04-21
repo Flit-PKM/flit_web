@@ -168,9 +168,11 @@ export function validateProfileForm(
 	if (emailErr) errors.email = emailErr;
 
 	// Check if username or email changed (requires current password)
-	const usernameChanged = originalUser && data.username !== originalUser.username;
-	const emailChanged = originalUser && data.email !== originalUser.email;
+	const _usernameChanged = originalUser && data.username !== originalUser.username;
+	const _emailChanged = originalUser && data.email !== originalUser.email;
 	const passwordChanging = !!(data.newPassword || data.confirmNewPassword);
+	void _usernameChanged;
+	void _emailChanged;
 
 	// Require current password for all updates (backend requirement)
 	if (!data.currentPassword?.trim()) {

@@ -24,6 +24,8 @@ interface ImportMetaEnv {
 	readonly VITE_TURNSTILE_SITE_KEY?: string;
 }
 
+// Used for Vite client typings (import.meta.env)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface ImportMeta {
 	readonly env: ImportMetaEnv;
 }

@@ -2,13 +2,13 @@
 
 ## Overview
 
-**Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and Tailwind CSS 4.x. It provides a client-side interface for a FastAPI backend, handling authentication, notes and category management, billing/subscription, profile, connected apps, and a superuser-only dashboard (users, newsletter subscriptions, access codes).
+**Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and vanilla CSS. It provides a client-side interface for a FastAPI backend, handling authentication, notes and category management, billing/subscription, profile, and connected apps.
 
 ## Tech Stack
 
 - **Framework**: SvelteKit 2.x (SSR + SPA)
 - **Language**: TypeScript 5.x (strict mode)
-- **Styling**: Tailwind CSS 4.x (utility-first)
+- **Styling**: Vanilla CSS with layers (reset, base, layout, components) and design tokens in `src/css/colors.css`. Entry: `src/css/style.css`. Reusable patterns must live in shared class-based CSS (`layout.css` and `components.css`). Do **not** use `<style>` blocks in Svelte files. Inline `style` is allowed only for truly dynamic runtime values (for example width percentages driven by state). Canonical class conventions: button variants use `btn-*` modifiers (`btn-primary`, `btn-secondary`, `btn-danger`), and card element classes use `card__*` naming.
 - **Code Quality**: ESLint 9.x + Prettier 3.x
 - **Build**: Vite 6.x
 
@@ -33,6 +33,7 @@ Client-driven API architecture with centralized API client handling HTTP communi
 
 ```
 src/
+├── css/            # Vanilla CSS: _reset.css, base.css, colors.css, layout.css, components.css, style.css
 ├── lib/
 │   ├── api/        # API client (ApiClient class)
 │   ├── assets/     # Static assets (favicon, etc.)
@@ -41,7 +42,7 @@ src/
 │   ├── types/      # TypeScript definitions
 │   └── utils/      # Helper functions (auth, validation, error-handler)
 └── routes/         # SvelteKit pages/layouts
-    └── (protected)/ # Auth guard layout; profile, notes, dashboard (superuser-only) live here
+    └── (protected)/ # Auth guard layout; profile and notes live here
 ```
 
 ## Essential Workflows
@@ -51,7 +52,7 @@ src/
 3. **API Usage**: Always use `apiClient` methods (no raw fetch)
 4. **State**: Use `$state` for local, `authStore` for global auth state
 5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
-6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI. The dashboard (`/dashboard`) is superuser-only: its layout redirects non-superusers to `/profile`; nav shows "Dashboard" only when `currentUser.is_superuser` is true.
+6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI.
 7. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`)
 8. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
 
@@ -61,4 +62,6 @@ src/
 - Implement debouncing for search/filter inputs
 - Persist tokens in localStorage only (check `browser` env)
 - Handle 401 errors by clearing token and redirecting
-- Use `flit-*` Tailwind color conventions consistently
+- Use `flit-*` color classes and design tokens from `src/css/colors.css` and shared layout/component classes consistently; use inline styles only for dynamic runtime values
+- Keep global CSS valid vanilla CSS syntax only (no Svelte-only selectors like `:global(...)` in `src/css/*.css`)
+- New classes must be added intentionally to shared CSS before use; avoid placeholder/undefined class hooks in markup

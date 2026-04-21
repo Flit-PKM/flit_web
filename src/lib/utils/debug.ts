@@ -4,8 +4,7 @@
  * Consistent debugging and logging utilities for the application
  */
 
-import { browser } from '$app/environment';
-import { errorLogger } from '$lib/utils/error-handler';
+import { errorLogger, type ErrorContext } from '$lib/utils/error-handler';
 
 /**
  * Debug logging utility with consistent formatting
@@ -45,18 +44,9 @@ export class DebugLogger {
 	/**
 	 * Log debug information
 	 */
-	log(message: string, data?: any, context?: any): void {
+	log(message: string, data?: unknown, context?: unknown): void {
 		if (this.isEnabled) {
-			const logData = {
-				timestamp: new Date().toISOString(),
-				message,
-				data,
-				context,
-				userAgent: browser ? navigator.userAgent : 'server',
-				url: browser ? window.location.href : undefined
-			};
-
-			errorLogger.logDebug(`[DEBUG] ${message}`, context);
+			errorLogger.logDebug(`[DEBUG] ${message}`, context as ErrorContext | undefined);
 
 			if (data) {
 				console.debug(`[DEBUG] ${message}:`, data);
@@ -67,9 +57,12 @@ export class DebugLogger {
 	/**
 	 * Log performance measurements
 	 */
-	performance(label: string, duration: number, context?: any): void {
+	performance(label: string, duration: number, context?: unknown): void {
 		if (this.isEnabled) {
-			errorLogger.logDebug(`[PERFORMANCE] ${label}: ${duration}ms`, context);
+			errorLogger.logDebug(
+				`[PERFORMANCE] ${label}: ${duration}ms`,
+				context as ErrorContext | undefined
+			);
 			console.debug(`[PERFORMANCE] ${label}: ${duration}ms`);
 		}
 	}

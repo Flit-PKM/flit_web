@@ -22,23 +22,21 @@
 	} = $props();
 </script>
 
-<div class="mb-4">
-	<label for={id} class="mb-2 block text-sm font-medium text-flit-ink">
+<div class="form-group">
+	<label for={id}>
 		Current password
 		{#if requiredToSave}
-			<span class="text-flit-muted">(required to save changes)</span>
+			<span class="card__meta">(required to save changes)</span>
 		{/if}
 	</label>
-	<div class="relative">
+	<div class="input-wrap">
 		<input
 			{id}
 			{name}
 			type={showPassword ? 'text' : 'password'}
 			{disabled}
-			class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-			class:border-flit-negative={!!error}
-			class:focus:ring-flit-negative={!!error}
-			class:focus:border-flit-negative={!!error}
+			class="input"
+			class:input--error={!!error}
 			placeholder="Enter current password"
 			{value}
 			oninput={(e) => oninput?.(e.currentTarget.value)}
@@ -47,13 +45,13 @@
 		/>
 		<button
 			type="button"
-			class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
+			class="input__action"
 			onclick={() => (showPassword = !showPassword)}
 			{disabled}
 			aria-label={showPassword ? 'Hide password' : 'Show password'}
 		>
 			{#if showPassword}
-				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -62,7 +60,7 @@
 					/>
 				</svg>
 			{:else}
-				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -80,8 +78,6 @@
 		</button>
 	</div>
 	{#if error}
-		<p id={errorId} class="mt-1 text-sm text-flit-negative" role="alert">
-			{error}
-		</p>
+		<p id={errorId} class="form-group__error" role="alert">{error}</p>
 	{/if}
 </div>

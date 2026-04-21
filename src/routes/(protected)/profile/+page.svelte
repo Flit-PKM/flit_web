@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { base, resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { authActions, currentUser, isAuthenticated } from '$lib/stores/auth';
@@ -37,7 +36,6 @@
 	// Connect app state
 	let connectCode = $state('');
 	let connectCodeExpiresIn = $state<number | undefined>(undefined);
-	let connectCodeApp = $state<string | undefined>(undefined);
 	let connectCodeLoading = $state(false);
 	let connectCodeError = $state('');
 	let connectCodeCopied = $state(false);
@@ -134,10 +132,6 @@
 	let colorSchemeChanged = $derived(
 		$currentUser !== null && formData.colorScheme !== ($currentUser?.color_scheme || 'default')
 	);
-	let hasChangesRequiringPassword = $derived(
-		usernameChanged || emailChanged || colorSchemeChanged || showPasswordChange
-	);
-
 	// Form validator
 	let validator: FormValidator<ProfileFormData>;
 	let debouncedValidator: ReturnType<typeof createDebouncedValidator>;
@@ -426,41 +420,6 @@
 		}
 	}
 
-	// Password strength color classes (flit tokens)
-	function getStrengthColor(strength: number): string {
-		switch (strength) {
-			case 0:
-				return 'bg-flit-muted/30';
-			case 1:
-				return 'bg-flit-negative';
-			case 2:
-				return 'bg-amber-500';
-			case 3:
-				return 'bg-amber-400';
-			case 4:
-				return 'bg-flit-positive';
-			default:
-				return 'bg-flit-muted/30';
-		}
-	}
-
-	function getStrengthTextColor(strength: number): string {
-		switch (strength) {
-			case 0:
-				return 'text-flit-muted';
-			case 1:
-				return 'text-flit-negative';
-			case 2:
-				return 'text-amber-600';
-			case 3:
-				return 'text-amber-600';
-			case 4:
-				return 'text-flit-positive';
-			default:
-				return 'text-flit-muted';
-		}
-	}
-
 	// Handle logout
 	function handleLogout() {
 		authActions.logout();
@@ -471,14 +430,12 @@
 		connectCodeError = '';
 		connectCode = '';
 		connectCodeExpiresIn = undefined;
-		connectCodeApp = undefined;
 		connectCodeLoading = true;
 		try {
 			errorLogger.logDebug('Requesting connection code');
 			const res = await apiClient.requestConnectCode();
 			connectCode = res.connection_code;
 			connectCodeExpiresIn = res.expires_in;
-			connectCodeApp = res.app;
 			errorLogger.logDebug('Connection code requested successfully');
 		} catch (err) {
 			connectCodeError = captureApiError(err, {
@@ -507,7 +464,6 @@
 	function handleCloseConnectCode() {
 		connectCode = '';
 		connectCodeExpiresIn = undefined;
-		connectCodeApp = undefined;
 		connectCodeError = '';
 		connectCodeCopied = false;
 	}
@@ -686,113 +642,89 @@
 	/>
 </svelte:head>
 
-<!-- Protected page layout: mx-auto max-w-* px-4 py-8 sm:px-6 lg:px-8 -->
-<div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-	<h1 class="text-2xl font-bold text-flit-ink sm:text-3xl">Your Profile</h1>
+<h1>Your Profile</h1>
 
-	{#if isLoading}
-		<div class="mt-6 flex items-center justify-center py-8">
-			<svg
-				class="h-8 w-8 animate-spin text-flit-primary"
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				aria-hidden="true"
-			>
-				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
+{#if isLoading}
+	<div class="loading">
+		<span class="loading__spinner" aria-hidden="true">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+				<circle
+					class="loading__spinner-inner"
+					cx="12"
+					cy="12"
+					r="10"
+					stroke="currentColor"
+					stroke-width="4"
 				></circle>
 				<path
-					class="opacity-75"
+					class="loading__spinner-path"
 					fill="currentColor"
 					d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 				></path>
 			</svg>
-			<span class="ml-2 text-flit-muted">Loading your profile...</span>
-		</div>
-	{:else if $currentUser}
-		<!-- Header: subtitle + Sign out -->
-		<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-			<div class="flex flex-wrap items-center justify-between gap-4">
-				<p class="text-flit-muted">Manage your account information</p>
-				<button onclick={handleLogout} class="btn btn-secondary px-4">
-					<svg class="mr-2 -ml-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		</span>
+		<span>Loading your profile...</span>
+	</div>
+{:else if $currentUser}
+	<div class="page-subhead card__row card__row--between">
+		<p class="card__meta">Manage your account information</p>
+		<button onclick={handleLogout} class="btn">
+			<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+				/>
+			</svg>
+			Sign out
+		</button>
+	</div>
+
+	<div class="profile-stack">
+		{#if successMessage}
+			<div class="alert alert--success" role="alert">
+				<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor">
+					<path
+						fill-rule="evenodd"
+						d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+						clip-rule="evenodd"
+					/>
+				</svg>
+				<p class="alert__message">{successMessage}</p>
+			</div>
+		{/if}
+
+		<div class="card">
+			<h2>Connected Apps</h2>
+
+			<!-- Connected Apps List -->
+			{#if connectedAppsError || revokeError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
 						/>
 					</svg>
-					Sign out
-				</button>
-			</div>
-		</div>
-
-			<!-- Success Message -->
-			{#if successMessage}
-				<div
-					class="mb-6 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-					role="alert"
-				>
-					<div class="flex">
-						<div class="flex-shrink-0">
-							<svg class="h-5 w-5 text-flit-positive" viewBox="0 0 20 20" fill="currentColor">
-								<path
-									fill-rule="evenodd"
-									d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-									clip-rule="evenodd"
-								/>
-							</svg>
-						</div>
-						<div class="ml-3">
-							<p class="text-sm text-flit-ink">{successMessage}</p>
-						</div>
+					<div class="alert__message card__block">
+						{#if connectedAppsError}
+							<p>{connectedAppsError}</p>
+						{/if}
+						{#if revokeError}
+							<p>{revokeError}</p>
+						{/if}
 					</div>
 				</div>
 			{/if}
 
-			<!-- Connect app -->
-			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-				<h2 class="mb-4 text-lg font-semibold text-flit-ink">Connect app</h2>
-
-				<!-- Connected Apps List -->
-				{#if connectedAppsError || revokeError}
-					<div
-						class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-						role="alert"
-					>
-						<div class="flex">
-							<div class="flex-shrink-0">
-								<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-									<path
-										fill-rule="evenodd"
-										d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-										clip-rule="evenodd"
-									/>
-								</svg>
-							</div>
-							<div class="ml-3">
-								{#if connectedAppsError}
-									<p class="text-sm text-flit-ink">{connectedAppsError}</p>
-								{/if}
-								{#if revokeError}
-									<p class="mt-1 text-sm text-flit-ink">{revokeError}</p>
-								{/if}
-							</div>
-						</div>
-					</div>
-				{/if}
-
-				{#if connectedAppsLoading}
-					<div class="mb-4 flex items-center justify-center py-4">
-						<svg
-							class="h-6 w-6 animate-spin text-flit-primary"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
+			{#if connectedAppsLoading}
+				<div class="loading loading--muted">
+					<span class="loading__spinner" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 							<circle
-								class="opacity-25"
+								class="loading__spinner-inner"
 								cx="12"
 								cy="12"
 								r="10"
@@ -800,65 +732,51 @@
 								stroke-width="4"
 							></circle>
 							<path
-								class="opacity-75"
+								class="loading__spinner-path"
 								fill="currentColor"
 								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 							></path>
 						</svg>
-						<span class="ml-2 text-sm text-flit-muted">Loading connected apps...</span>
-					</div>
-				{:else if connectedApps.length > 0}
-					<div class="mb-6 space-y-3">
-						<h3 class="text-sm font-medium text-flit-ink">Connected Apps</h3>
-						<div class="space-y-2">
-							{#each connectedApps as app (app.id)}
-								<div
-									class="rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-3 backdrop-blur-sm"
-								>
-									<div class="flex items-start justify-between gap-3">
-										<div class="flex-1">
-											<div class="flex items-center gap-2">
-												<span class="font-medium text-flit-ink">
-													{app.app_name || app.device_name}
-												</span>
-												<span
-													class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-														app.is_active
-															? 'bg-flit-positive/20 text-flit-positive'
-															: 'bg-flit-muted/30 text-flit-muted'
-													}`}
-												>
-													{app.is_active ? 'Active' : 'Inactive'}
-												</span>
-											</div>
-											<div class="mt-1 text-sm text-flit-muted">
-												{app.device_name}
-												{#if app.platform}
-													<span class="mx-1">•</span>
-													{app.platform}
-												{/if}
-											</div>
-											<div class="mt-1 text-xs text-flit-muted">
-												Connected {formatDate(app.created_at)}
-											</div>
-										</div>
-										{#if app.is_active}
-											<button
-												type="button"
-												class="btn btn-secondary px-3 py-1 text-xs disabled:cursor-not-allowed"
-												onclick={() => handleRevokeConnectedApp(app.id)}
-												disabled={revokingAppId === app.id}
-												aria-label={`Revoke connected app ${app.app_name || app.device_name}`}
-											>
-												{#if revokingAppId === app.id}
-													<svg
-														class="mr-1 h-4 w-4 animate-spin text-flit-muted"
-														xmlns="http://www.w3.org/2000/svg"
-														fill="none"
-														viewBox="0 0 24 24"
-													>
+					</span>
+					<span>Loading connected apps...</span>
+				</div>
+			{:else if connectedApps.length > 0}
+				<div class="card__column">
+					{#each connectedApps as app (app.id)}
+						<div class="card">
+							<div class="card__column">
+								<div class="card__row card__row--between">
+									<span>
+										{app.app_name || app.device_name}
+									</span>
+									<span class="badge {app.is_active ? 'badge--positive' : 'badge--muted'}">
+										{app.is_active ? 'Active' : 'Inactive'}
+									</span>
+								</div>
+								<div class="card__row text-sm">
+									{app.device_name}
+									{#if app.platform}
+										<span class="profile-status-dot">•</span>
+										{app.platform}
+									{/if}
+								</div>
+								<div class="card__row text-xs">
+									Connected {formatDate(app.created_at)}
+								</div>
+								<div class="card__row card__row--end">
+									{#if app.is_active}
+										<button
+											type="button"
+											class="btn btn--compact"
+											onclick={() => handleRevokeConnectedApp(app.id)}
+											disabled={revokingAppId === app.id}
+											aria-label={`Revoke connected app ${app.app_name || app.device_name}`}
+										>
+											{#if revokingAppId === app.id}
+												<span class="loading__spinner" aria-hidden="true">
+													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 														<circle
-															class="opacity-25"
+															class="loading__spinner-inner"
 															cx="12"
 															cy="12"
 															r="10"
@@ -866,71 +784,58 @@
 															stroke-width="4"
 														></circle>
 														<path
-															class="opacity-75"
+															class="loading__spinner-path"
 															fill="currentColor"
 															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 														></path>
 													</svg>
-													Revoking…
-												{:else}
-													Revoke
-												{/if}
-											</button>
-										{/if}
-									</div>
+												</span>
+												Revoking…
+											{:else}
+												Revoke
+											{/if}
+										</button>
+									{/if}
 								</div>
-							{/each}
+							</div>
 						</div>
-					</div>
-				{:else}
-					<div class="mb-6 text-sm text-flit-muted">
-						No connected apps yet. Connect an app to get started.
-					</div>
-				{/if}
+					{/each}
+				</div>
+			{:else}
+				<div class="card__meta">No connected apps yet. Connect an app to get started.</div>
+			{/if}
 
-				{#if connectCodeError}
-					<div
-						class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-						role="alert"
-					>
-						<div class="flex">
-							<div class="flex-shrink-0">
-								<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-									<path
-										fill-rule="evenodd"
-										d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-										clip-rule="evenodd"
-									/>
-								</svg>
-							</div>
-							<div class="ml-3">
-								<p class="text-sm text-flit-ink">{connectCodeError}</p>
-							</div>
-						</div>
-					</div>
-				{/if}
+			{#if connectCodeError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<p class="alert__message">{connectCodeError}</p>
+				</div>
+			{/if}
+
+			<div class="card__column">
 				{#if connectCode}
-					<div class="space-y-4">
-						<p class="text-sm text-flit-muted">
-							Enter this code in the app you wish to connect to Flit - Core
-						</p>
-						<div
-							class="rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-4 py-3 font-mono text-xl font-semibold tracking-wider text-flit-ink backdrop-blur-sm"
-							aria-label="Connection code"
-						>
+					<div class="card__column card__column--center">
+						<p class="card__meta">Enter this code in the app you wish to connect to Flit - Core</p>
+						<div class="card text-md" aria-label="Connection code">
 							{connectCode}
 						</div>
 						{#if connectCodeExpiresIn != null && connectCodeExpiresIn > 0}
 							{@const minutes = Math.ceil(connectCodeExpiresIn / 60)}
-							<p class="text-sm text-flit-muted">
+							<p class="card__meta">
 								This code expires in {minutes} minute{minutes === 1 ? '' : 's'}.
 							</p>
 						{/if}
-						<div class="flex flex-wrap gap-3">
+						<div class="auth__actions">
 							<button
 								type="button"
 								onclick={handleCopyCode}
-								class="btn btn-secondary px-4"
+								class="btn"
 								aria-label="Copy connection code"
 							>
 								{connectCodeCopied ? 'Copied!' : 'Copy'}
@@ -939,7 +844,7 @@
 								type="button"
 								onclick={handleConnectApp}
 								disabled={connectCodeLoading}
-								class="btn btn-secondary px-4 disabled:cursor-not-allowed"
+								class="btn"
 								aria-label="Get new connection code"
 							>
 								Get new code
@@ -947,7 +852,7 @@
 							<button
 								type="button"
 								onclick={handleCloseConnectCode}
-								class="btn btn-primary px-4"
+								class="btn btn-primary"
 								aria-label="Close connection code"
 							>
 								Close
@@ -959,792 +864,14 @@
 						type="button"
 						onclick={handleConnectApp}
 						disabled={connectCodeLoading}
-						class="btn btn-primary px-4 disabled:cursor-not-allowed"
+						class="btn btn-primary"
 						aria-label="Request connection code to connect an app to Flit Core"
 					>
 						{#if connectCodeLoading}
-							<svg
-								class="mr-2 h-5 w-5 animate-spin"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								aria-hidden="true"
-							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="4"
-								></circle>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-								></path>
-							</svg>
-							Requesting...
-						{:else}
-							+ Connect App
-						{/if}
-					</button>
-				{/if}
-			</div>
-
-			<!-- Access Code -->
-			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-				<h2 class="mb-4 text-lg font-semibold text-flit-ink">Access Code</h2>
-				{#if $currentUser?.access_grant}
-					<div
-						class="rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-						role="status"
-					>
-						<p class="text-sm font-medium text-flit-ink">
-							Access active until {formatDate($currentUser.access_grant.expires_at)}
-						</p>
-						<p class="mt-1 text-sm text-flit-muted">
-							Includes encryption: {$currentUser.access_grant.includes_encryption ? 'Yes' : 'No'}
-						</p>
-					</div>
-				{:else}
-					<p class="mb-3 text-sm text-flit-muted">
-						Enter an 8-character access code to activate time-limited access.
-					</p>
-					{#if accessCodeError}
-						<div
-							class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-							role="alert"
-						>
-							<p class="text-sm text-flit-ink">{accessCodeError}</p>
-						</div>
-					{/if}
-					{#if accessCodeSuccess}
-						<div
-							class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-							role="alert"
-						>
-							<p class="text-sm text-flit-ink">{accessCodeSuccess}</p>
-						</div>
-					{/if}
-					<form
-						onsubmit={(e) => {
-							e.preventDefault();
-							handleActivateAccessCode();
-						}}
-						class="flex flex-wrap items-end gap-3"
-					>
-						<div>
-							<label for="access-code-input" class="sr-only">Access code</label>
-							<input
-								id="access-code-input"
-								type="text"
-								maxlength="8"
-								placeholder="Enter 8-character code"
-								bind:value={accessCodeInput}
-								disabled={accessCodeActivating}
-								class="input w-48 font-mono tracking-wider"
-								autocomplete="off"
-							/>
-						</div>
-						<button
-							type="submit"
-							class="btn btn-primary"
-							disabled={accessCodeActivating || accessCodeInput.trim().length !== 8}
-						>
-							{#if accessCodeActivating}
-								Activating…
-							{:else}
-								Activate
-							{/if}
-						</button>
-					</form>
-				{/if}
-			</div>
-
-			<!-- Billing -->
-			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-				<h2 class="mb-2 text-lg font-semibold text-flit-ink">Billing</h2>
-				<p class="mb-4 text-sm text-flit-muted">Manage your subscription and payment.</p>
-
-				{#if subscriptionLoading}
-					<p class="text-sm text-flit-muted">Loading subscription…</p>
-				{:else if subscriptionError}
-					<div
-						class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-						role="alert"
-					>
-						<p class="text-sm text-flit-ink">{subscriptionError}</p>
-					</div>
-				{/if}
-
-				{#if showActivePlan}
-					<div
-						class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-						role="status"
-					>
-						<p class="text-sm font-medium text-flit-ink">You have an active subscription.</p>
-						{#if currentPlanProductId && subscriptionPlans.length > 0}
-							{@const currentPlan = subscriptionPlans.find(
-								(p) => p.product_id === currentPlanProductId
-							)}
-							{#if currentPlan?.name}
-								<p class="mt-1 text-sm text-flit-muted">Your plan: {currentPlan.name}</p>
-							{/if}
-						{/if}
-						{#if currentPeriodEnd}
-							<p class="mt-1 text-sm text-flit-muted">
-								Next billing date: {formatDate(currentPeriodEnd)}
-							</p>
-						{/if}
-						{#if currentPlanProductId}
-							<button
-								type="button"
-								onclick={() => handleCheckout(currentPlanProductId)}
-								disabled={checkoutLoading}
-								class="btn btn-primary mt-3 px-4 disabled:cursor-not-allowed"
-								aria-label="Manage Subscription"
-							>
-								{#if checkoutLoading}
-									<svg
-										class="mr-2 h-5 w-5 animate-spin"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										aria-hidden="true"
-									>
-										<circle
-											class="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									Redirecting…
-								{:else}
-									Manage Subscription
-								{/if}
-							</button>
-						{/if}
-					</div>
-				{/if}
-
-				{#if showSubscriptionLoaded}
-					{#if checkoutError}
-						<div
-							class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-							role="alert"
-						>
-							<div class="flex">
-								<div class="flex-shrink-0">
-									<svg class="h-5 w-5 text-flit-negative" viewBox="0 0 20 20" fill="currentColor">
-										<path
-											fill-rule="evenodd"
-											d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-											clip-rule="evenodd"
-										/>
-									</svg>
-								</div>
-								<div class="ml-3">
-									<p class="text-sm text-flit-ink">{checkoutError}</p>
-								</div>
-							</div>
-						</div>
-					{/if}
-					{#if !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
-						{@const status = subscriptionStatus?.status ?? ''}
-						{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
-						<p class="mb-4 text-sm text-flit-muted">
-							{isPaymentIssue
-								? 'Payment issue — update your payment method or resubscribe below.'
-								: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
-						</p>
-					{:else if !hasActiveSubscription}
-						<p class="mb-4 text-sm text-flit-muted">
-							Upgrade or manage your subscription via secure checkout.
-						</p>
-					{/if}
-
-					{#if plansLoading}
-						<p class="text-sm text-flit-muted">Loading plans…</p>
-					{:else if plansError}
-						<div
-							class="rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-							role="alert"
-						>
-							<p class="text-sm text-flit-ink">{plansError}</p>
-						</div>
-					{:else if plans.length === 0}
-						<p class="text-sm text-flit-muted">No plans available at the moment.</p>
-					{:else if showPlansList}
-						<!-- Subscription plans: click card to go to checkout -->
-						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							{#each subscriptionPlans as plan (plan.product_id)}
-								<button
-									type="button"
-									onclick={() => handleCheckout(plan.product_id)}
-									disabled={checkoutLoading}
-									class="flex min-h-[200px] flex-col rounded-lg border border-flit-muted/30 bg-flit-canvas/50 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-200 hover:border-flit-primary/40 hover:bg-flit-canvas/70 hover:shadow-flit-sm focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:hover:border-flit-muted/30 disabled:hover:bg-flit-canvas/50 disabled:hover:shadow-none"
-									aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
-								>
-									{#if plan.image}
-										<img src={plan.image} alt="" class="mb-3 h-16 w-auto rounded object-contain" />
-									{/if}
-									<h3 class="text-base font-semibold text-flit-ink">
-										{plan.name ?? 'Subscription plan'}
-									</h3>
-									{#if plan.description}
-										<div class="mt-1 text-sm text-flit-muted">
-											{#each plan.description.split(/\n/).filter(Boolean) as paragraph}
-												<p>{paragraph}</p>
-											{/each}
-										</div>
-									{/if}
-									<div class="mt-3">
-										<span class="text-lg font-medium text-flit-ink">
-											{formatPlanPrice(plan.price)}
-										</span>
-									</div>
-									{#if checkoutLoading}
-										<div class="mt-3 flex items-center text-sm text-flit-muted">
-											<svg
-												class="mr-2 h-4 w-4 animate-spin"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												aria-hidden="true"
-											>
-												<circle
-													class="opacity-25"
-													cx="12"
-													cy="12"
-													r="10"
-													stroke="currentColor"
-													stroke-width="4"
-												></circle>
-												<path
-													class="opacity-75"
-													fill="currentColor"
-													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-												></path>
-											</svg>
-											Redirecting to checkout…
-										</div>
-									{/if}
-								</button>
-							{/each}
-						</div>
-					{/if}
-				{/if}
-			</div>
-
-			<!-- Profile Form -->
-			<div>
-				<form
-					class="space-y-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm"
-					onsubmit={(e) => {
-						console.log('[Profile] Form onsubmit event fired');
-						handleSubmit(e);
-					}}
-					novalidate
-				>
-					<!-- Account Information Section -->
-					<div>
-						<h2 class="mb-4 text-lg font-semibold text-flit-ink">Account Information</h2>
-
-						<!-- Username Field -->
-						<div class="mb-4">
-							<label for="username" class="mb-2 block text-sm font-medium text-flit-ink">
-								Username
-							</label>
-							<input
-								id="username"
-								name="username"
-								type="text"
-								required
-								disabled={isSaving}
-								class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-								class:border-flit-negative={errors.username}
-								class:focus:ring-flit-negative={errors.username}
-								class:focus:border-flit-negative={errors.username}
-								bind:value={formData.username}
-								oninput={(e) => handleFieldChange('username', e.currentTarget.value)}
-								aria-describedby={errors.username ? 'username-error' : undefined}
-								aria-invalid={!!errors.username}
-							/>
-							{#if errors.username}
-								<p id="username-error" class="mt-1 text-sm text-flit-negative" role="alert">
-									{errors.username}
-								</p>
-							{/if}
-						</div>
-
-						<!-- Email Field -->
-						<div class="mb-4">
-							<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
-								Email address
-							</label>
-							<input
-								id="email"
-								name="email"
-								type="email"
-								required
-								disabled={isSaving}
-								class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-								class:border-flit-negative={errors.email}
-								class:focus:ring-flit-negative={errors.email}
-								class:focus:border-flit-negative={errors.email}
-								bind:value={formData.email}
-								oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
-								aria-describedby={errors.email ? 'email-error' : undefined}
-								aria-invalid={!!errors.email}
-							/>
-							{#if errors.email}
-								<p id="email-error" class="mt-1 text-sm text-flit-negative" role="alert">
-									{errors.email}
-								</p>
-							{/if}
-						</div>
-
-						<!-- Color Scheme Preference -->
-						<div class="mb-4">
-							<label for="color-scheme-light" class="mb-2 block text-sm font-medium text-flit-ink">
-								Color Scheme
-							</label>
-							<p class="mb-3 text-xs text-flit-muted">
-								Choose your preferred color scheme for the interface
-							</p>
-							{#if colorSchemeChanged && !formData.currentPassword}
-								<p class="mb-3 text-xs text-flit-primary">
-									Enter your current password below and click Save to apply.
-								</p>
-							{/if}
-							<div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
-								<label
-									class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
-									'light'
-										? 'border-flit-primary bg-flit-primary/10'
-										: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
-								>
-									<input
-										id="color-scheme-light"
-										type="radio"
-										name="colorScheme"
-										value="light"
-										bind:group={formData.colorScheme}
-										disabled={isSaving}
-										class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
-									/>
-									<div class="ml-3 flex-1">
-										<div class="flex items-center gap-2">
-											<svg
-												class="h-5 w-5 text-flit-ink"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-												/>
-											</svg>
-											<span class="text-sm font-medium text-flit-ink">Light</span>
-										</div>
-										<p class="mt-1 text-xs text-flit-muted">Bright and clear</p>
-									</div>
-								</label>
-
-								<label
-									class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
-									'dark'
-										? 'border-flit-primary bg-flit-primary/10'
-										: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
-								>
-									<input
-										type="radio"
-										name="colorScheme"
-										value="dark"
-										bind:group={formData.colorScheme}
-										disabled={isSaving}
-										class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
-									/>
-									<div class="ml-3 flex-1">
-										<div class="flex items-center gap-2">
-											<svg
-												class="h-5 w-5 text-flit-ink"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-												/>
-											</svg>
-											<span class="text-sm font-medium text-flit-ink">Dark</span>
-										</div>
-										<p class="mt-1 text-xs text-flit-muted">Easy on the eyes</p>
-									</div>
-								</label>
-
-								<label
-									class="flex flex-1 cursor-pointer items-center rounded-lg border-2 px-4 py-3 transition-colors {formData.colorScheme ===
-									'default'
-										? 'border-flit-primary bg-flit-primary/10'
-										: 'border-flit-muted/30 bg-flit-canvas/50 hover:border-flit-muted/50'}"
-								>
-									<input
-										type="radio"
-										name="colorScheme"
-										value="default"
-										bind:group={formData.colorScheme}
-										disabled={isSaving}
-										class="h-4 w-4 border-flit-muted/30 text-flit-primary focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas disabled:cursor-not-allowed disabled:opacity-50"
-									/>
-									<div class="ml-3 flex-1">
-										<div class="flex items-center gap-2">
-											<svg
-												class="h-5 w-5 text-flit-ink"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-												/>
-											</svg>
-											<span class="text-sm font-medium text-flit-ink">Auto</span>
-										</div>
-										<p class="mt-1 text-xs text-flit-muted">Follow system</p>
-									</div>
-								</label>
-							</div>
-						</div>
-
-						<!-- Account Status (entitlement: subscription or access-code grant) -->
-						<div class="mb-4 grid grid-cols-2 gap-4">
-							<div>
-								<div class="mb-2 block text-sm font-medium text-flit-ink">Account Status</div>
-								<div class="flex items-center">
-									<span
-										class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-											($currentUser?.entitlement_active ?? false)
-												? 'bg-flit-positive/20 text-flit-positive'
-												: 'bg-flit-negative/20 text-flit-negative'
-										}`}
-										role="status"
-										aria-label="Account status"
-									>
-										{($currentUser?.entitlement_active ?? false) ? 'Active' : 'Inactive'}
-									</span>
-								</div>
-							</div>
-							<div>
-								<div class="mb-2 block text-sm font-medium text-flit-ink">Email Verified</div>
-								<div class="flex flex-wrap items-center gap-2">
-									<span
-										class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-											$currentUser.is_verified
-												? 'bg-flit-positive/20 text-flit-positive'
-												: 'bg-amber-500/20 text-amber-600'
-										}`}
-										role="status"
-										aria-label="Email verification status"
-									>
-										{$currentUser.is_verified ? 'Verified' : 'Unverified'}
-									</span>
-									{#if !$currentUser.is_verified}
-										<button
-											type="button"
-											onclick={handleVerifyEmail}
-											disabled={verifyEmailLoading}
-											class="btn btn-secondary px-3 py-1 text-xs disabled:cursor-not-allowed"
-											aria-label="Send verification email"
-										>
-											{#if verifyEmailLoading}
-												<svg
-													class="mr-2 inline-block h-4 w-4 animate-spin"
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-													aria-hidden="true"
-												>
-													<circle
-														class="opacity-25"
-														cx="12"
-														cy="12"
-														r="10"
-														stroke="currentColor"
-														stroke-width="4"
-													></circle>
-													<path
-														class="opacity-75"
-														fill="currentColor"
-														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-													></path>
-												</svg>
-												Sending…
-											{:else}
-												Verify Email
-											{/if}
-										</button>
-									{/if}
-								</div>
-								{#if verifyEmailSuccess}
-									<p class="mt-1 text-sm text-flit-positive" role="status">{verifyEmailSuccess}</p>
-								{/if}
-								{#if verifyEmailError}
-									<p class="mt-1 text-sm text-flit-negative" role="alert">{verifyEmailError}</p>
-								{/if}
-							</div>
-						</div>
-
-						<!-- Account Dates -->
-						<div class="grid grid-cols-2 gap-4">
-							<div>
-								<div class="mb-2 block text-sm font-medium text-flit-ink">Member Since</div>
-								<p class="text-sm text-flit-muted" aria-label="Account creation date">
-									{formatDate($currentUser.created_at)}
-								</p>
-							</div>
-							<div>
-								<div class="mb-2 block text-sm font-medium text-flit-ink">Last Updated</div>
-								<p class="text-sm text-flit-muted" aria-label="Account last updated date">
-									{formatDate($currentUser.updated_at)}
-								</p>
-							</div>
-						</div>
-					</div>
-
-					<!-- Password Change Section -->
-					<div class="border-t border-flit-muted/20 pt-6">
-						<div class="mb-6 flex items-center justify-between">
-							<h2 class="text-lg font-semibold text-flit-ink">Change Password</h2>
-							<button type="button" onclick={togglePasswordChange} class="btn btn-secondary px-4">
-								{showPasswordChange ? 'Cancel' : 'Change password'}
-							</button>
-						</div>
-
-						{#if (usernameChanged || emailChanged || colorSchemeChanged) && !showPasswordChange}
-							<CurrentPasswordInput
-								id="currentPasswordForChange"
-								name="currentPasswordForChange"
-								requiredToSave={true}
-								value={formData.currentPassword}
-								oninput={(v) => handleFieldChange('currentPassword', v)}
-								error={errors.currentPassword}
-								disabled={isSaving}
-								bind:showPassword={showCurrentPassword}
-								errorId="current-password-error-change"
-							/>
-						{/if}
-
-						{#if showPasswordChange}
-							<CurrentPasswordInput
-								id="currentPassword"
-								name="currentPassword"
-								value={formData.currentPassword}
-								oninput={(v) => handleFieldChange('currentPassword', v)}
-								error={errors.currentPassword}
-								disabled={isSaving}
-								bind:showPassword={showCurrentPassword}
-								errorId="current-password-error"
-							/>
-
-							<!-- New Password -->
-							<div class="mb-4">
-								<label for="newPassword" class="mb-2 block text-sm font-medium text-flit-ink">
-									New password
-								</label>
-								<div class="relative">
-									<input
-										id="newPassword"
-										name="newPassword"
-										type={showNewPassword ? 'text' : 'password'}
-										disabled={isSaving}
-										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-										class:border-flit-negative={errors.newPassword}
-										class:focus:ring-flit-negative={errors.newPassword}
-										class:focus:border-flit-negative={errors.newPassword}
-										placeholder="Enter new password"
-										bind:value={formData.newPassword}
-										oninput={(e) => handleFieldChange('newPassword', e.currentTarget.value)}
-										aria-describedby={errors.newPassword
-											? 'new-password-error'
-											: 'password-strength'}
-										aria-invalid={!!errors.newPassword}
-									/>
-									<button
-										type="button"
-										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-										onclick={() => (showNewPassword = !showNewPassword)}
-										disabled={isSaving}
-										aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-									>
-										{#if showNewPassword}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-												/>
-											</svg>
-										{:else}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-												/>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-												/>
-											</svg>
-										{/if}
-									</button>
-								</div>
-
-								<!-- Password Strength Indicator -->
-								{#if formData.newPassword}
-									<div class="mt-2">
-										<div class="flex items-center space-x-2">
-											<div class="h-2 flex-1 rounded-full bg-flit-muted/20">
-												<div
-													class="h-2 rounded-full transition-all duration-300 {getStrengthColor(
-														newPasswordStrength
-													)}"
-													style="width: {(newPasswordStrength / 4) * 100}%"
-												></div>
-											</div>
-											<span class="text-xs font-medium {getStrengthTextColor(newPasswordStrength)}">
-												{newPasswordStrengthLabel}
-											</span>
-										</div>
-										<p id="password-strength" class="mt-1 text-xs text-flit-muted">
-											Use at least 8 characters with uppercase, lowercase, number, and special
-											character.
-										</p>
-									</div>
-								{/if}
-
-								{#if errors.newPassword}
-									<p id="new-password-error" class="mt-1 text-sm text-flit-negative" role="alert">
-										{errors.newPassword}
-									</p>
-								{/if}
-							</div>
-
-							<!-- Confirm New Password -->
-							<div class="mb-4">
-								<label
-									for="confirmNewPassword"
-									class="mb-2 block text-sm font-medium text-flit-ink"
-								>
-									Confirm new password
-								</label>
-								<div class="relative">
-									<input
-										id="confirmNewPassword"
-										name="confirmNewPassword"
-										type={showConfirmPassword ? 'text' : 'password'}
-										disabled={isSaving}
-										class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-										class:border-flit-negative={errors.confirmNewPassword}
-										class:focus:ring-flit-negative={errors.confirmNewPassword}
-										class:focus:border-flit-negative={errors.confirmNewPassword}
-										placeholder="Confirm new password"
-										bind:value={formData.confirmNewPassword}
-										oninput={(e) => handleFieldChange('confirmNewPassword', e.currentTarget.value)}
-										aria-describedby={errors.confirmNewPassword
-											? 'confirm-new-password-error'
-											: undefined}
-										aria-invalid={!!errors.confirmNewPassword}
-									/>
-									<button
-										type="button"
-										class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-										onclick={() => (showConfirmPassword = !showConfirmPassword)}
-										disabled={isSaving}
-										aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-									>
-										{#if showConfirmPassword}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-												/>
-											</svg>
-										{:else}
-											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-												/>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-												/>
-											</svg>
-										{/if}
-									</button>
-								</div>
-								{#if errors.confirmNewPassword}
-									<p
-										id="confirm-new-password-error"
-										class="mt-1 text-sm text-flit-negative"
-										role="alert"
-									>
-										{errors.confirmNewPassword}
-									</p>
-								{/if}
-							</div>
-						{/if}
-					</div>
-
-					<!-- General Error -->
-					<GeneralErrorAlert message={generalError} />
-
-					<!-- Submit Button -->
-					<div class="flex justify-end border-t border-flit-muted/20 pt-6">
-						<button
-							type="submit"
-							disabled={isSaving}
-							class="btn btn-primary px-6 py-3 text-base disabled:cursor-not-allowed"
-						>
-							{#if isSaving}
-								<svg
-									class="mr-3 -ml-1 h-5 w-5 animate-spin text-white"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
+							<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 									<circle
-										class="opacity-25"
+										class="loading__spinner-inner"
 										cx="12"
 										cy="12"
 										r="10"
@@ -1752,55 +879,748 @@
 										stroke-width="4"
 									></circle>
 									<path
-										class="opacity-75"
+										class="loading__spinner-path"
 										fill="currentColor"
 										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 									></path>
 								</svg>
-								Saving...
+							</span>
+							Requesting...
+						{:else}
+							+ Connect App
+						{/if}
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Access Code -->
+		<div class="card">
+			<h2>Access Code</h2>
+			{#if $currentUser?.access_grant}
+				<div class="alert alert--success card__block" role="status">
+					<p class="card__label">
+						Access active until {formatDate($currentUser.access_grant.expires_at)}
+					</p>
+					<p class="card__meta">
+						Includes encryption: {$currentUser.access_grant.includes_encryption ? 'Yes' : 'No'}
+					</p>
+				</div>
+			{:else}
+				<p class="card__meta">Enter an 8-character access code to activate time-limited access.</p>
+				{#if accessCodeError}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{accessCodeError}</p>
+					</div>
+				{/if}
+				{#if accessCodeSuccess}
+					<div class="alert alert--success alert--mb-md" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{accessCodeSuccess}</p>
+					</div>
+				{/if}
+				<form
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleActivateAccessCode();
+					}}
+					class="card__row card__row--start"
+				>
+					<div class="form-group form-group--mb-none">
+						<label for="access-code-input" class="visually-hidden">Access code</label>
+						<input
+							id="access-code-input"
+							type="text"
+							maxlength="8"
+							placeholder="Enter 8-character code"
+							bind:value={accessCodeInput}
+							disabled={accessCodeActivating}
+							class="input input--code"
+							autocomplete="off"
+						/>
+					</div>
+					<button
+						type="submit"
+						class="btn btn-primary"
+						disabled={accessCodeActivating || accessCodeInput.trim().length !== 8}
+					>
+						{#if accessCodeActivating}
+							Activating…
+						{:else}
+							Activate
+						{/if}
+					</button>
+				</form>
+			{/if}
+		</div>
+
+		<!-- Billing -->
+		<div class="card">
+			<h2>Billing</h2>
+			<p class="card__meta">Manage your subscription and payment.</p>
+
+			{#if subscriptionLoading}
+				<p class="card__meta">Loading subscription…</p>
+			{:else if subscriptionError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<p class="alert__message">{subscriptionError}</p>
+				</div>
+			{/if}
+
+			{#if showActivePlan}
+				<div class="alert alert--success card__block alert--mb-md" role="status">
+					<p class="card__label">You have an active subscription.</p>
+					{#if currentPlanProductId && subscriptionPlans.length > 0}
+						{@const currentPlan = subscriptionPlans.find(
+							(p) => p.product_id === currentPlanProductId
+						)}
+						{#if currentPlan?.name}
+							<p class="card__meta">Your plan: {currentPlan.name}</p>
+						{/if}
+					{/if}
+					{#if currentPeriodEnd}
+						<p class="card__meta">
+							Next billing date: {formatDate(currentPeriodEnd)}
+						</p>
+					{/if}
+					{#if currentPlanProductId}
+						<button
+							type="button"
+							onclick={() => handleCheckout(currentPlanProductId)}
+							disabled={checkoutLoading}
+							class="btn btn-primary mt-md"
+							aria-label="Manage Subscription"
+						>
+							{#if checkoutLoading}
+								<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle
+											class="loading__spinner-inner"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="loading__spinner-path"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+								</span>
+								Redirecting…
 							{:else}
-								Save Changes
+								Manage Subscription
 							{/if}
 						</button>
-					</div>
-				</form>
-			</div>
-			<br />
-			<!-- Feedback -->
-			<div class="mb-6 rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-				<h2 class="mb-4 text-lg font-semibold text-flit-ink">Feedback</h2>
-				<p class="mb-3 text-sm text-flit-muted">
-					Share your love, hate and everything in between! Your feedback helps us improve.
-				</p>
-				{#if feedbackError}
-					<div
-						class="mb-4 rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4"
-						role="alert"
-					>
-						<p class="text-sm text-flit-ink">{feedbackError}</p>
-					</div>
-				{/if}
-				{#if feedbackSuccess}
-					<div
-						class="mb-4 rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-						role="alert"
-					>
-						<p class="text-sm text-flit-ink">{feedbackSuccess}</p>
+					{/if}
+				</div>
+			{/if}
+
+			{#if showSubscriptionLoaded}
+				{#if checkoutError}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{checkoutError}</p>
 					</div>
 				{/if}
-				<div class="space-y-3">
+				{#if !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
+					{@const status = subscriptionStatus?.status ?? ''}
+					{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
+					<p class="card__meta card__meta--mb-md">
+						{isPaymentIssue
+							? 'Payment issue — update your payment method or resubscribe below.'
+							: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
+					</p>
+				{:else if !hasActiveSubscription}
+					<p class="card__meta card__meta--mb-md">
+						Upgrade or manage your subscription via secure checkout.
+					</p>
+				{/if}
+
+				{#if plansLoading}
+					<p class="card__meta">Loading plans…</p>
+				{:else if plansError}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{plansError}</p>
+					</div>
+				{:else if plans.length === 0}
+					<p class="card__meta">No plans available at the moment.</p>
+				{:else if showPlansList}
+					<!-- Subscription plans: click card to go to checkout -->
+					<div class="grid-cards grid-cards--plans">
+						{#each subscriptionPlans as plan (plan.product_id)}
+							<button
+								type="button"
+								onclick={() => handleCheckout(plan.product_id)}
+								disabled={checkoutLoading}
+								class="plan-card"
+								aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
+							>
+								{#if plan.image}
+									<img src={plan.image} alt="" class="plan-card__image" />
+								{/if}
+								<h3 class="plan-card__title">
+									{plan.name ?? 'Subscription plan'}
+								</h3>
+								{#if plan.description}
+									<div class="plan-card__description card__meta">
+										{#each plan.description.split(/\n/).filter(Boolean) as paragraph (paragraph)}
+											<p>{paragraph}</p>
+										{/each}
+									</div>
+								{/if}
+								<div class="plan-card__price card__label text-md">
+									{formatPlanPrice(plan.price)}
+								</div>
+								{#if checkoutLoading}
+									<div class="profile-section__row card__meta mt-md text-sm">
+										<span class="loading__spinner" aria-hidden="true">
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+												<circle
+													class="loading__spinner-inner"
+													cx="12"
+													cy="12"
+													r="10"
+													stroke="currentColor"
+													stroke-width="4"
+												></circle>
+												<path
+													class="loading__spinner-path"
+													fill="currentColor"
+													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+												></path>
+											</svg>
+										</span>
+										<span>Redirecting to checkout…</span>
+									</div>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			{/if}
+		</div>
+
+		<!-- Profile Form -->
+		<div>
+			<form
+				class="card"
+				onsubmit={(e) => {
+					console.log('[Profile] Form onsubmit event fired');
+					handleSubmit(e);
+				}}
+				novalidate
+			>
+				<!-- Account Information Section -->
+				<h2>Account Information</h2>
+				<div class="card__column">
+					<!-- Username Field -->
+					<div class="card__row card__row--start">
+						<label for="username" class="label-inline-end"> Username </label>
+						<input
+							id="username"
+							name="username"
+							type="text"
+							required
+							disabled={isSaving}
+							class="input"
+							class:input--error={!!errors.username}
+							bind:value={formData.username}
+							oninput={(e) => handleFieldChange('username', e.currentTarget.value)}
+							aria-describedby={errors.username ? 'username-error' : undefined}
+							aria-invalid={!!errors.username}
+						/>
+						{#if errors.username}
+							<p id="username-error" class="form-group__error" role="alert">
+								{errors.username}
+							</p>
+						{/if}
+					</div>
+
+					<!-- Email Field -->
+					<div class="card__row card__row--start">
+						<label for="email" class="label-inline-end"> Email address </label>
+						<input
+							id="email"
+							name="email"
+							type="email"
+							required
+							disabled={isSaving}
+							class="input"
+							class:input--error={!!errors.email}
+							bind:value={formData.email}
+							oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
+							aria-describedby={errors.email ? 'email-error' : undefined}
+							aria-invalid={!!errors.email}
+						/>
+						{#if errors.email}
+							<p id="email-error" class="form-group__error" role="alert">
+								{errors.email}
+							</p>
+						{/if}
+					</div>
+
+					<!-- Color Scheme Preference -->
+					<div class="card__column">
+						<span class="card__label">Color scheme</span>
+						<p class="card__meta">Choose your preferred color scheme for the interface</p>
+						{#if colorSchemeChanged && !formData.currentPassword}
+							<p>Enter your current password below and click Save to apply.</p>
+						{/if}
+						<div class="color-scheme-picker">
+							<div
+								class="radio-card radio-card--light-preview"
+								class:radio-card--selected={formData.colorScheme === 'light'}
+							>
+								<input
+									id="color-scheme-light"
+									type="radio"
+									name="colorScheme"
+									value="light"
+									bind:group={formData.colorScheme}
+									disabled={isSaving}
+								/>
+								<div class="radio-card__content">
+									<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+										/>
+									</svg>
+									<span>Light</span>
+									<p class="muted">Bright and clear</p>
+								</div>
+							</div>
+							<div
+								class="radio-card radio-card--dark-preview"
+								class:radio-card--selected={formData.colorScheme === 'dark'}
+							>
+								<input
+									id="color-scheme-dark"
+									type="radio"
+									name="colorScheme"
+									value="dark"
+									bind:group={formData.colorScheme}
+									disabled={isSaving}
+								/>
+								<div class="radio-card__content">
+									<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+										/>
+									</svg>
+									<span>Dark</span>
+									<p class="muted">Easy on the eyes</p>
+								</div>
+							</div>
+							<div
+								class="radio-card radio-card--auto-preview"
+								class:radio-card--selected={formData.colorScheme === 'default'}
+							>
+								<input
+									id="color-scheme-default"
+									type="radio"
+									name="colorScheme"
+									value="default"
+									bind:group={formData.colorScheme}
+									disabled={isSaving}
+								/>
+								<div class="radio-card__content">
+									<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+										/>
+									</svg>
+									<span>Auto</span>
+									<p class="muted">Follow system</p>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Account Status (entitlement: subscription or access-code grant) -->
+					<div class="card__column">
+						<div>
+							<span class="card__label--muted"> Account Status </span>
+							<div>
+								<span
+									class="badge {($currentUser?.entitlement_active ?? false)
+										? 'badge--positive'
+										: 'badge--negative'}"
+									role="status"
+									aria-label="Account status"
+								>
+									{($currentUser?.entitlement_active ?? false) ? 'Active' : 'Inactive'}
+								</span>
+							</div>
+						</div>
+						<div>
+							<span class="card__label--muted"> Email Verified </span>
+							<div class="card__row flex-start">
+								<span
+									class="badge {$currentUser.is_verified ? 'badge--positive' : 'badge--muted'}"
+									role="status"
+									aria-label="Email verification status"
+								>
+									{$currentUser.is_verified ? 'Verified' : 'Unverified'}
+								</span>
+								{#if !$currentUser.is_verified}
+									<button
+										type="button"
+										onclick={handleVerifyEmail}
+										disabled={verifyEmailLoading}
+										class="btn btn--compact"
+										aria-label="Send verification email"
+									>
+										{#if verifyEmailLoading}
+											<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+													<circle
+														class="loading__spinner-inner"
+														cx="12"
+														cy="12"
+														r="10"
+														stroke="currentColor"
+														stroke-width="4"
+													></circle>
+													<path
+														class="loading__spinner-path"
+														fill="currentColor"
+														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+													></path>
+												</svg>
+											</span>
+											Sending…
+										{:else}
+											Verify Email
+										{/if}
+									</button>
+								{/if}
+								{#if verifyEmailSuccess}
+									<span class="card__label text-positive mt-xs" role="status">
+										{verifyEmailSuccess}
+									</span>
+								{/if}
+								{#if verifyEmailError}
+									<span class="form-group__error mt-xs" role="alert">
+										{verifyEmailError}
+									</span>
+								{/if}
+							</div>
+						</div>
+					</div>
+
+					<!-- Account Dates -->
 					<div>
-						<label for="feedback-content" class="sr-only">Your feedback</label>
-						<textarea
-							id="feedback-content"
-							placeholder="Your feedback..."
-							bind:value={feedbackContent}
-							disabled={feedbackSubmitting}
-							rows="4"
-							class="input w-full resize-y backdrop-blur-sm disabled:cursor-not-allowed"
-							aria-label="Feedback message"
-						></textarea>
+						<div>
+							<span class="card__label--muted"> Member Since: </span>
+							<span class="card__meta" aria-label="Account creation date">
+								{formatDate($currentUser.created_at)}
+							</span>
+						</div>
+						<div>
+							<span class="card__label--muted"> Last Updated: </span>
+							<span class="card__meta" aria-label="Account last updated date">
+								{formatDate($currentUser.updated_at)}
+							</span>
+						</div>
 					</div>
+				</div>
+
+				<!-- Password Change Section -->
+				<div class="card__column">
+					<div class="card__row">
+						<h2>Change Password</h2>
+						<button type="button" onclick={togglePasswordChange} class="btn">
+							{showPasswordChange ? 'Cancel' : 'Change password'}
+						</button>
+					</div>
+
+					{#if (usernameChanged || emailChanged || colorSchemeChanged) && !showPasswordChange}
+						<CurrentPasswordInput
+							id="currentPasswordForChange"
+							name="currentPasswordForChange"
+							requiredToSave={true}
+							value={formData.currentPassword}
+							oninput={(v) => handleFieldChange('currentPassword', v)}
+							error={errors.currentPassword}
+							disabled={isSaving}
+							bind:showPassword={showCurrentPassword}
+							errorId="current-password-error-change"
+						/>
+					{/if}
+
+					{#if showPasswordChange}
+						<CurrentPasswordInput
+							id="currentPassword"
+							name="currentPassword"
+							value={formData.currentPassword}
+							oninput={(v) => handleFieldChange('currentPassword', v)}
+							error={errors.currentPassword}
+							disabled={isSaving}
+							bind:showPassword={showCurrentPassword}
+							errorId="current-password-error"
+						/>
+
+						<!-- New Password -->
+						<div class="card__row">
+							<label for="newPassword"> New password </label>
+							<div>
+								<input
+									id="newPassword"
+									name="newPassword"
+									type={showNewPassword ? 'text' : 'password'}
+									disabled={isSaving}
+									class="input"
+									class:input--error={!!errors.newPassword}
+									placeholder="Enter new password"
+									bind:value={formData.newPassword}
+									oninput={(e) => handleFieldChange('newPassword', e.currentTarget.value)}
+									aria-describedby={errors.newPassword ? 'new-password-error' : 'password-strength'}
+									aria-invalid={!!errors.newPassword}
+								/>
+								<button
+									type="button"
+									class="input__action"
+									onclick={() => (showNewPassword = !showNewPassword)}
+									disabled={isSaving}
+									aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+								>
+									{#if showNewPassword}
+										<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+											/>
+										</svg>
+									{:else}
+										<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+											/>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+											/>
+										</svg>
+									{/if}
+								</button>
+							</div>
+
+							<!-- Password Strength Indicator -->
+							{#if formData.newPassword}
+								{@const level = Math.min(4, Math.max(0, newPasswordStrength))}
+								<div class="strength-bar">
+									<div class="strength-bar__track">
+										<div
+											class="strength-bar__fill strength-bar__fill--{level}"
+											style="width: {(level / 4) * 100}%"
+										></div>
+									</div>
+									<span class="strength-bar__label strength-bar__label--{level}">
+										{newPasswordStrengthLabel}
+									</span>
+								</div>
+								<p id="password-strength" class="form-group__hint">
+									Use at least 8 characters with uppercase, lowercase, number, and special
+									character.
+								</p>
+							{/if}
+
+							{#if errors.newPassword}
+								<p id="new-password-error" class="form-group__error" role="alert">
+									{errors.newPassword}
+								</p>
+							{/if}
+						</div>
+
+						<!-- Confirm New Password -->
+						<div class="card__row">
+							<label for="confirmNewPassword"> Confirm new password </label>
+							<div>
+								<input
+									id="confirmNewPassword"
+									name="confirmNewPassword"
+									type={showConfirmPassword ? 'text' : 'password'}
+									disabled={isSaving}
+									class="input"
+									class:input--error={!!errors.confirmNewPassword}
+									placeholder="Confirm new password"
+									bind:value={formData.confirmNewPassword}
+									oninput={(e) => handleFieldChange('confirmNewPassword', e.currentTarget.value)}
+									aria-describedby={errors.confirmNewPassword
+										? 'confirm-new-password-error'
+										: undefined}
+									aria-invalid={!!errors.confirmNewPassword}
+								/>
+								<button
+									type="button"
+									class="input__action"
+									onclick={() => (showConfirmPassword = !showConfirmPassword)}
+									disabled={isSaving}
+									aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+								>
+									{#if showConfirmPassword}
+										<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+											/>
+										</svg>
+									{:else}
+										<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+											/>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+											/>
+										</svg>
+									{/if}
+								</button>
+							</div>
+							{#if errors.confirmNewPassword}
+								<p id="confirm-new-password-error" class="form-group__error" role="alert">
+									{errors.confirmNewPassword}
+								</p>
+							{/if}
+						</div>
+					{/if}
+				</div>
+
+				<!-- General Error -->
+				<GeneralErrorAlert message={generalError} />
+
+				<!-- Submit Button -->
+				<div class="card__row">
+					<button type="submit" disabled={isSaving} class="btn btn-primary">
+						{#if isSaving}
+							<span class="loading__spinner loading__spinner--mr-md" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle
+										class="loading__spinner-inner"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="loading__spinner-path"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+							</span>
+							Saving...
+						{:else}
+							Save Changes
+						{/if}
+					</button>
+				</div>
+			</form>
+		</div>
+		<!-- Feedback -->
+		<div class="card">
+			<h2>Feedback</h2>
+			<p class="card__meta">
+				Share your love, hate and everything in between! Your feedback helps us improve.
+			</p>
+			{#if feedbackError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<p class="alert__message">{feedbackError}</p>
+				</div>
+			{/if}
+			{#if feedbackSuccess}
+				<div class="alert alert--success alert--mb-md" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<p class="alert__message">{feedbackSuccess}</p>
+				</div>
+			{/if}
+			<div class="card__column">
+				<div class="form-group">
+					<label for="feedback-content">Message</label>
+					<textarea
+						id="feedback-content"
+						placeholder="Share your thoughts…"
+						bind:value={feedbackContent}
+						disabled={feedbackSubmitting}
+						rows="5"
+						class="input wide textarea-resize-y"
+					></textarea>
+				</div>
+				<div class="card__row">
 					<button
 						type="button"
 						class="btn btn-primary"
@@ -1810,17 +1630,20 @@
 						{#if feedbackSubmitting}
 							Submitting…
 						{:else}
-							Submit
+							Submit feedback
 						{/if}
 					</button>
 				</div>
 			</div>
-	{:else}
-		<!-- Not authenticated -->
-		<div class="mt-6 text-center">
-			<p class="mb-2 font-semibold text-flit-ink">Access Denied</p>
-			<p class="mb-6 text-flit-muted">You need to sign in to access your profile.</p>
-			<a href={resolve('/login')} class="btn btn-primary px-6 py-3 text-base"> Sign In </a>
 		</div>
-	{/if}
-</div>
+	</div>
+{:else}
+	<!-- Not authenticated -->
+	<h2>Access Denied</h2>
+	<div class="card">
+		<p>You need to sign in to access your profile.</p>
+		<div class="card__row">
+			<a href={resolve('/login')} class="btn btn-primary">Sign In</a>
+		</div>
+	</div>
+{/if}

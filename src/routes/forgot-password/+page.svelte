@@ -106,130 +106,119 @@
 	{/if}
 </svelte:head>
 
-<div class="flex min-h-[calc(100vh-12rem)] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-	<div class="w-full max-w-md space-y-8">
-		<!-- Header -->
-		<div class="text-center">
-			<h1 class="mb-2 text-3xl font-bold text-flit-ink">Forgot password</h1>
-			<p class="text-flit-muted">
-				Enter your email and we'll send you a link to reset your password.
-			</p>
+<div class="auth">
+	<div class="auth__inner">
+		<div class="auth__header">
+			<h1>Forgot password</h1>
+			<p>Enter your email and we'll send you a link to reset your password.</p>
 		</div>
-
-		<!-- Form -->
-		<form
-			class="mb-4 space-y-6 rounded-2xl bg-flit-card px-6 pt-6 pb-8 shadow-flit-sm backdrop-blur-sm sm:px-8"
-			onsubmit={handleSubmit}
-			novalidate
-		>
-			{#if showSuccessMessage}
-				<div
-					class="rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-					role="status"
-				>
-					<p class="text-sm text-flit-ink">
-						If an account exists for this email, we've sent a reset link.
-					</p>
-				</div>
-			{/if}
-
-			{#if cooldownDetail}
-				<div class="rounded-lg border border-flit-negative/30 bg-flit-negative/10 p-4" role="alert">
-					<p class="text-sm text-flit-ink">{cooldownDetail}</p>
-				</div>
-			{/if}
-
-			<GeneralErrorAlert message={generalError} />
-
-			{#if !showSuccessMessage}
-				<!-- Email Field -->
-				<div>
-					<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
-						Email address
-					</label>
-					<input
-						bind:this={emailInput}
-						id="email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						required
-						disabled={isSubmitting}
-						class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-						class:border-flit-negative={!!errors.email}
-						class:focus:ring-flit-negative={!!errors.email}
-						class:focus:border-flit-negative={!!errors.email}
-						placeholder="Enter your email"
-						value={email}
-						oninput={handleEmailInput}
-						aria-describedby={errors.email ? 'email-error' : undefined}
-						aria-invalid={!!errors.email}
-					/>
-					{#if errors.email}
-						<p id="email-error" class="mt-1 text-sm text-flit-negative" role="alert">
-							{errors.email}
+		<div class="card">
+			<form onsubmit={handleSubmit} novalidate>
+				{#if showSuccessMessage}
+					<div class="alert alert--success" role="status">
+						<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
+						</svg>
+						<p class="alert__message">
+							If an account exists for this email, we've sent a reset link.
 						</p>
-					{/if}
-				</div>
-
-				{#if turnstileSiteKey}
-					<div
-						class="cf-turnstile"
-						data-sitekey={turnstileSiteKey}
-						data-theme="auto"
-						data-size="compact"
-						data-action="forgot_password"
-						data-callback="onTurnstileSuccess"
-						data-error-callback="onTurnstileError"
-						data-widget-id="forgot-password-widget"
-					></div>
+					</div>
 				{/if}
 
-				<!-- Submit Button -->
-				<div>
-					<button
-						type="submit"
-						disabled={!turnstileReady || isSubmitting}
-						class="btn btn-primary w-full justify-center py-3 disabled:cursor-not-allowed"
-					>
-						{#if isSubmitting}
-							<svg
-								class="mr-3 -ml-1 h-5 w-5 animate-spin text-white"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="4"
-								></circle>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-								></path>
-							</svg>
-							Sending…
-						{:else}
-							Send reset link
-						{/if}
-					</button>
-				</div>
-			{/if}
+				{#if cooldownDetail}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
+						</svg>
+						<p class="alert__message">{cooldownDetail}</p>
+					</div>
+				{/if}
 
-			<!-- Links -->
-			<div class="text-center">
-				<a
-					href={resolve('/login')}
-					class="text-sm font-medium text-flit-link transition-opacity hover:opacity-80"
-				>
-					Back to sign in
-				</a>
-			</div>
-		</form>
+				<GeneralErrorAlert message={generalError} />
+
+				{#if !showSuccessMessage}
+					<div class="card__row card__row--start">
+						<label class="label-inline-end" for="email">Email address</label>
+						<input
+							bind:this={emailInput}
+							id="email"
+							name="email"
+							type="email"
+							autocomplete="email"
+							required
+							disabled={isSubmitting}
+							class="input"
+							class:input--error={!!errors.email}
+							placeholder="Enter your email"
+							value={email}
+							oninput={handleEmailInput}
+							aria-describedby={errors.email ? 'email-error' : undefined}
+							aria-invalid={!!errors.email}
+						/>
+						{#if errors.email}
+							<p id="email-error" role="alert">{errors.email}</p>
+						{/if}
+					</div>
+
+					{#if turnstileSiteKey}
+						<div
+							class="cf-turnstile"
+							data-sitekey={turnstileSiteKey}
+							data-theme="auto"
+							data-size="compact"
+							data-action="forgot_password"
+							data-callback="onTurnstileSuccess"
+							data-error-callback="onTurnstileError"
+							data-widget-id="forgot-password-widget"
+						></div>
+					{/if}
+				{/if}
+
+				<div class="auth__actions">
+					{#if !showSuccessMessage}
+						<button
+							type="submit"
+							disabled={!turnstileReady || isSubmitting}
+							class="btn btn-primary btn--block"
+						>
+							{#if isSubmitting}
+								<span class="loading__spinner" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle
+											class="loading__spinner-inner"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="loading__spinner-path"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+								</span>
+								Sending…
+							{:else}
+								Send reset link
+							{/if}
+						</button>
+					{/if}
+
+					<a href={resolve('/login')} class="btn btn-secondary">Back to sign in</a>
+				</div>
+			</form>
+		</div>
 	</div>
 </div>

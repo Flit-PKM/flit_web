@@ -30,6 +30,16 @@ export default defineConfig(
 			'svelte/prefer-writable-derived': 'off'
 		}
 	},
+	// Sanitized {@html} (markdownToSafeHtml) in notes pages
+	{
+		files: ['**/notes/**/+page.svelte'],
+		rules: { 'svelte/no-at-html-tags': 'off' }
+	},
+	// SvelteMap/SvelteSet need $state for assignment updates to trigger reactivity
+	{
+		files: ['src/routes/(protected)/notes/**/+page.svelte'],
+		rules: { 'svelte/no-unnecessary-state-wrap': 'off' }
+	},
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 

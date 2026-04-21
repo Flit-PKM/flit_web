@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -54,7 +55,7 @@
 	let markdownHtml = $state('');
 
 	// Titles for related notes (id -> title) so we show name instead of "Note #id"
-	let relatedNoteTitles = $state<Map<number, string>>(new Map());
+	let relatedNoteTitles = $state(new SvelteMap<number, string>());
 
 	// Debounced note search when popup is open
 	$effect(() => {
@@ -95,16 +96,16 @@
 	async function loadNote(noteId: number): Promise<{
 		data: NoteDetail | null;
 		error: string;
-		relatedTitles: Map<number, string>;
+		relatedTitles: SvelteMap<number, string>;
 	}> {
 		const empty = {
 			data: null as NoteDetail | null,
 			error: '',
-			relatedTitles: new Map<number, string>()
+			relatedTitles: new SvelteMap<number, string>()
 		};
 		try {
 			const noteData = await apiClient.getNote(noteId);
-			const relatedTitles = new Map<number, string>();
+			const relatedTitles = new SvelteMap<number, string>();
 			const rels = filterNotDeleted(noteData.relationships);
 			if (rels.length > 0) {
 				const otherIds = [...new Set(rels.map((r) => otherNoteId(r, noteId)))];
@@ -145,7 +146,7 @@
 		isLoading = true;
 		error = '';
 		note = null;
-		relatedNoteTitles = new Map();
+		relatedNoteTitles = new SvelteMap();
 		loadNote(noteId)
 			.then(async (r) => {
 				const current = get(page);
@@ -260,11 +261,6 @@
 		addRelNoteTitle = selected.title;
 		await addRelationship();
 		closeNoteSearchPopup();
-	}
-
-	function clearRelNoteSelection() {
-		addRelNoteId = '';
-		addRelNoteTitle = '';
 	}
 
 	function handleNoteSearchKeydown(e: KeyboardEvent) {
@@ -388,7 +384,8 @@
 				relationships: [...existing, newRel]
 			};
 			if (addRelNoteTitle) {
-				relatedNoteTitles = new Map(relatedNoteTitles).set(otherId, addRelNoteTitle);
+				relatedNoteTitles = new SvelteMap(relatedNoteTitles);
+				relatedNoteTitles.set(otherId, addRelNoteTitle);
 			}
 			addRelNoteId = '';
 			addRelNoteTitle = '';
@@ -465,97 +462,96 @@
 	<title>{note ? `${note.title} – Notes` : 'Note – Flit Web'}</title>
 	<meta name="description" content={note ? note.title : 'Note detail'} />
 </svelte:head>
-
-<div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-	<a
-		href={resolve('/notes')}
-		class="inline-flex items-center text-sm font-medium text-flit-link transition-colors hover:text-flit-ink focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-	>
-		← Back to Notes
-	</a>
-
+<a href={resolve('/notes')} class="link mt-sm">← Back to Notes</a>
+<div class="note-page">
 	{#if isLoading}
-		<p class="mt-6 text-flit-muted">Loading note…</p>
+		<div class="card">
+			<p class="loading loading--inline-start">
+				<span class="loading__spinner" aria-hidden="true">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+						<circle
+							class="loading__spinner-inner"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						></circle>
+						<path
+							class="loading__spinner-path"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						></path>
+					</svg>
+				</span>
+				<span>Loading note…</span>
+			</p>
+		</div>
 	{:else if error}
-		<div
-			class="mt-6 rounded-lg border border-flit-negative/30 bg-flit-card p-4 text-flit-ink shadow-flit-sm"
-		>
-			<p class="font-medium">Could not load note</p>
-			<p class="mt-1 text-sm text-flit-muted">{error}</p>
+		<div class="note-error">
+			<p class="section-title">Could not load note</p>
+			<p class="card__meta">{error}</p>
 		</div>
 	{:else if note}
-		<article class="card mt-6">
+		<article class={isEditing ? 'note-editor' : 'note-view'}>
 			{#if isEditing}
-				<!-- Edit mode -->
-				<header class="border-b border-flit-muted/20 pb-4">
-					<div class="flex flex-wrap items-start justify-between gap-2">
-						<div class="min-w-0 flex-1">
+				<header class="note-editor__header">
+					<div class="note-editor__header-row">
+						<div class="note-editor__header-title-wrap">
 							<input
 								type="text"
 								bind:value={draftTitle}
-								class="input text-2xl font-bold sm:text-3xl"
+								class="input note-editor__title-input"
 								placeholder="Title"
 							/>
 						</div>
-						<div>
-							<div class="flex items-center gap-2">
+						<div class="note-editor__actions-row">
+							<div class="note-editor__actions">
 								<button
 									type="button"
 									onclick={saveNoteFields}
 									disabled={isSaving}
-									class="btn btn-primary"
+									class="btn btn-primary">Save</button
 								>
-									Save
-								</button>
 								<button
 									type="button"
 									onclick={cancelEditing}
 									disabled={isSaving}
-									class="btn btn-secondary"
+									class="btn btn-secondary">Cancel</button
 								>
-									Cancel
-								</button>
 							</div>
-							<div class="mt-3 flex justify-center">
+							<div class="flex-center">
 								<button
 									type="button"
 									onclick={deleteNote}
 									disabled={isSaving}
-									class="btn btn-danger"
+									class="btn btn-danger">Delete</button
 								>
-									Delete
-								</button>
 							</div>
 						</div>
 					</div>
-					<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-flit-muted">
+					<div class="note-editor__meta">
 						<span>Type: {note.type}</span>
 						<span>Updated: {formatDate(note.updated_at)}</span>
 						<span>Created: {formatDate(note.created_at)}</span>
 					</div>
 				</header>
-				<div class="mt-4">
-					<textarea
-						bind:value={draftContent}
-						rows={12}
-						class="input font-sans whitespace-pre-wrap"
-						placeholder="Content"
+				<div class="note-editor__body">
+					<textarea bind:value={draftContent} rows={12} class="input pre-wrap" placeholder="Content"
 					></textarea>
 				</div>
 
-				<section class="mt-6 border-t border-flit-muted/20 pt-4">
-					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">Categories</h2>
-					<ul class="mt-2 flex flex-wrap gap-2">
+				<section class="note-editor__block">
+					<h2 class="note-editor__block-title">Categories</h2>
+					<ul class="note-editor__categories-list">
 						{#each filteredCategories as category (category.id)}
-							<li
-								class="inline-flex items-center gap-1 rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-ink"
-							>
-								<span>{category.name}</span>
+							<li class="note-editor__category-item">
+								<span class="badge badge--muted">{category.name}</span>
 								<button
 									type="button"
 									onclick={() => removeCategory(category.id)}
 									disabled={isSaving}
-									class="rounded p-0.5 text-flit-muted hover:bg-flit-negative/20 hover:text-flit-negative focus:ring-2 focus:ring-flit-primary focus:outline-none disabled:opacity-50"
+									class="btn btn-secondary btn--chip"
 									title="Remove category"
 									aria-label="Remove category"
 								>
@@ -564,12 +560,12 @@
 							</li>
 						{/each}
 					</ul>
-					<div class="mt-2 flex flex-wrap items-center gap-2">
+					<div class="note-editor__add-row">
 						<select
 							bind:value={addCategoryId}
 							onchange={() => addCategoryId && addCategory()}
 							disabled={isSaving}
-							class="input w-[40ch] text-sm"
+							class="input ch-40"
 						>
 							<option value="">Add category…</option>
 							{#each availableCategories as cat (cat.id)}
@@ -579,25 +575,16 @@
 					</div>
 				</section>
 
-				<section class="mt-6 border-t border-flit-muted/20 pt-4">
-					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">
-						Relationships
-					</h2>
-					<ul class="mt-2 space-y-2">
+				<section class="note-editor__block">
+					<h2 class="note-editor__block-title">Relationships</h2>
+					<ul class="note-editor__rel-list">
 						{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
-							<li
-								class="flex items-center justify-between gap-2 rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-4 py-3 shadow-flit-sm"
-							>
-								<div class="flex items-center gap-3">
-									<span
-										class="inline-flex rounded-md bg-flit-primary/20 px-2 py-1 text-xs font-medium text-flit-primary"
+							<li class="note-editor__rel-item">
+								<div class="note-editor__rel-item-inner">
+									<span class="badge badge--primary"
+										>{formatRelationshipTypeLabel(rel, note.id)}</span
 									>
-										{formatRelationshipTypeLabel(rel, note.id)}
-									</span>
-									<a
-										href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}
-										class="text-sm text-flit-link hover:underline"
-									>
+									<a href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}>
 										{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
 											`Note #${otherNoteId(rel, note.id)}`}
 									</a>
@@ -606,20 +593,20 @@
 									type="button"
 									onclick={() => removeRelationship(rel)}
 									disabled={isSaving}
-									class="rounded px-2 py-1 text-sm font-medium text-flit-muted hover:bg-flit-negative/20 hover:text-flit-negative focus:ring-2 focus:ring-flit-primary focus:outline-none disabled:opacity-50"
+									class="btn btn-secondary"
 								>
 									Remove
 								</button>
 							</li>
 						{/each}
 					</ul>
-					<div class="mt-2 flex flex-col gap-2">
-						<select bind:value={addRelType} class="input w-[40ch] text-sm">
-							{#each RELATIONSHIP_TYPES as t}
+					<div class="note-editor__add-row">
+						<select bind:value={addRelType} class="input ch-40">
+							{#each RELATIONSHIP_TYPES as t (t)}
 								<option value={t}>{formatRelationshipType(t)}</option>
 							{/each}
 						</select>
-						<div class="flex flex-wrap items-center gap-2">
+						<div class="note-editor__actions">
 							<button
 								type="button"
 								onclick={openNoteSearchPopup}
@@ -632,65 +619,59 @@
 					</div>
 				</section>
 
-				<section class="mt-6 border-t border-flit-muted/20 pt-4">
-					<div class="mt-6 flex items-center justify-center gap-2">
+				<section class="note-editor__block">
+					<div class="note-editor__block-actions">
 						<button
 							type="button"
 							onclick={saveNoteFields}
 							disabled={isSaving}
-							class="btn btn-primary"
+							class="btn btn-primary">Save</button
 						>
-							Save
-						</button>
 						<button
 							type="button"
 							onclick={cancelEditing}
 							disabled={isSaving}
-							class="btn btn-secondary"
+							class="btn btn-secondary">Cancel</button
 						>
-							Cancel
-						</button>
 					</div>
 				</section>
-
 			{:else}
-				<!-- View mode -->
-				<header class="border-b border-flit-muted/20 pb-4">
-					<div class="flex flex-wrap items-start justify-between gap-2">
-						<div class="min-w-0 flex-1">
-							<h1 class="text-center text-2xl font-bold text-flit-ink sm:text-3xl">{note.title}</h1>
+				<header class="note-view__header">
+					<div class="note-view__header-row">
+						<div class="note-view__header-title-wrap">
+							<h1>{note.title}</h1>
 						</div>
-						<div class="flex items-center gap-2">
-							<button type="button" onclick={startEditing} class="btn btn-secondary"> Edit </button>
-							<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
-								Delete
-							</button>
+						<div class="note-view__actions">
+							<button type="button" onclick={startEditing} class="btn btn-secondary">Edit</button>
+							<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger"
+								>Delete</button
+							>
 						</div>
 					</div>
-					<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-flit-muted">
+					<div class="note-view__meta">
 						<span>Type: {note.type}</span>
 						<span>Updated: {formatDate(note.updated_at)}</span>
 						<span>Created: {formatDate(note.created_at)}</span>
 					</div>
 				</header>
 
-				<div class="mt-4">
+				<div class="note-view__body">
 					{#if markdownHtml}
-					<div class="prose max-w-none prose-flit">{@html markdownHtml}</div>
+						<div class="prose">{@html markdownHtml}</div>
 					{:else}
-					<pre class="font-sans whitespace-pre-wrap text-flit-ink">{note.content}</pre>
+						<pre class="pre-wrap">{note.content}</pre>
 					{/if}
 				</div>
-				
-				<section class="mt-6 border-t border-flit-muted/20 pt-4">
-					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">Categories</h2>
+
+				<section class="note-view__block">
+					<h2 class="note-view__block-title">Categories</h2>
 					{#if filteredCategories.length > 0}
-						<ul class="mt-2 flex flex-wrap gap-2">
+						<ul class="note-view__categories-list">
 							{#each filteredCategories as category (category.id)}
 								<li>
 									<a
 										href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
-										class="inline-flex rounded-md bg-flit-muted/20 px-2 py-1 text-sm text-flit-link hover:bg-flit-muted/30 hover:underline focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
+										class="badge badge--muted"
 									>
 										{category.name}
 									</a>
@@ -698,35 +679,31 @@
 							{/each}
 						</ul>
 					{:else}
-						<p class="mt-2 text-sm text-flit-muted">No categories</p>
+						<p class="card__meta">No categories</p>
 					{/if}
 				</section>
 
-				<section class="mt-6 border-t border-flit-muted/20 pt-4">
-					<h2 class="text-sm font-semibold tracking-wide text-flit-muted uppercase">
-						Relationships
-					</h2>
+				<section class="note-view__block">
+					<h2 class="note-view__block-title">Relationships</h2>
 					{#if filteredRelationships.length > 0}
-						<ul class="mt-2 space-y-2">
+						<ul class="note-view__rel-list">
 							{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
 								<li>
 									<a
 										href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}
-										class="flex items-center justify-between rounded-lg border border-flit-muted/30 bg-flit-canvas/50 px-4 py-3 shadow-flit-sm backdrop-blur-sm transition-all hover:border-flit-primary/50 hover:bg-flit-muted/5 hover:shadow-md focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
+										class="note-view__rel-item"
 									>
-										<div class="flex items-center gap-3">
-											<span
-												class="inline-flex rounded-md bg-flit-primary/20 px-2 py-1 text-xs font-medium text-flit-primary"
+										<div class="note-view__rel-item-inner">
+											<span class="badge badge--primary"
+												>{formatRelationshipTypeLabel(rel, note.id)}</span
 											>
-												{formatRelationshipTypeLabel(rel, note.id)}
-											</span>
-											<span class="text-sm text-flit-ink"
+											<span
 												>{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
 													`Note #${otherNoteId(rel, note.id)}`}</span
 											>
 										</div>
 										<svg
-											class="h-5 w-5 text-flit-muted transition-transform group-hover:translate-x-1"
+											class="icon_sm icon_sm--muted"
 											fill="none"
 											viewBox="0 0 24 24"
 											stroke="currentColor"
@@ -743,75 +720,66 @@
 							{/each}
 						</ul>
 					{:else}
-						<p class="mt-2 text-sm text-flit-muted">No relationships</p>
+						<p class="card__meta">No relationships</p>
 					{/if}
 				</section>
-
 			{/if}
 			{#if saveError}
-				<p class="mt-2 text-sm text-flit-negative">{saveError}</p>
+				<p class="form-group__error">{saveError}</p>
 			{/if}
 		</article>
 	{/if}
+</div>
 
-	<!-- Note search popup (Add relationship) -->
-	{#if showNoteSearchPopup}
-		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-			tabindex="-1"
-			onkeydown={handleNoteSearchKeydown}
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="note-search-title"
-			onclick={(e) => e.target === e.currentTarget && closeNoteSearchPopup()}
-		>
-			<div
-				class="w-full max-w-md rounded-xl border border-flit-muted/20 bg-flit-card-opaque p-4 shadow-flit-sm"
-				role="document"
-			>
-				<h2
-					id="note-search-title"
-					class="text-sm font-semibold tracking-wide text-flit-muted uppercase"
-				>
-					Select note to link
-				</h2>
-				<input
-					bind:this={noteSearchInputEl}
-					type="text"
-					bind:value={noteSearchQuery}
-					placeholder="Search notes…"
-					class="input mt-2 text-sm"
-				/>
-				<div class="mt-2 max-h-64 overflow-y-auto rounded-lg border border-flit-muted/20">
-					{#if noteSearchLoading}
-						<p class="py-4 text-center text-sm text-flit-muted">Loading…</p>
-					{:else if noteSearchResults.length === 0}
-						<p class="py-4 text-center text-sm text-flit-muted">
-							{noteSearchQuery.trim() ? 'No notes found.' : 'Type to search.'}
-						</p>
-					{:else}
-						<ul class="divide-y divide-flit-muted/20">
-							{#each noteSearchResults as n (n.id)}
-								<li>
-									<button
-										type="button"
-										onclick={() => selectNoteFromSearch(n)}
-										class="w-full px-3 py-2 text-left text-sm text-flit-ink hover:bg-flit-muted/10 focus:bg-flit-muted/10 focus:ring-2 focus:ring-flit-primary focus:outline-none focus:ring-inset"
-									>
-										<span class="font-medium">{n.title}</span>
-										<span class="ml-2 text-flit-muted">#{n.id}</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</div>
-				<div class="mt-3 flex justify-end">
-					<button type="button" onclick={closeNoteSearchPopup} class="btn btn-secondary">
-						Cancel
-					</button>
-				</div>
+<!-- Note search popup (Add relationship) -->
+{#if showNoteSearchPopup}
+	<div
+		class="modal-backdrop modal-backdrop--overlay"
+		tabindex="-1"
+		onkeydown={handleNoteSearchKeydown}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="note-search-title"
+		onclick={(e) => e.target === e.currentTarget && closeNoteSearchPopup()}
+	>
+		<div class="card note-search-dialog" role="document">
+			<h2 id="note-search-title" class="section-title--muted">Select note to link</h2>
+			<input
+				bind:this={noteSearchInputEl}
+				type="text"
+				bind:value={noteSearchQuery}
+				placeholder="Search notes…"
+				class="input"
+			/>
+			<div class="note-search-dialog__scroll">
+				{#if noteSearchLoading}
+					<p class="card__empty">Loading…</p>
+				{:else if noteSearchResults.length === 0}
+					<p class="card__empty">
+						{noteSearchQuery.trim() ? 'No notes found.' : 'Type to search.'}
+					</p>
+				{:else}
+					<ul class="note-search-dialog__list">
+						{#each noteSearchResults as n (n.id)}
+							<li>
+								<button
+									type="button"
+									onclick={() => selectNoteFromSearch(n)}
+									class="btn btn-secondary w-full flex flex-start text-left"
+								>
+									<span>{n.title}</span>
+									<span class="card__meta">#{n.id}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+			<div class="note-search-dialog__actions">
+				<button type="button" onclick={closeNoteSearchPopup} class="btn btn-secondary">
+					Cancel
+				</button>
 			</div>
 		</div>
-	{/if}
-</div>
+	</div>
+{/if}

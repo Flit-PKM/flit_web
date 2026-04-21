@@ -89,14 +89,7 @@
 
 		if (result.success) {
 			// Redirect to intended page or notes (allowlist for type-safe goto)
-			const ALLOWED_REDIRECTS = [
-				'/profile',
-				'/notes',
-				'/dashboard',
-				'/',
-				'/about',
-				'/terms'
-			] as const;
+			const ALLOWED_REDIRECTS = ['/profile', '/notes', '/', '/about', '/terms'] as const;
 			const requested = $page.url.searchParams.get('redirect') || '/notes';
 			const path = ALLOWED_REDIRECTS.includes(requested as (typeof ALLOWED_REDIRECTS)[number])
 				? (requested as (typeof ALLOWED_REDIRECTS)[number])
@@ -132,182 +125,152 @@
 	/>
 </svelte:head>
 
-<div class="flex min-h-[calc(100vh-12rem)] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-	<div class="w-full max-w-md space-y-8">
-		<!-- Header -->
-		<div class="text-center">
-			<h1 class="mb-2 text-3xl font-bold text-flit-ink">Welcome back</h1>
-			<p class="text-flit-muted">Sign in to your account to continue</p>
+<div class="auth">
+	<div class="auth__inner">
+		<div class="auth__header">
+			<h1>Welcome back</h1>
+			<p>Sign in to your account to continue</p>
 		</div>
-
-		<!-- Form (landing card style) -->
-		<form
-			class="mb-4 space-y-6 rounded-2xl bg-flit-card px-6 pt-6 pb-8 shadow-flit-sm backdrop-blur-sm sm:px-8"
-			onsubmit={handleSubmit}
-			novalidate
-		>
-			{#if $page.url.searchParams.get('password_reset') === 'success'}
-				<div
-					class="rounded-lg border border-flit-positive/30 bg-flit-positive/10 p-4"
-					role="status"
-				>
-					<p class="text-sm text-flit-ink">Password updated. Please sign in.</p>
-				</div>
-			{/if}
-
-			<!-- Email Field -->
-			<div>
-				<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
-					Email address
-				</label>
-				<input
-					bind:this={emailInput}
-					id="email"
-					name="email"
-					type="email"
-					autocomplete="email"
-					required
-					disabled={isSubmitting}
-					class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-					class:border-flit-negative={errors.email}
-					class:focus:ring-flit-negative={errors.email}
-					class:focus:border-flit-negative={errors.email}
-					placeholder="Enter your email"
-					bind:value={formData.email}
-					oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
-					aria-describedby={errors.email ? 'email-error' : undefined}
-					aria-invalid={!!errors.email}
-				/>
-				{#if errors.email}
-					<p id="email-error" class="mt-1 text-sm text-flit-negative" role="alert">
-						{errors.email}
-					</p>
+		<div class="card">
+			<form onsubmit={handleSubmit} novalidate>
+				{#if $page.url.searchParams.get('password_reset') === 'success'}
+					<div class="alert alert--success" role="status">
+						<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
+						</svg>
+						<p class="alert__message">Password updated. Please sign in.</p>
+					</div>
 				{/if}
-			</div>
 
-			<!-- Password Field -->
-			<div>
-				<label for="password" class="mb-2 block text-sm font-medium text-flit-ink">
-					Password
-				</label>
-				<div class="relative">
+				<div class="form-group">
+					<label for="email">Email address</label>
 					<input
-						bind:this={passwordInput}
-						id="password"
-						name="password"
-						type={showPassword ? 'text' : 'password'}
-						autocomplete="current-password"
+						bind:this={emailInput}
+						id="email"
+						name="email"
+						type="email"
+						autocomplete="email"
 						required
 						disabled={isSubmitting}
-						class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-						class:border-flit-negative={errors.password}
-						class:focus:ring-flit-negative={errors.password}
-						class:focus:border-flit-negative={errors.password}
-						placeholder="Enter your password"
-						bind:value={formData.password}
-						oninput={(e) => handleFieldChange('password', e.currentTarget.value)}
-						aria-describedby={errors.password ? 'password-error' : undefined}
-						aria-invalid={!!errors.password}
+						class="input wide"
+						class:input--error={!!errors.email}
+						placeholder="Enter your email"
+						bind:value={formData.email}
+						oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
+						aria-describedby={errors.email ? 'email-error' : undefined}
+						aria-invalid={!!errors.email}
 					/>
+					{#if errors.email}
+						<p id="email-error" class="form-group__error" role="alert">{errors.email}</p>
+					{/if}
+				</div>
+
+				<div class="form-group">
+					<label for="password">Password</label>
+					<div class="input-wrap">
+						<input
+							bind:this={passwordInput}
+							id="password"
+							name="password"
+							type={showPassword ? 'text' : 'password'}
+							autocomplete="current-password"
+							required
+							disabled={isSubmitting}
+							class="input wide"
+							class:input--error={!!errors.password}
+							placeholder="Enter your password"
+							bind:value={formData.password}
+							oninput={(e) => handleFieldChange('password', e.currentTarget.value)}
+							aria-describedby={errors.password ? 'password-error' : undefined}
+							aria-invalid={!!errors.password}
+						/>
+						<button
+							type="button"
+							class="input__action"
+							onclick={togglePasswordVisibility}
+							disabled={isSubmitting}
+							aria-label={showPassword ? 'Hide password' : 'Show password'}
+						>
+							{#if showPassword}
+								<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+									/>
+								</svg>
+							{:else}
+								<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+									/>
+								</svg>
+							{/if}
+						</button>
+					</div>
+					{#if errors.password}
+						<p id="password-error" class="form-group__error" role="alert">{errors.password}</p>
+					{/if}
+				</div>
+
+				<GeneralErrorAlert message={generalError} />
+
+				<div class="auth__actions">
 					<button
-						type="button"
-						class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-						onclick={togglePasswordVisibility}
-						disabled={isSubmitting}
-						aria-label={showPassword ? 'Hide password' : 'Show password'}
+						type="submit"
+						disabled={isSubmitting || $isLoading}
+						class="btn btn-primary btn--block"
 					>
-						{#if showPassword}
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-								/>
-							</svg>
+						{#if isSubmitting || $isLoading}
+							<span class="loading__spinner" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle
+										class="loading__spinner-inner"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="loading__spinner-path"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+							</span>
+							Signing in...
 						{:else}
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-								/>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-								/>
-							</svg>
+							Sign in
 						{/if}
 					</button>
 				</div>
-				{#if errors.password}
-					<p id="password-error" class="mt-1 text-sm text-flit-negative" role="alert">
-						{errors.password}
+
+				<div class="auth__links">
+					<p class="card__meta">
+						Don't have an account?
+						<a href={resolve('/register')}>Sign up here</a>
 					</p>
-				{/if}
-			</div>
-
-			<!-- General Error -->
-			<GeneralErrorAlert message={generalError} />
-
-			<!-- Submit Button -->
-			<div>
-				<button
-					type="submit"
-					disabled={isSubmitting || $isLoading}
-					class="btn btn-primary w-full justify-center py-3 disabled:cursor-not-allowed"
-				>
-					{#if isSubmitting || $isLoading}
-						<svg
-							class="mr-3 -ml-1 h-5 w-5 animate-spin text-white"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
-							<circle
-								class="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="4"
-							></circle>
-							<path
-								class="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							></path>
-						</svg>
-						Signing in...
-					{:else}
-						Sign in
-					{/if}
-				</button>
-			</div>
-
-			<!-- Links -->
-			<div class="space-y-2 text-center">
-				<p class="text-sm text-flit-muted">
-					Don't have an account?
-					<a
-						href={resolve('/register')}
-						class="font-medium text-flit-link transition-opacity hover:opacity-80"
-					>
-						Sign up here
-					</a>
-				</p>
-				<p class="text-sm text-flit-muted">
-					<a
-						href={resolve('/forgot-password')}
-						class="font-medium text-flit-link transition-opacity hover:opacity-80"
-					>
-						Forgot your password?
-					</a>
-				</p>
-			</div>
-		</form>
+					<p class="card__meta">
+						<a href={resolve('/forgot-password')}>Forgot your password?</a>
+					</p>
+				</div>
+			</form>
+		</div>
 	</div>
 </div>

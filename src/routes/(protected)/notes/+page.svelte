@@ -272,197 +272,148 @@
 
 <svelte:head>
 	<title>Notes – Flit Web</title>
-	<meta name="description" content="Your notes, sorted by last updated." />
 </svelte:head>
 
-<!-- Protected page layout: mx-auto max-w-* px-4 py-8 sm:px-6 lg:px-8 -->
-<div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-	<h1 class="text-2xl font-bold text-flit-ink sm:text-3xl">Notes</h1>
+<h1>Notes</h1>
 
-	<!-- Search and Filter Controls -->
-	<div class="card mt-6 p-4">
-		<div class="flex flex-col gap-4 sm:flex-row sm:items-center">
-			<!-- Search Input -->
-			<div class="relative flex-1">
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<svg
-						class="h-5 w-5 text-flit-muted"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-						/>
-					</svg>
-				</div>
+<section class="card">
+	<div class="notes-toolbar">
+		<div class="notes-toolbar__row">
+			<span class="notes-toolbar__icon" aria-hidden="true">
+				<svg fill="none" class="icon_md" viewBox="0 0 24 24" stroke="currentColor">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					/>
+				</svg>
+			</span>
+			<div class="notes-toolbar__grow">
 				<input
 					type="text"
 					placeholder="Search notes..."
 					value={searchQuery}
 					oninput={handleSearchInput}
-					class="input py-2 pr-4 pl-10 backdrop-blur-sm transition-colors"
+					class="input wide"
 				/>
 			</div>
+		</div>
 
-			<!-- Category Filter -->
-			<div class="flex flex-wrap items-center gap-2">
-				<label for="category-filter" class="text-sm font-medium whitespace-nowrap text-flit-muted">
-					Category:
-				</label>
+		<div class="notes-toolbar__row">
+			<label for="category-filter" class="notes-toolbar__label nowrap">Category</label>
+			<div class="notes-toolbar__grow">
 				<select
 					id="category-filter"
 					value={selectedCategory}
 					onchange={handleCategoryChange}
-					class="input w-auto min-w-0 backdrop-blur-sm transition-colors"
+					class="input wide"
 				>
 					<option value="">All categories</option>
 					{#each categories as category (category.id)}
 						<option value={category.name}>{category.name}</option>
 					{/each}
 				</select>
-				<div class="flex min-w-0 flex-1 justify-end gap-2">
-					<button
-						type="button"
-						onclick={openCreateCategory}
-						disabled={isCategoryBusy}
-						class="btn btn-secondary"
-						title="Create category"
-					>
-						+
-					</button>
-					<button
-						type="button"
-						onclick={deleteSelectedCategory}
-						disabled={selectedCategoryId === undefined || isCategoryBusy}
-						class="btn btn-secondary"
-						title="Delete selected category"
-					>
-						-
-					</button>
-				</div>
 			</div>
+			<div class="profile-section__row">
+				<button
+					type="button"
+					onclick={openCreateCategory}
+					disabled={isCategoryBusy}
+					class="btn"
+					title="Create category">+</button
+				>
+				<button
+					type="button"
+					onclick={deleteSelectedCategory}
+					disabled={selectedCategoryId === undefined || isCategoryBusy}
+					class="btn"
+					title="Delete selected category">−</button
+				>
+				{#if hasActiveFilters}
+					<button type="button" onclick={clearFilters} class="btn"> Clear </button>
+				{/if}
+			</div>
+		</div>
+	</div>
 
-			<!-- Clear Filters Button -->
-			{#if hasActiveFilters}
-				<button type="button" onclick={clearFilters} class="btn btn-secondary">
-					<svg class="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M6 18L18 6M6 6l12 12"
-						/>
-					</svg>
-					Clear
-				</button>
+	{#if showCreateCategory}
+		<div class="card__row card__row--start">
+			<input
+				type="text"
+				bind:value={newCategoryName}
+				placeholder="New category name"
+				class="input"
+				onkeydown={(e) => e.key === 'Enter' && submitCreateCategory()}
+			/>
+			<button
+				type="button"
+				onclick={submitCreateCategory}
+				disabled={isCategoryBusy}
+				class="btn btn-primary">Create</button
+			>
+			<button
+				type="button"
+				onclick={cancelCreateCategory}
+				disabled={isCategoryBusy}
+				class="btn btn-secondary">Cancel</button
+			>
+			{#if categoryError}
+				<span class="form-group__error">{categoryError}</span>
 			{/if}
 		</div>
+	{/if}
 
-		<!-- Create category inline -->
-		{#if showCreateCategory}
-			<div class="mt-3 flex flex-wrap items-center gap-2">
-				<input
-					type="text"
-					bind:value={newCategoryName}
-					placeholder="New category name"
-					class="input"
-					onkeydown={(e) => e.key === 'Enter' && submitCreateCategory()}
-				/>
-				<button
-					type="button"
-					onclick={submitCreateCategory}
-					disabled={isCategoryBusy}
-					class="btn btn-primary"
-				>
-					Create
-				</button>
-				<button
-					type="button"
-					onclick={cancelCreateCategory}
-					disabled={isCategoryBusy}
-					class="btn btn-secondary"
-				>
-					Cancel
-				</button>
-				{#if categoryError}
-					<span class="text-sm text-flit-negative">{categoryError}</span>
-				{/if}
-			</div>
-		{/if}
+	{#if hasActiveFilters}
+		<div class="profile-section__row mt-sm">
+			<span>Filtering by:</span>
+			{#if searchQuery}
+				<span class="badge badge--primary">Search: "{searchQuery}"</span>
+			{/if}
+			{#if selectedCategory}
+				<span class="badge badge--primary">Category: {selectedCategory}</span>
+			{/if}
+		</div>
+	{/if}
+</section>
 
-		<!-- Active filters indicator -->
-		{#if hasActiveFilters}
-			<div class="mt-3 flex flex-wrap items-center gap-2 text-sm text-flit-muted">
-				<span>Filtering by:</span>
-				{#if searchQuery}
-					<span
-						class="inline-flex items-center rounded-full bg-flit-primary/20 px-2.5 py-0.5 text-xs font-medium text-flit-primary"
-					>
-						Search: "{searchQuery}"
-					</span>
-				{/if}
-				{#if selectedCategory}
-					<span
-						class="inline-flex items-center rounded-full bg-flit-primary/20 px-2.5 py-0.5 text-xs font-medium text-flit-primary"
-					>
-						Category: {selectedCategory}
-					</span>
-				{/if}
-			</div>
-		{/if}
-	</div>
+<div class="card__row card__row--end mt-md">
+	<button type="button" onclick={createNewNote} disabled={isCreatingNote} class="btn btn-primary">
+		+ New Note
+	</button>
+</div>
 
-	<!-- +New Note -->
-	<div class="mt-4">
-		<button
-			type="button"
-			onclick={createNewNote}
-			disabled={isCreatingNote}
-			class="btn btn-primary px-4"
-		>
-			+ New Note
-		</button>
-	</div>
-
-	<!-- Notes List -->
-	{#if isLoading}
-		<div class="mt-6 flex items-center justify-center py-8">
-			<svg
-				class="h-8 w-8 animate-spin text-flit-primary"
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-			>
-				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
+{#if isLoading}
+	<div class="loading">
+		<span class="loading__spinner" aria-hidden="true">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+				<circle
+					class="loading__spinner-inner"
+					cx="12"
+					cy="12"
+					r="10"
+					stroke="currentColor"
+					stroke-width="4"
 				></circle>
 				<path
-					class="opacity-75"
+					class="loading__spinner-path"
 					fill="currentColor"
 					d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 				></path>
 			</svg>
-			<span class="ml-2 text-flit-muted">Loading notes...</span>
-		</div>
-	{:else if error}
-		<div
-			class="mt-6 rounded-lg border border-flit-negative/30 bg-flit-card p-4 text-flit-ink shadow-flit-sm"
-		>
-			<p class="font-medium">Could not load notes</p>
-			<p class="mt-1 text-sm text-flit-muted">{error}</p>
-		</div>
-	{:else if notes.length === 0}
-		<div class="mt-6 py-8 text-center">
-			{#if hasActiveFilters}
-				<svg
-					class="mx-auto h-12 w-12 text-flit-muted"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-				>
+		</span>
+		<span>Loading notes...</span>
+	</div>
+{:else if error}
+	<div class="card card__block">
+		<p class="section-title">Could not load notes</p>
+		<p class="card__meta">{error}</p>
+	</div>
+{:else if notes.length === 0}
+	<div class="card card__column card__column--center">
+		{#if hasActiveFilters}
+			<span class="icon_md" aria-hidden="true">
+				<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -470,114 +421,90 @@
 						d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
 					/>
 				</svg>
-				<p class="mt-2 text-flit-muted">No notes match your filters.</p>
-				<button type="button" onclick={clearFilters} class="btn btn-primary mt-4 px-4">
-					Clear filters
-				</button>
-			{:else}
-				<p class="text-flit-muted">No notes yet.</p>
-			{/if}
-		</div>
-	{:else}
-		<p class="mt-4 text-sm text-flit-muted">
-			{notes.length} note{notes.length === 1 ? '' : 's'} found
-		</p>
-		<ul class="mt-4 space-y-8">
-			{#each notes as note (note.id)}
-				<li class="relative">
-					<a
-						href={resolve(`/notes/${note.id}`)}
-						class="block rounded-xl border border-flit-muted/20 bg-flit-card p-4 pb-14 shadow-flit-sm transition-colors hover:border-flit-muted/40 hover:bg-flit-muted/5 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-					>
-						<h2 class="text-center font-semibold text-flit-ink">{note.title}</h2>
-						<hr class="my-2 border-flit-muted/20" />
-						{#if hasPreview(note.content)}
-							<div class="prose prose-sm mt-2 line-clamp-3 max-w-none text-flit-muted prose-flit">
-								{@html previewHtmlByNoteId[note.id] ?? ''}
-							</div>
-						{/if}
-					</a>
-					<div
-						class="absolute right-0 bottom-0 left-0 z-10 mr-[2ch] flex translate-y-1/2 flex-row justify-end gap-2"
-						role="group"
-						aria-label="Note actions"
-					>
-						<button
-							type="button"
-							title="Append note"
-							disabled={isAppendingNoteId === note.id}
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								appendNote(note.id);
-							}}
-							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-flit-canvas bg-flit-card-opaque shadow-flit-sm transition-colors hover:border-flit-primary/50 hover:bg-flit-muted/10 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none disabled:opacity-50"
-						>
-							<svg
-								class="h-5 w-5 text-flit-ink"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M12 4v16m8-8H4"
-								/>
-							</svg>
-						</button>
-						<button
-							type="button"
-							title="Edit note"
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								navigateToEdit(note.id);
-							}}
-							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-flit-canvas bg-flit-card-opaque shadow-flit-sm transition-colors hover:border-flit-primary/50 hover:bg-flit-muted/10 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-						>
-							<svg
-								class="h-5 w-5 text-flit-ink"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-								/>
-							</svg>
-						</button>
-						<button
-							type="button"
-							title="Delete note"
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								deleteNote(note.id, note.title);
-							}}
-							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-flit-canvas bg-flit-card-opaque shadow-flit-sm transition-colors hover:border-flit-negative/50 hover:bg-flit-negative/10 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-						>
-							<svg
-								class="h-5 w-5 text-flit-ink"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-								/>
-							</svg>
-						</button>
+			</span>
+			<p class="card__meta card__meta--mt-sm">No notes match your filters.</p>
+			<button type="button" onclick={clearFilters} class="btn btn-primary mt-md"
+				>Clear filters</button
+			>
+		{:else}
+			<p class="card__meta">No notes yet.</p>
+		{/if}
+	</div>
+{:else}
+	<p class="muted">
+		{notes.length} note{notes.length === 1 ? '' : 's'} found
+	</p>
+	{#each notes as note (note.id)}
+		<div class="card">
+			<a href={resolve(`/notes/${note.id}`)}>
+				<h2>{note.title}</h2>
+				<hr />
+				{#if hasPreview(note.content)}
+					<div class="prose">
+						{@html previewHtmlByNoteId[note.id] ?? ''}
 					</div>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</div>
+				{/if}
+			</a>
+			<div class="card__actions" role="group" aria-label="Note actions">
+				<button
+					type="button"
+					title="Append note"
+					disabled={isAppendingNoteId === note.id}
+					onclick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						appendNote(note.id);
+					}}
+					class="btn"
+				>
+					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M12 4v16m8-8H4"
+						/>
+					</svg>
+				</button>
+				<button
+					type="button"
+					title="Edit note"
+					onclick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						navigateToEdit(note.id);
+					}}
+					class="btn"
+				>
+					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+						/>
+					</svg>
+				</button>
+				<button
+					type="button"
+					title="Delete note"
+					onclick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						deleteNote(note.id, note.title);
+					}}
+					class="btn btn-danger"
+				>
+					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+						/>
+					</svg>
+				</button>
+			</div>
+		</div>
+	{/each}
+{/if}

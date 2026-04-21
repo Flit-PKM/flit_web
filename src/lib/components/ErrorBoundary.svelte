@@ -50,23 +50,20 @@
 </script>
 
 {#if hasError}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-red-50 p-4">
-		<div class="max-w-md rounded-lg bg-white p-6 shadow-xl">
-			<h2 class="text-lg font-bold text-red-800">An error occurred</h2>
-			<p class="mt-2 text-red-700">
+	<div class="modal-backdrop modal-backdrop--panel">
+		<div class="card modal-dialog">
+			<h2 class="section-title">An error occurred</h2>
+			<p class="form-group__error">
 				We're sorry, but something went wrong. Please try refreshing the page.
 			</p>
-			<div class="mt-4 text-sm text-red-600">
-				<p>Error: {error?.message || 'Unknown error'}</p>
+			<div class="card__block">
+				<p class="card__meta">Error: {error?.message || 'Unknown error'}</p>
 				{#if errorInfo}
-					<pre class="mt-2 overflow-auto text-xs">{errorInfo}</pre>
+					<pre class="overflow-auto text-xs">{errorInfo}</pre>
 				{/if}
 			</div>
-			<div class="mt-4 flex justify-end">
-				<button
-					onclick={() => window.location.reload()}
-					class="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
-				>
+			<div class="card__row card__row--end">
+				<button type="button" onclick={() => window.location.reload()} class="btn btn-danger">
 					Refresh Page
 				</button>
 			</div>

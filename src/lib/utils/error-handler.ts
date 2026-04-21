@@ -18,7 +18,7 @@ export interface ErrorContext {
 	noteId?: number;
 	action?: string;
 	timestamp?: number;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 /**
@@ -43,7 +43,7 @@ export class ApiError extends AppError {
 	constructor(
 		message: string,
 		public readonly status: number,
-		public readonly response?: any,
+		public readonly response?: unknown,
 		context?: ErrorContext,
 		originalError?: Error
 	) {
@@ -166,6 +166,8 @@ export class ErrorLogger {
 	private async reportToExternalService(error: Error, context?: ErrorContext): Promise<void> {
 		// In a real application, this would integrate with Sentry, Rollbar, or similar
 		// For now, we just log to console but this is where external reporting would go
+		void error;
+		void context;
 
 		try {
 			// Example integration (uncomment if using external service):

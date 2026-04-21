@@ -58,41 +58,25 @@
 
 <svelte:head>
 	<title>Flit Web – Welcome</title>
-	<meta
-		name="description"
-		content="Flit Web – Webapp for Flit-Core. View and manage your notes and insights as a knowledge graph. Part of the Flit-PKM ecosystem."
-	/>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-	<!-- Hero (landing-style) -->
-	<header class="text-center">
-		<h1 class="text-4xl font-bold text-flit-ink sm:text-5xl md:text-6xl">Flit Web</h1>
-		<h2 class="mt-2 text-2xl font-semibold text-flit-muted">Personal Knowledge Management</h2>
-		<p class="mt-2 text-base text-flit-muted sm:text-lg">
-			Butterfly on the web of consciousness, Flutter.
-		</p>
-		<p class="mx-auto mt-6 max-w-2xl text-flit-ink">
-			Welcome to the Flit-PKM ecosystem. Build your personal knowledge base here; with powerful AI
-			relationship analysis, summarization and insight generation.
-		</p>
-	</header>
+<header class="hero">
+	<h1>Flit</h1>
+	<h2>Note Taking & Personal Knowledge Management</h2>
+	<p class="card__meta">Butterfly on the web of consciousness, Flutter.</p>
+	<p>
+		Welcome to the Flit-PKM ecosystem — your secure, personal space to capture thoughts, weave ideas
+		together, and let powerful AI gently reveal hidden connections, smart summaries, and fresh
+		insights you never expected.
+	</p>
+</header>
 
-	<!-- Authentication Status Card (landing main-content style) -->
-	<div
-		class="mx-auto mt-12 max-w-md rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm sm:p-8"
-	>
+<div>
+	<div class="card small">
 		{#if $isAuthenticated && $currentUser}
-			<div class="text-center">
-				<div
-					class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-flit-positive/20"
-				>
-					<svg
-						class="h-8 w-8 text-flit-positive"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
+			<div class="landing__stack">
+				<div class="landing__avatar" data-tone="positive">
+					<svg class="icon_md text-positive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -101,25 +85,14 @@
 						/>
 					</svg>
 				</div>
-				<h3 class="mt-4 text-lg font-semibold text-flit-ink">
-					Welcome back, {$currentUser.email}!
-				</h3>
-				<p class="mt-2 text-sm text-flit-muted">You are successfully signed in to your account.</p>
-				<div class="mt-6">
-					<a href={resolve('/profile')} class="btn btn-primary px-4"> View Profile </a>
-				</div>
+				<h3>Welcome back, {$currentUser.email}!</h3>
+				<p class="card__meta">You are successfully signed in to your account.</p>
+				<a href={resolve('/profile')} class="btn btn-primary">View Profile</a>
 			</div>
 		{:else}
-			<div class="text-center">
-				<div
-					class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-flit-muted/20"
-				>
-					<svg
-						class="h-8 w-8 text-flit-muted"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
+			<div class="landing__stack">
+				<div class="landing__avatar" data-tone="muted">
+					<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -128,53 +101,22 @@
 						/>
 					</svg>
 				</div>
-				<h3 class="mt-4 text-lg font-semibold text-flit-ink">Get Started</h3>
-				<p class="mt-2 text-sm text-flit-muted">
+				<h3>Get Started</h3>
+				<p class="card__meta">
 					Create an account or sign in to access your knowledge graph and manage your notes.
 				</p>
-				<div class="mt-6 space-y-3">
-					<a
-						href={resolve('/register')}
-						class="inline-flex w-full items-center justify-center rounded-lg border border-transparent bg-flit-primary px-4 py-2 text-sm font-medium text-white shadow-flit-sm transition-opacity hover:opacity-90 focus:ring-2 focus:ring-flit-primary focus:ring-offset-2 focus:ring-offset-flit-canvas focus:outline-none"
-					>
-						Create Account
-					</a>
-					<a href={resolve('/login')} class="btn btn-secondary w-full justify-center px-4">
-						Sign In
-					</a>
+				<div class="landing__cta">
+					<a href={resolve('/register')} class="btn btn-primary btn--block">Create Account</a>
+					<a href={resolve('/login')} class="btn btn-secondary btn--block">Sign In</a>
 				</div>
 			</div>
 		{/if}
 	</div>
 
-	<!-- Features (landing main-content card style) -->
-	<div class="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-		<div class="flex flex-col rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-			<div
-				class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-flit-primary/20 text-flit-primary"
-			>
-				<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-					/>
-				</svg>
-			</div>
-			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">
-				Secure Authentication and Database Encryption
-			</h3>
-			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				Industry-standard security and resting encryption of your data.
-			</p>
-		</div>
-
-		<div class="flex flex-col rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-			<div
-				class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-flit-positive/20 text-flit-positive"
-			>
-				<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+	<div class="grid-cards landing__highlights">
+		<article class="landing__tile">
+			<div class="landing__tile-icon" data-tone="positive">
+				<svg class="icon_base" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -183,19 +125,37 @@
 					/>
 				</svg>
 			</div>
-			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Knowledge Graph</h3>
-			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				Build your personal knowledge base; create/edit/delete notes, joint them together with 2-way
-				relationships, categorize them for easy navigation and summariation, and find new
-				connections and insights with AI.
+			<h3>Connected Thinking, AI-Powered</h3>
+			<p>
+				Create your ultimate personal knowledge hub: write notes, weave them together with
+				effortless back-and-forth links, organize by topic or project, and summarize on demand. Then
+				let AI scan your entire base to surface surprising links, deeper insights, and creative
+				connections that help you think bigger and clearer.
 			</p>
-		</div>
+		</article>
 
-		<div class="flex flex-col rounded-2xl bg-flit-card p-6 shadow-flit-sm backdrop-blur-sm">
-			<div
-				class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-flit-primary/20 text-flit-primary"
-			>
-				<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		<article class="landing__tile">
+			<div class="landing__tile-icon" data-tone="primary">
+				<svg class="icon_base" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+					/>
+				</svg>
+			</div>
+			<h3>Fortress-Level Security for Your Mind</h3>
+			<p>
+				We take your privacy seriously. Every piece of your knowledge is shielded with
+				industry-leading encryption — end-to-end and at rest — so it remains 100% yours and
+				unreadable to anyone else. Safe today, safe tomorrow.
+			</p>
+		</article>
+
+		<article class="landing__tile">
+			<div class="landing__tile-icon" data-tone="primary">
+				<svg class="icon_base" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -204,10 +164,12 @@
 					/>
 				</svg>
 			</div>
-			<h3 class="mt-4 text-center text-lg font-semibold text-flit-ink">Export & Import</h3>
-			<p class="mt-2 flex-1 text-center text-sm text-flit-muted">
-				Import and Export in a standardized Markdown format, for easy sharing and collaboration.
+			<h3>Share Ideas Without Limits</h3>
+			<p>
+				Export your connected knowledge base as standard Markdown files — ideal for collaborating,
+				archiving, or using elsewhere. Import Markdown from other apps or friends to expand your
+				base instantly. No barriers, no formats to fight — just pure, easy flow of your thoughts.
 			</p>
-		</div>
+		</article>
 	</div>
 </div>

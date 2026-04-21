@@ -15,7 +15,6 @@ import type {
 	UserCreate,
 	UserUpdate,
 	AuthToken,
-	PaginatedResponse,
 	VerifySendResponse,
 	PasswordResetRequestResponse,
 	PasswordResetConfirm,
@@ -40,7 +39,6 @@ import type {
 	PlanDetailResponse,
 	SubscriptionStatusResponse
 } from '../types/billing';
-import type { AccessCodeCreateResponse, SubscriptionRead } from '../types/admin';
 import type { FeedbackCreate, FeedbackRead } from '../types/feedback';
 import { errorLogger, handleApiError } from '$lib/utils/error-handler';
 
@@ -283,94 +281,6 @@ export class ApiClient {
 			body: userData
 		});
 
-		return response.data;
-	}
-
-	/**
-	 * User management endpoints
-	 */
-	async getUsers(params: { skip?: number; limit?: number } = {}): Promise<PaginatedResponse<User>> {
-		const endpoint = endpointWithQuery('/users/', params);
-
-		const response = await this.request<User[]>(endpoint, {
-			method: 'GET'
-		});
-
-		// Transform array response to paginated response
-		return {
-			items: response.data,
-			total: parseInt(response.headers.get('x-total-count') || '0'),
-			skip: params.skip || 0,
-			limit: params.limit || 10
-		};
-	}
-
-	async getUser(userId: number): Promise<User> {
-		const response = await this.request<User>(`/users/${userId}`, {
-			method: 'GET'
-		});
-
-		return response.data;
-	}
-
-	async updateUser(userId: number, userData: UserUpdate): Promise<User> {
-		const response = await this.request<User>(`/users/${userId}`, {
-			method: 'PATCH',
-			body: userData
-		});
-
-		return response.data;
-	}
-
-	async deleteUser(userId: number): Promise<void> {
-		await this.request(`/users/${userId}`, {
-			method: 'DELETE'
-		});
-	}
-
-	/**
-	 * Grant superuser privilege to a user. POST /users/{user_id}/superuser. Superuser only.
-	 */
-	async grantSuperuser(userId: number): Promise<User> {
-		const response = await this.request<User>(`/users/${userId}/superuser`, {
-			method: 'POST'
-		});
-		return response.data;
-	}
-
-	/**
-	 * Revoke superuser privilege from a user. DELETE /users/{user_id}/superuser. Superuser only.
-	 */
-	async revokeSuperuser(userId: number): Promise<User> {
-		const response = await this.request<User>(`/users/${userId}/superuser`, {
-			method: 'DELETE'
-		});
-		return response.data;
-	}
-
-	/**
-	 * List newsletter subscriptions. GET /subscriptions/?skip=&limit=. Superuser only.
-	 */
-	async getSubscriptions(
-		params: { skip?: number; limit?: number } = {}
-	): Promise<SubscriptionRead[]> {
-		const endpoint = endpointWithQuery('/subscriptions/', params);
-		const response = await this.request<SubscriptionRead[]>(endpoint, { method: 'GET' });
-		return response.data;
-	}
-
-	/**
-	 * Create a single-use access code. GET /access-codes/create?period_weeks=&includes_encryption=. Superuser only.
-	 */
-	async createAccessCode(params: {
-		period_weeks: number;
-		includes_encryption: boolean;
-	}): Promise<AccessCodeCreateResponse> {
-		const endpoint = endpointWithQuery('/access-codes/create', {
-			period_weeks: params.period_weeks,
-			includes_encryption: params.includes_encryption
-		});
-		const response = await this.request<AccessCodeCreateResponse>(endpoint, { method: 'GET' });
 		return response.data;
 	}
 

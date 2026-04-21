@@ -154,41 +154,6 @@
 			}
 		};
 	});
-
-	// Password strength color classes (flit tokens)
-	function getStrengthColor(strength: number): string {
-		switch (strength) {
-			case 0:
-				return 'bg-flit-muted/30';
-			case 1:
-				return 'bg-flit-negative';
-			case 2:
-				return 'bg-amber-500';
-			case 3:
-				return 'bg-amber-400';
-			case 4:
-				return 'bg-flit-positive';
-			default:
-				return 'bg-flit-muted/30';
-		}
-	}
-
-	function getStrengthTextColor(strength: number): string {
-		switch (strength) {
-			case 0:
-				return 'text-flit-muted';
-			case 1:
-				return 'text-flit-negative';
-			case 2:
-				return 'text-amber-600';
-			case 3:
-				return 'text-amber-600';
-			case 4:
-				return 'text-flit-positive';
-			default:
-				return 'text-flit-muted';
-		}
-	}
 </script>
 
 <svelte:head>
@@ -199,264 +164,222 @@
 	{/if}
 </svelte:head>
 
-<div class="flex min-h-[calc(100vh-12rem)] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-	<div class="w-full max-w-md space-y-8">
-		<!-- Header -->
-		<div class="text-center">
-			<h1 class="mb-2 text-3xl font-bold text-flit-ink">Create your account</h1>
-			<p class="text-flit-muted">Join the Flit-PKM ecosystem and manage your knowledge graph.</p>
+<div class="auth">
+	<div class="auth__inner">
+		<div class="auth__header">
+			<h1>Create your account</h1>
+			<p>Join the Flit-PKM ecosystem and manage your knowledge graph.</p>
 		</div>
-
-		<!-- Form (landing card style) -->
-		<form
-			class="mb-4 space-y-6 rounded-2xl bg-flit-card px-6 pt-6 pb-8 shadow-flit-sm backdrop-blur-sm sm:px-8"
-			onsubmit={handleSubmit}
-			novalidate
-		>
-			<!-- Email Field -->
-			<div>
-				<label for="email" class="mb-2 block text-sm font-medium text-flit-ink">
-					Email address
-				</label>
-				<input
-					bind:this={emailInput}
-					id="email"
-					name="email"
-					type="email"
-					autocomplete="email"
-					required
-					disabled={isSubmitting}
-					class="input backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-					class:border-flit-negative={errors.email}
-					class:focus:ring-flit-negative={errors.email}
-					class:focus:border-flit-negative={errors.email}
-					placeholder="Enter your email"
-					bind:value={formData.email}
-					oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
-					aria-describedby={errors.email ? 'email-error' : undefined}
-					aria-invalid={!!errors.email}
-				/>
-				{#if errors.email}
-					<p id="email-error" class="mt-1 text-sm text-flit-negative" role="alert">
-						{errors.email}
-					</p>
-				{/if}
-			</div>
-
-			<!-- Password Field -->
-			<div>
-				<label for="password" class="mb-2 block text-sm font-medium text-flit-ink">
-					Password
-				</label>
-				<div class="relative">
+		<div class="card">
+			<form onsubmit={handleSubmit} novalidate>
+				<div class="form-group">
+					<label for="email">Email address</label>
 					<input
-						id="password"
-						name="password"
-						type={showPassword ? 'text' : 'password'}
-						autocomplete="new-password"
+						bind:this={emailInput}
+						id="email"
+						name="email"
+						type="email"
+						autocomplete="email"
 						required
 						disabled={isSubmitting}
-						class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-						class:border-flit-negative={errors.password}
-						class:focus:ring-flit-negative={errors.password}
-						class:focus:border-flit-negative={errors.password}
-						placeholder="Create a strong password"
-						bind:value={formData.password}
-						oninput={(e) => handleFieldChange('password', e.currentTarget.value)}
-						aria-describedby={errors.password ? 'password-error' : 'password-strength'}
-						aria-invalid={!!errors.password}
+						class="input wide"
+						class:input--error={!!errors.email}
+						placeholder="Enter your email"
+						bind:value={formData.email}
+						oninput={(e) => handleFieldChange('email', e.currentTarget.value)}
+						aria-describedby={errors.email ? 'email-error' : undefined}
+						aria-invalid={!!errors.email}
 					/>
-					<button
-						type="button"
-						class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-						onclick={togglePasswordVisibility}
-						disabled={isSubmitting}
-						aria-label={showPassword ? 'Hide password' : 'Show password'}
-					>
-						{#if showPassword}
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-								/>
-							</svg>
-						{:else}
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-								/>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-								/>
-							</svg>
-						{/if}
-					</button>
+					{#if errors.email}
+						<p id="email-error" class="form-group__error" role="alert">{errors.email}</p>
+					{/if}
 				</div>
 
-				<!-- Password Strength Indicator -->
-				{#if formData.password}
-					<div class="mt-2">
-						<div class="flex items-center space-x-2">
-							<div class="h-2 flex-1 rounded-full bg-flit-muted/20">
+				<div class="form-group">
+					<label for="password">Password</label>
+					<div class="input-wrap">
+						<input
+							id="password"
+							name="password"
+							type={showPassword ? 'text' : 'password'}
+							autocomplete="new-password"
+							required
+							disabled={isSubmitting}
+							class="input wide"
+							class:input--error={!!errors.password}
+							placeholder="Create a strong password"
+							bind:value={formData.password}
+							oninput={(e) => handleFieldChange('password', e.currentTarget.value)}
+							aria-describedby={errors.password ? 'password-error' : 'password-strength'}
+							aria-invalid={!!errors.password}
+						/>
+						<button
+							type="button"
+							class="input__action"
+							onclick={togglePasswordVisibility}
+							disabled={isSubmitting}
+							aria-label={showPassword ? 'Hide password' : 'Show password'}
+						>
+							{#if showPassword}
+								<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+									/>
+								</svg>
+							{:else}
+								<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+									/>
+								</svg>
+							{/if}
+						</button>
+					</div>
+
+					{#if formData.password}
+						<div class="strength-bar">
+							<div class="strength-bar__track">
 								<div
-									class="h-2 rounded-full transition-all duration-300 {getStrengthColor(
-										passwordStrength
-									)}"
+									class="strength-bar__fill strength-bar__fill--{passwordStrength}"
 									style="width: {(passwordStrength / 4) * 100}%"
 								></div>
 							</div>
-							<span class="text-xs font-medium {getStrengthTextColor(passwordStrength)}">
+							<span class="strength-bar__label strength-bar__label--{passwordStrength}">
 								{passwordStrengthLabel}
 							</span>
 						</div>
-						<p id="password-strength" class="mt-1 text-xs text-flit-muted">
+						<p id="password-strength" class="form-group__hint">
 							Use at least 8 characters with uppercase, lowercase, number, and special character.
 						</p>
+					{/if}
+
+					{#if errors.password}
+						<p id="password-error" class="form-group__error" role="alert">{errors.password}</p>
+					{/if}
+				</div>
+
+				<div class="form-group">
+					<label for="confirmPassword">Confirm password</label>
+					<div class="input-wrap">
+						<input
+							id="confirmPassword"
+							name="confirmPassword"
+							type={showConfirmPassword ? 'text' : 'password'}
+							autocomplete="new-password"
+							required
+							disabled={isSubmitting}
+							class="input wide"
+							class:input--error={!!errors.confirmPassword}
+							placeholder="Confirm your password"
+							bind:value={formData.confirmPassword}
+							oninput={(e) => handleFieldChange('confirmPassword', e.currentTarget.value)}
+							aria-describedby={errors.confirmPassword ? 'confirm-password-error' : undefined}
+							aria-invalid={!!errors.confirmPassword}
+						/>
+						<button
+							type="button"
+							class="input__action"
+							onclick={toggleConfirmPasswordVisibility}
+							disabled={isSubmitting}
+							aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+						>
+							{#if showConfirmPassword}
+								<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
+									/>
+								</svg>
+							{:else}
+								<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+									/>
+								</svg>
+							{/if}
+						</button>
 					</div>
+					{#if errors.confirmPassword}
+						<p id="confirm-password-error" class="form-group__error" role="alert">
+							{errors.confirmPassword}
+						</p>
+					{/if}
+				</div>
+
+				<GeneralErrorAlert message={generalError} />
+
+				{#if turnstileSiteKey}
+					<div
+						class="cf-turnstile"
+						data-sitekey={turnstileSiteKey}
+						data-theme="auto"
+						data-size="compact"
+						data-action="register"
+						data-callback="onTurnstileSuccess"
+						data-error-callback="onTurnstileError"
+						data-widget-id="register-widget"
+					></div>
 				{/if}
 
-				{#if errors.password}
-					<p id="password-error" class="mt-1 text-sm text-flit-negative" role="alert">
-						{errors.password}
-					</p>
-				{/if}
-			</div>
-
-			<!-- Confirm Password Field -->
-			<div>
-				<label for="confirmPassword" class="mb-2 block text-sm font-medium text-flit-ink">
-					Confirm password
-				</label>
-				<div class="relative">
-					<input
-						id="confirmPassword"
-						name="confirmPassword"
-						type={showConfirmPassword ? 'text' : 'password'}
-						autocomplete="new-password"
-						required
-						disabled={isSubmitting}
-						class="input pr-10 backdrop-blur-sm transition-colors disabled:cursor-not-allowed"
-						class:border-flit-negative={errors.confirmPassword}
-						class:focus:ring-flit-negative={errors.confirmPassword}
-						class:focus:border-flit-negative={errors.confirmPassword}
-						placeholder="Confirm your password"
-						bind:value={formData.confirmPassword}
-						oninput={(e) => handleFieldChange('confirmPassword', e.currentTarget.value)}
-						aria-describedby={errors.confirmPassword ? 'confirm-password-error' : undefined}
-						aria-invalid={!!errors.confirmPassword}
-					/>
+				<div class="auth__actions">
 					<button
-						type="button"
-						class="absolute inset-y-0 right-0 flex items-center pr-3 text-flit-muted transition-opacity hover:opacity-80"
-						onclick={toggleConfirmPasswordVisibility}
-						disabled={isSubmitting}
-						aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+						type="submit"
+						disabled={!turnstileReady || isSubmitting}
+						class="btn btn-primary btn--block"
 					>
-						{#if showConfirmPassword}
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.05 8.05m1.829 1.829l4.242 4.242M12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-1.563 3.029m-5.858-.908a3 3 0 01-4.243-4.243"
-								/>
-							</svg>
+						{#if isSubmitting}
+							<span class="loading__spinner" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle
+										class="loading__spinner-inner"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="loading__spinner-path"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+							</span>
+							Creating account…
 						{:else}
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-								/>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-								/>
-							</svg>
+							Create account
 						{/if}
 					</button>
 				</div>
-				{#if errors.confirmPassword}
-					<p id="confirm-password-error" class="mt-1 text-sm text-flit-negative" role="alert">
-						{errors.confirmPassword}
-					</p>
-				{/if}
-			</div>
 
-			<!-- General Error -->
-			<GeneralErrorAlert message={generalError} />
-
-			{#if turnstileSiteKey}
-				<div
-					class="cf-turnstile"
-					data-sitekey={turnstileSiteKey}
-					data-theme="auto"
-					data-size="compact"
-					data-action="register"
-					data-callback="onTurnstileSuccess"
-					data-error-callback="onTurnstileError"
-					data-widget-id="register-widget"
-				></div>
-			{/if}
-
-			<!-- Submit Button -->
-			<div>
-				<button
-					type="submit"
-					disabled={!turnstileReady || isSubmitting}
-					class="btn btn-primary w-full justify-center py-3 disabled:cursor-not-allowed"
-				>
-					{#if isSubmitting}
-						<svg
-							class="mr-3 -ml-1 h-5 w-5 animate-spin text-white"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
-							<circle
-								class="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="4"
-							></circle>
-							<path
-								class="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							></path>
-						</svg>
-						Creating account...
-					{:else}
-						Create account
-					{/if}
-				</button>
-			</div>
-
-			<!-- Links -->
-			<div class="text-center">
-				<p class="text-sm text-flit-muted">
+				<p class="card__meta">
 					Already have an account?
-					<a
-						href={resolve('/login')}
-						class="font-medium text-flit-link transition-opacity hover:opacity-80"
-					>
-						Sign in here
-					</a>
+					<a href={resolve('/login')}>Sign in</a>
 				</p>
-			</div>
-		</form>
+			</form>
+		</div>
 	</div>
 </div>

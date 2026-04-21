@@ -1,0 +1,55 @@
+/* Flit-PKM design tokens (no layers) */
+:root {
+	--color-green: oklch(0.63 0.5 142);
+	--color-red: oklch(0.63 0.5 31);
+	--color-blue: oklch(0.63 0.5 240);
+	--color-mid-grey: oklch(50% 0 0);
+
+	--canvas-dark: oklch(18% 0.01 176);
+	--canvas-light: oklch(90% 0.01 80);
+	--ink-dark: oklch(90% 0.02 100);
+	--ink-light: oklch(18% 0.02 176);
+
+	--color-canvas: var(--canvas-light);
+	--color-canvas-lv1: color-mix(in oklab, var(--color-mid-grey) 8%, var(--color-canvas));
+	--color-canvas-lv2: color-mix(in oklab, var(--color-mid-grey) 12%, var(--color-canvas));
+	--color-canvas-lv3: color-mix(in oklab, var(--color-mid-grey) 16%, var(--color-canvas));
+	--color-canvas-negative: color-mix(in oklab, var(--color-red) 20%, var(--color-canvas));
+	--color-canvas-positive: color-mix(in oklab, var(--color-green) 20%, var(--color-canvas));
+	--color-canvas-neutral: color-mix(in oklab, var(--color-blue) 20%, var(--color-canvas));
+
+	--color-ink: var(--ink-light);
+	--color-ink-negative: color-mix(in oklab, var(--color-red) 20%, var(--color-ink));
+	--color-ink-positive: color-mix(in oklab, var(--color-green) 20%, var(--color-ink));
+	--color-ink-neutral: color-mix(in oklab, var(--color-blue) 20%, var(--color-ink));
+	--color-link: color-mix(in oklab, var(--color-blue) 30%, var(--color-ink));
+	--color-ink-meta: color-mix(in oklab, var(--color-mid-grey) 50%, var(--color-ink));
+
+	--color-border: color-mix(in oklab, var(--color-mid-grey) 20%, transparent);
+
+	--flit-card-bg: color-mix(in oklab, var(--color-mid-grey) 7%, transparent);
+	--flit-card-opaque: color-mix(in oklab, var(--color-mid-grey) 10%, var(--color-canvas));
+	--flit-footer-bg: color-mix(in oklab, var(--color-canvas), var(--color-mid-grey) 10%);
+	--flit-shadow-color: color-mix(in oklab, var(--color-ink) 15%, transparent);
+	--flit-shadow-sm: 1px 1px 3px var(--flit-shadow-color);
+	--flit-shadow-md: 4px 4px 12px var(--flit-shadow-color);
+
+	--font-sans: system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--color-canvas: var(--canvas-dark);
+		--color-ink: var(--ink-dark);
+	}
+}
+
+[data-color-scheme='light'] {
+	--color-canvas: var(--canvas-light);
+	--color-ink: var(--ink-light);
+}
+
+[data-color-scheme='dark'] {
+	--color-canvas: var(--canvas-dark);
+	--color-ink: var(--ink-dark);
+}
