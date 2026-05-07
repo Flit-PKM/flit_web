@@ -5,11 +5,12 @@
 	import { isAuthenticated, authActions } from '$lib/stores/auth';
 	import {
 		validateRegisterForm,
-		sanitizeInput,
 		getPasswordStrength,
 		getPasswordStrengthLabel
 	} from '$lib/utils/auth';
+	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
+	import { errorLogger } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import type { RegisterFormData, FormErrors } from '$lib/types/auth';
 
@@ -70,8 +71,9 @@
 
 	// Handle form field changes with validation
 	function handleFieldChange(field: keyof RegisterFormData, value: string) {
-		formData[field] = sanitizeInput(value);
-		errors[field] = '';
+		const fieldName = String(field);
+		updateSanitizedField(formData, fieldName, value);
+		clearFieldError(errors, fieldName);
 
 		// Debounced validation for real-time feedback
 		debouncedValidator.validateField(field as string, value, (error) => {
@@ -123,11 +125,11 @@
 
 	// Toggle password visibility
 	function togglePasswordVisibility() {
-		showPassword = !showPassword;
+		showPassword = toggleFlag(showPassword);
 	}
 
 	function toggleConfirmPasswordVisibility() {
-		showConfirmPassword = !showConfirmPassword;
+		showConfirmPassword = toggleFlag(showConfirmPassword);
 	}
 
 	// Focus management for accessibility
@@ -143,7 +145,11 @@
 			(window as Window & { onTurnstileError?: (code?: string) => void }).onTurnstileError = (
 				code
 			) => {
-				console.error('Turnstile error:', code);
+				errorLogger.logError(new Error('Turnstile error'), {
+					component: 'Register',
+					operation: 'turnstileError',
+					code
+				});
 			};
 		}
 

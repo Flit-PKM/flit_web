@@ -42,15 +42,22 @@ export class DebugLogger {
 	}
 
 	/**
+	 * Follow logger level configured globally.
+	 */
+	syncFromLoggerLevel(): void {
+		this.isEnabled = errorLogger.getLogLevel() === 'debug';
+	}
+
+	/**
 	 * Log debug information
 	 */
 	log(message: string, data?: unknown, context?: unknown): void {
 		if (this.isEnabled) {
-			errorLogger.logDebug(`[DEBUG] ${message}`, context as ErrorContext | undefined);
-
-			if (data) {
-				console.debug(`[DEBUG] ${message}:`, data);
-			}
+			const debugContext: ErrorContext = {
+				...(context as ErrorContext | undefined),
+				data
+			};
+			errorLogger.logDebug(message, debugContext);
 		}
 	}
 
@@ -63,7 +70,6 @@ export class DebugLogger {
 				`[PERFORMANCE] ${label}: ${duration}ms`,
 				context as ErrorContext | undefined
 			);
-			console.debug(`[PERFORMANCE] ${label}: ${duration}ms`);
 		}
 	}
 

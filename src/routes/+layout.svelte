@@ -6,6 +6,9 @@
 	import { page } from '$app/stores';
 	import { authActions, currentUser, isAuthenticated } from '$lib/stores/auth';
 	import { pendingColorScheme } from '$lib/stores/theme';
+	import { initializeLogging } from '$lib/utils/log-config';
+
+	const isProd = import.meta.env.MODE === 'production';
 
 	let { children } = $props();
 	let showMobileMenu = $state(false);
@@ -14,6 +17,7 @@
 
 	// Initialize auth state on app start
 	onMount(() => {
+		initializeLogging();
 		authActions.initialize();
 	});
 
@@ -87,6 +91,14 @@
 		name="description"
 		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
 	/>
+
+	{#if isProd}
+		<script
+			defer
+			src="https://analytics.bmd-studios.com/script.js"
+			data-website-id="a2c2a395-85ef-4245-b680-4bc920056956"
+		></script>
+	{/if}
 </svelte:head>
 
 <div class="app">

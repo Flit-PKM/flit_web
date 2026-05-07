@@ -67,6 +67,8 @@ function endpointWithQuery(
 	return query ? `${path}?${query}` : path;
 }
 
+const RETRY_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 /**
  * Resolve API base URL: same origin in production (browser), else dev env or localhost.
  * Backend is mounted at /api, so all requests go to baseUrl + endpoint (e.g. /api/auth/login-json).
@@ -146,21 +148,20 @@ export class ApiClient {
 
 		let lastError: Error = new Error('Request failed');
 
-		// Retry logic for failed requests
-		for (let attempt = 0; attempt <= this.config.retries; attempt++) {
+		const method = (options.method || 'GET').toUpperCase();
+		const maxAttempts = RETRY_SAFE_METHODS.has(method) ? this.config.retries : 0;
+
+		// Retry only for safe/idempotent methods by default.
+		for (let attempt = 0; attempt <= maxAttempts; attempt++) {
+			let timeoutId: ReturnType<typeof setTimeout> | null = null;
 			try {
 				const controller = new AbortController();
-				const timeoutId = setTimeout(
-					() => controller.abort(),
-					options.timeout || this.config.timeout
-				);
+				timeoutId = setTimeout(() => controller.abort(), options.timeout || this.config.timeout);
 
 				const response = await fetch(url, {
 					...config,
 					signal: controller.signal
 				});
-
-				clearTimeout(timeoutId);
 
 				// Handle authentication errors
 				if (response.status === 401) {
@@ -236,10 +237,14 @@ export class ApiClient {
 				}
 
 				// Wait before retrying (except on last attempt)
-				if (attempt < this.config.retries) {
+				if (attempt < maxAttempts) {
 					await new Promise((resolve) =>
 						setTimeout(resolve, this.config.retryDelay * (attempt + 1))
 					);
+				}
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
 				}
 			}
 		}

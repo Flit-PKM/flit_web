@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { isAuthenticated } from '$lib/stores/auth';
+	import { getProtectedRouteRedirect } from '$lib/utils/navigation';
 
 	let { children } = $props();
 
 	// Redirect unauthenticated users to login (single place for all protected routes)
 	$effect(() => {
-		if (!$isAuthenticated) {
-			goto(resolve('/login'));
-		}
+		const redirectPath = getProtectedRouteRedirect($isAuthenticated);
+		if (redirectPath) goto(redirectPath as Parameters<typeof goto>[0]);
 	});
 </script>
 

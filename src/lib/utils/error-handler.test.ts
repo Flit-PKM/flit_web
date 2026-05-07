@@ -6,13 +6,21 @@ import {
 	AppError,
 	ApiError,
 	ValidationError,
-	NetworkError
+	NetworkError,
+	errorLogger
 } from './error-handler';
 import { HttpError } from '$lib/api/client';
 
 describe('handleApiError', () => {
 	beforeEach(() => {
-		vi.stubGlobal('console', { ...console, error: vi.fn(), debug: vi.fn() });
+		vi.stubGlobal('console', {
+			...console,
+			error: vi.fn(),
+			debug: vi.fn(),
+			info: vi.fn(),
+			warn: vi.fn()
+		});
+		errorLogger.setLogLevel('error');
 	});
 
 	it('returns same error if already AppError', () => {
@@ -69,7 +77,14 @@ describe('formatErrorForUser', () => {
 
 describe('captureApiError', () => {
 	beforeEach(() => {
-		vi.stubGlobal('console', { ...console, error: vi.fn(), debug: vi.fn() });
+		vi.stubGlobal('console', {
+			...console,
+			error: vi.fn(),
+			debug: vi.fn(),
+			info: vi.fn(),
+			warn: vi.fn()
+		});
+		errorLogger.setLogLevel('error');
 	});
 
 	it('returns user-facing string and logs', () => {
@@ -82,5 +97,43 @@ describe('captureApiError', () => {
 		const httpErr = new HttpError('Unauthorized', 401);
 		const msg = captureApiError(httpErr);
 		expect(msg).toBe('Unauthorized');
+	});
+});
+
+describe('ErrorLogger log levels', () => {
+	beforeEach(() => {
+		vi.stubGlobal('console', {
+			...console,
+			error: vi.fn(),
+			debug: vi.fn(),
+			info: vi.fn(),
+			warn: vi.fn()
+		});
+	});
+
+	it('debug level logs debug/info/warn/error', () => {
+		errorLogger.setLogLevel('debug');
+		errorLogger.logDebug('debug message');
+		errorLogger.logInfo('info message');
+		errorLogger.logWarning('warn message');
+		errorLogger.logError(new Error('error message'));
+
+		expect(console.debug).toHaveBeenCalled();
+		expect(console.info).toHaveBeenCalled();
+		expect(console.warn).toHaveBeenCalled();
+		expect(console.error).toHaveBeenCalled();
+	});
+
+	it('deploy-like warn level suppresses debug/info', () => {
+		errorLogger.setLogLevel('warn');
+		errorLogger.logDebug('debug message');
+		errorLogger.logInfo('info message');
+		errorLogger.logWarning('warn message');
+		errorLogger.logError(new Error('error message'));
+
+		expect(console.debug).not.toHaveBeenCalled();
+		expect(console.info).not.toHaveBeenCalled();
+		expect(console.warn).toHaveBeenCalled();
+		expect(console.error).toHaveBeenCalled();
 	});
 });

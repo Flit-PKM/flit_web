@@ -1,16 +1,25 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient, HttpError } from '$lib/api/client';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+	import { debounceTrailing } from '$lib/utils/debounce';
 	import { filterNotDeleted } from '$lib/utils/filter';
-	import { markdownToSafeHtml } from '$lib/utils/markdown';
+	import { buildRelatedTitleMap, getOtherNoteId } from '$lib/utils/notes';
+	import {
+		formatNoteDate,
+		formatRelationshipType,
+		formatRelationshipTypeLabel,
+		normalizeNoteContent,
+		normalizeNoteTitle,
+		RELATIONSHIP_TYPES
+	} from '$lib/utils/note-detail';
 	import type {
 		NoteDetail,
 		NoteRead,
@@ -18,24 +27,35 @@
 		CategoryRead,
 		RelationshipType
 	} from '$lib/types/note';
+	import type { Component } from 'svelte';
 
-	const RELATIONSHIP_TYPES: RelationshipType[] = [
-		'RELATED_TO',
-		'FOLLOWS_ON',
-		'SIMILAR_TO',
-		'CONTRADICTS',
-		'REFERENCES'
-	];
+	type NoteMarkdownEditorProps = {
+		noteId: number;
+		initialContent: string;
+		onChange: (value: string) => void;
+	};
+
+	/** Client-only chunk: avoid static import so ProseMirror/Tiptap are not evaluated during SSR. */
+	let NoteBodyEditor = $state<Component<NoteMarkdownEditorProps> | null>(null);
+
+	if (browser) {
+		void import('$lib/components/NoteMarkdownEditor.svelte').then((m) => {
+			NoteBodyEditor = m.default;
+		});
+	}
+
+	const AUTOSAVE_DEBOUNCE_MS = 5000;
 
 	let isLoading = $state(true);
 	let note = $state<NoteDetail | null>(null);
 	let error = $state('');
 	let categories = $state<CategoryRead[]>([]);
 
-	// Edit mode
-	let isEditing = $state(false);
-	let draftTitle = $state('');
-	let draftContent = $state('');
+	let isAppending = $state(false);
+	let liveTitle = $state('');
+	let latestContent = $state('');
+	let lastSyncedTitle = $state('');
+	let lastSyncedContent = $state('');
 	let saveError = $state('');
 	let isSaving = $state(false);
 	let addCategoryId = $state('');
@@ -43,7 +63,6 @@
 	let addRelNoteTitle = $state('');
 	let addRelType = $state<RelationshipType>('RELATED_TO');
 
-	// Note search popup (Add relationship)
 	let showNoteSearchPopup = $state(false);
 	let noteSearchQuery = $state('');
 	let noteSearchResults = $state<NoteRead[]>([]);
@@ -51,13 +70,108 @@
 	let noteSearchDebounce: ReturnType<typeof setTimeout> | null = null;
 	let noteSearchInputEl = $state<HTMLInputElement | null>(null);
 
-	// Markdown-rendered HTML (detail view only, client-side)
-	let markdownHtml = $state('');
-
-	// Titles for related notes (id -> title) so we show name instead of "Note #id"
+	let showJumpToBottom = $state(false);
 	let relatedNoteTitles = $state(new SvelteMap<number, string>());
+	let lastHydratedNoteId = $state<number | null>(null);
 
-	// Debounced note search when popup is open
+	let saveToastVisible = $state(false);
+	let saveToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+	let saveRequestId = 0;
+
+	function isDirtyAgainstBaseline(): boolean {
+		return (
+			normalizeNoteTitle(liveTitle) !== normalizeNoteTitle(lastSyncedTitle) ||
+			normalizeNoteContent(latestContent) !== normalizeNoteContent(lastSyncedContent)
+		);
+	}
+
+	function pulseSaveToast() {
+		if (saveToastTimer) clearTimeout(saveToastTimer);
+		saveToastVisible = true;
+		saveToastTimer = setTimeout(() => {
+			saveToastVisible = false;
+			saveToastTimer = null;
+		}, 2400);
+	}
+
+	async function flushNoteToServer() {
+		if (!note) return;
+		const title = liveTitle.trim();
+		const content = latestContent.trim();
+		if (!isDirtyAgainstBaseline()) return;
+		if (!title) {
+			saveError = 'Title is required.';
+			return;
+		}
+		if (!content) {
+			saveError = 'Content is required.';
+			return;
+		}
+		const id = ++saveRequestId;
+		saveError = '';
+		isSaving = true;
+		try {
+			errorLogger.logDebug('Autosaving note', { noteId: note.id });
+			const updated = await apiClient.updateNote(note.id, { title, content });
+			if (id !== saveRequestId) return;
+			note = {
+				...note,
+				title: updated.title,
+				content: updated.content,
+				type: updated.type,
+				version: updated.version,
+				updated_at: updated.updated_at
+			};
+			lastSyncedTitle = updated.title;
+			lastSyncedContent = updated.content;
+			errorLogger.logDebug('Note autosaved', { noteId: note.id });
+			pulseSaveToast();
+		} catch (err) {
+			if (id === saveRequestId) {
+				saveError = captureApiError(err, {
+					component: 'NoteDetail',
+					operation: 'autosaveNote',
+					noteId: note.id
+				});
+			}
+		} finally {
+			if (id === saveRequestId) isSaving = false;
+		}
+	}
+
+	const autosave = debounceTrailing(flushNoteToServer, AUTOSAVE_DEBOUNCE_MS);
+
+	beforeNavigate(async () => {
+		await autosave.flush();
+	});
+
+	function scheduleAutosave() {
+		saveError = '';
+		if (isDirtyAgainstBaseline()) {
+			autosave.schedule();
+		} else {
+			autosave.cancel();
+		}
+	}
+
+	function onEditorContentChange(value: string) {
+		latestContent = value;
+		scheduleAutosave();
+	}
+
+	$effect(() => {
+		const id = note?.id ?? null;
+		if (id === null) return;
+		if (lastHydratedNoteId !== id) {
+			lastHydratedNoteId = id;
+			liveTitle = note!.title;
+			latestContent = note!.content;
+			lastSyncedTitle = note!.title;
+			lastSyncedContent = note!.content;
+		}
+	});
+
 	$effect(() => {
 		if (!showNoteSearchPopup) return;
 		const q = noteSearchQuery;
@@ -84,15 +198,6 @@
 		};
 	});
 
-	// Parse markdown to HTML when viewing (not editing)
-	$effect(() => {
-		if (!browser || isEditing || !note) {
-			markdownHtml = '';
-			return;
-		}
-		markdownHtml = markdownToSafeHtml(note.content ?? '');
-	});
-
 	async function loadNote(noteId: number): Promise<{
 		data: NoteDetail | null;
 		error: string;
@@ -105,17 +210,7 @@
 		};
 		try {
 			const noteData = await apiClient.getNote(noteId);
-			const relatedTitles = new SvelteMap<number, string>();
-			const rels = filterNotDeleted(noteData.relationships);
-			if (rels.length > 0) {
-				const otherIds = [...new Set(rels.map((r) => otherNoteId(r, noteId)))];
-				const results = await Promise.allSettled(
-					otherIds.map((id) => apiClient.getNote(id).then((n) => ({ id, title: n.title })))
-				);
-				for (const r of results) {
-					if (r.status === 'fulfilled') relatedTitles.set(r.value.id, r.value.title);
-				}
-			}
+			const relatedTitles = await buildRelatedTitleMap(apiClient, noteData);
 			return { data: noteData, error: '', relatedTitles };
 		} catch (err) {
 			if (err instanceof HttpError && err.status === 404) {
@@ -128,7 +223,6 @@
 		}
 	}
 
-	// Load note when route param or auth changes; ignore stale responses when navigating quickly
 	$effect(() => {
 		const id = $page.params.id;
 		const auth = $isAuthenticated;
@@ -154,99 +248,95 @@
 				note = r.data;
 				error = r.error;
 				relatedNoteTitles = r.relatedTitles;
-				if (
-					r.data &&
-					(current.url.searchParams.get('edit') === '1' ||
-						current.url.searchParams.get('edit') === 'true')
-				) {
-					startEditing();
-					const appendParam = current.url.searchParams.get('append');
-					const appendId = appendParam ? Number(appendParam) : NaN;
-					if (Number.isInteger(appendId) && appendId !== noteId) {
-						try {
-							await apiClient.createRelationship({
-								note_a_id: appendId,
-								note_b_id: noteId,
-								type: 'FOLLOWS_ON'
-							});
-							const refreshed = await loadNote(noteId);
-							if (get(page).params.id === String(noteId) && refreshed.data) {
-								note = refreshed.data;
-								relatedNoteTitles = refreshed.relatedTitles;
+				if (!r.data) return;
+				const wantsAppendFlow =
+					current.url.searchParams.get('edit') === '1' ||
+					current.url.searchParams.get('edit') === 'true';
+				if (!wantsAppendFlow) return;
+				const appendParam = current.url.searchParams.get('append');
+				const appendId = appendParam ? Number(appendParam) : NaN;
+				if (Number.isInteger(appendId) && appendId !== noteId) {
+					try {
+						const newRel = await apiClient.createRelationship({
+							note_a_id: appendId,
+							note_b_id: noteId,
+							type: 'FOLLOWS_ON'
+						});
+						if (get(page).params.id === String(noteId) && note) {
+							note = {
+								...note,
+								relationships: [...filterNotDeleted(note.relationships), newRel]
+							};
+							try {
+								const appendedFrom = await apiClient.getNote(appendId);
+								relatedNoteTitles = new SvelteMap(relatedNoteTitles);
+								relatedNoteTitles.set(appendId, appendedFrom.title);
+							} catch {
+								// Non-blocking best effort for relationship label hydration.
 							}
-						} catch (err) {
-							saveError = captureApiError(err, {
-								component: 'NoteDetail',
-								operation: 'appendRelationship',
-								appendFromNoteId: appendId,
-								noteId
-							});
 						}
-						goto(resolve(`/notes/${noteId}?edit=1`), { replaceState: true });
+					} catch (err) {
+						saveError = captureApiError(err, {
+							component: 'NoteDetail',
+							operation: 'appendRelationship',
+							appendFromNoteId: appendId,
+							noteId
+						});
 					}
 				}
+				goto(resolve(`/notes/${noteId}`), { replaceState: true });
 			})
 			.finally(() => {
 				if (get(page).params.id === String(noteId)) isLoading = false;
 			});
+		return () => {
+			autosave.cancel();
+		};
 	});
 
-	onMount(async () => {
+	onMount(() => {
 		if (!$isAuthenticated) {
 			isLoading = false;
 			return;
 		}
-		try {
-			const categoriesData = await apiClient.getCategories({ limit: 1000 });
-			categories = filterNotDeleted(categoriesData);
-		} catch {
-			// Non-blocking; note detail can still show
+		void (async () => {
+			try {
+				const categoriesData = await apiClient.getCategories({ limit: 1000 });
+				categories = filterNotDeleted(categoriesData);
+			} catch {
+				// Non-blocking
+			}
+		})();
+		updateJumpToBottomVisibility();
+		const onScroll = () => updateJumpToBottomVisibility();
+		const onResize = () => updateJumpToBottomVisibility();
+		window.addEventListener('scroll', onScroll, { passive: true });
+		window.addEventListener('resize', onResize);
+		return () => {
+			window.removeEventListener('scroll', onScroll);
+			window.removeEventListener('resize', onResize);
+		};
+	});
+
+	onDestroy(() => {
+		if (saveToastTimer) {
+			clearTimeout(saveToastTimer);
+			saveToastTimer = null;
 		}
 	});
 
-	function formatDate(iso: string): string {
-		try {
-			return new Date(iso).toLocaleString();
-		} catch {
-			return iso;
-		}
-	}
-
-	function otherNoteId(rel: RelationshipRead, currentId: number): number {
-		return rel.note_a_id === currentId ? rel.note_b_id : rel.note_a_id;
-	}
-
-	function formatRelationshipType(type: string): string {
-		return type
-			.replace(/_/g, ' ')
-			.toLowerCase()
-			.replace(/\b\w/g, (c) => c.toUpperCase());
-	}
-
-	function formatRelationshipTypeLabel(rel: RelationshipRead, currentNoteId: number): string {
-		if (rel.type === 'FOLLOWS_ON') {
-			return currentNoteId === rel.note_a_id ? 'Follows from' : 'Follows to';
-		}
-		return formatRelationshipType(rel.type);
-	}
-
-	function startEditing() {
-		if (!note) return;
-		isEditing = true;
-		draftTitle = note.title;
-		draftContent = note.content;
-		saveError = '';
-		addCategoryId = '';
-		addRelNoteId = '';
-		addRelNoteTitle = '';
-		addRelType = 'RELATED_TO';
-	}
+	$effect(() => {
+		void note?.id;
+		void isLoading;
+		void error;
+		if (!browser) return;
+		updateJumpToBottomVisibility();
+	});
 
 	function openNoteSearchPopup() {
 		showNoteSearchPopup = true;
 		noteSearchQuery = '';
 		noteSearchResults = [];
-		// Focus search input after panel is in DOM
 		setTimeout(() => noteSearchInputEl?.focus(), 0);
 	}
 
@@ -267,48 +357,27 @@
 		if (e.key === 'Escape') closeNoteSearchPopup();
 	}
 
-	function cancelEditing() {
-		isEditing = false;
-		draftTitle = '';
-		draftContent = '';
+	async function appendNoteFromDetail() {
+		if (!note || isAppending || isSaving) return;
+		isAppending = true;
 		saveError = '';
-	}
-
-	async function saveNoteFields() {
-		if (!note) return;
-		const title = draftTitle.trim();
-		const content = draftContent.trim();
-
-		// Validate inputs before attempting save
-		if (!title) {
-			saveError = 'Title is required.';
-			return;
-		}
-		if (!content) {
-			saveError = 'Content is required.';
-			return;
-		}
-
-		isSaving = true;
-		saveError = '';
-
-		const noteId = note.id;
 		try {
-			errorLogger.logDebug('Saving note', { noteId, action: 'saveNoteFields' });
-			await apiClient.updateNote(noteId, { title, content });
-			errorLogger.logDebug('Note saved successfully', { noteId });
+			errorLogger.logDebug('Appending note from detail', { appendFromNoteId: note.id });
+			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
+			goto(resolve(`/notes/${created.id}?edit=1&append=${note.id}`));
+			errorLogger.logDebug('Append note created successfully from detail', {
+				sourceNoteId: note.id,
+				newNoteId: created.id
+			});
 		} catch (err) {
 			saveError = captureApiError(err, {
 				component: 'NoteDetail',
-				operation: 'saveNoteFields',
-				noteId
+				operation: 'appendNoteFromDetail',
+				sourceNoteId: note.id
 			});
-			return;
 		} finally {
-			isSaving = false;
+			isAppending = false;
 		}
-		await new Promise((res) => setTimeout(res, 100));
-		window.location.replace(resolve(`/notes/${noteId}`));
 	}
 
 	async function addCategory() {
@@ -319,10 +388,12 @@
 		saveError = '';
 		try {
 			await apiClient.addCategoryToNote(note.id, categoryId);
-			const r = await loadNote(note.id);
-			if (r.data) {
-				note = r.data;
-				relatedNoteTitles = r.relatedTitles;
+			const selectedCategory = categories.find((category) => category.id === categoryId);
+			if (selectedCategory) {
+				note = {
+					...note,
+					categories: [...filterNotDeleted(note.categories), selectedCategory]
+				};
 			}
 			addCategoryId = '';
 		} catch (err) {
@@ -344,11 +415,12 @@
 		try {
 			errorLogger.logDebug('Removing category from note', { noteId: note.id, categoryId });
 			await apiClient.removeCategoryFromNote(note.id, categoryId);
-			const r = await loadNote(note.id);
-			if (r.data) {
-				note = r.data;
-				relatedNoteTitles = r.relatedTitles;
-			}
+			note = {
+				...note,
+				categories: filterNotDeleted(note.categories).filter(
+					(category) => category.id !== categoryId
+				)
+			};
 			errorLogger.logDebug('Category removed successfully', { noteId: note.id, categoryId });
 		} catch (err) {
 			saveError = captureApiError(err, {
@@ -377,7 +449,6 @@
 				note_b_id: otherId,
 				type: addRelType
 			});
-			// Update local note and related titles so the new relationship shows without waiting for refetch
 			const existing = filterNotDeleted(note.relationships);
 			note = {
 				...note,
@@ -411,11 +482,18 @@
 				relId: `${rel.note_a_id}-${rel.note_b_id}-${rel.type}`
 			});
 			await apiClient.deleteRelationship(rel.note_a_id, rel.note_b_id);
-			const r = await loadNote(note.id);
-			if (r.data) {
-				note = r.data;
-				relatedNoteTitles = r.relatedTitles;
-			}
+			const nextRelationships = filterNotDeleted(note.relationships).filter(
+				(existing) =>
+					!(
+						existing.note_a_id === rel.note_a_id &&
+						existing.note_b_id === rel.note_b_id &&
+						existing.type === rel.type
+					)
+			);
+			note = {
+				...note,
+				relationships: nextRelationships
+			};
 			errorLogger.logDebug('Relationship removed successfully', { noteId: note.id });
 		} catch (err) {
 			saveError = captureApiError(err, {
@@ -439,6 +517,7 @@
 		}
 		saveError = '';
 		try {
+			await autosave.flush();
 			await apiClient.deleteNote(note.id);
 			await goto(resolve('/notes'));
 		} catch (err) {
@@ -448,22 +527,46 @@
 		}
 	}
 
-	// Filtered note collections (exclude deleted)
+	function updateJumpToBottomVisibility() {
+		if (!browser || isLoading || !!error || !note) {
+			showJumpToBottom = false;
+			return;
+		}
+		const doc = document.documentElement;
+		const body = document.body;
+		const totalHeight = Math.max(doc.scrollHeight, body.scrollHeight);
+		const viewportHeight = window.innerHeight;
+		const scrollTop = window.scrollY || doc.scrollTop || 0;
+		const isLongContent = totalHeight > viewportHeight + 120;
+		const nearBottom = scrollTop + viewportHeight >= totalHeight - 120;
+		showJumpToBottom = isLongContent && !nearBottom;
+	}
+
+	function jumpToBottom() {
+		if (!browser) return;
+		window.scrollTo({
+			top: document.documentElement.scrollHeight,
+			behavior: 'smooth'
+		});
+	}
+
 	let filteredCategories = $derived(filterNotDeleted(note?.categories));
 	let filteredRelationships = $derived(filterNotDeleted(note?.relationships));
-
-	// Categories not already on the note (for Add dropdown)
 	let availableCategories = $derived(
 		note ? categories.filter((c) => !filteredCategories.some((fc) => fc.id === c.id)) : []
+	);
+
+	let documentTitle = $derived(
+		note ? `${liveTitle.trim() || note.title} – Notes` : 'Note – Flit Web'
 	);
 </script>
 
 <svelte:head>
-	<title>{note ? `${note.title} – Notes` : 'Note – Flit Web'}</title>
-	<meta name="description" content={note ? note.title : 'Note detail'} />
+	<title>{documentTitle}</title>
+	<meta name="description" content={note ? liveTitle.trim() || note.title : 'Note detail'} />
 </svelte:head>
-<a href={resolve('/notes')} class="link mt-sm">← Back to Notes</a>
 <div class="note-page">
+	<a href={resolve('/notes')} class="mt-sm note-page__back-link">← Back to Notes</a>
 	{#if isLoading}
 		<div class="card">
 			<p class="loading loading--inline-start">
@@ -493,60 +596,70 @@
 			<p class="card__meta">{error}</p>
 		</div>
 	{:else if note}
-		<article class={isEditing ? 'note-editor' : 'note-view'}>
-			{#if isEditing}
-				<header class="note-editor__header">
-					<div class="note-editor__header-row">
-						<div class="note-editor__header-title-wrap">
-							<input
-								type="text"
-								bind:value={draftTitle}
-								class="input note-editor__title-input"
-								placeholder="Title"
-							/>
-						</div>
-						<div class="note-editor__actions-row">
-							<div class="note-editor__actions">
-								<button
-									type="button"
-									onclick={saveNoteFields}
-									disabled={isSaving}
-									class="btn btn-primary">Save</button
-								>
-								<button
-									type="button"
-									onclick={cancelEditing}
-									disabled={isSaving}
-									class="btn btn-secondary">Cancel</button
-								>
-							</div>
-							<div class="flex-center">
-								<button
-									type="button"
-									onclick={deleteNote}
-									disabled={isSaving}
-									class="btn btn-danger">Delete</button
-								>
-							</div>
-						</div>
+		<article class="note-detail">
+			<header class="note-detail__header">
+				<div class="note-detail__header-row">
+					<div class="note-detail__header-title-wrap">
+						<input
+							type="text"
+							bind:value={liveTitle}
+							class="note-detail__title-input"
+							placeholder="Title"
+							autocomplete="off"
+							oninput={scheduleAutosave}
+						/>
 					</div>
-					<div class="note-editor__meta">
-						<span>Type: {note.type}</span>
-						<span>Updated: {formatDate(note.updated_at)}</span>
-						<span>Created: {formatDate(note.created_at)}</span>
+					<div class="note-detail__actions">
+						<button
+							type="button"
+							onclick={appendNoteFromDetail}
+							disabled={isAppending || isSaving}
+							class="btn"
+						>
+							Append
+						</button>
+						<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
+							Delete
+						</button>
 					</div>
-				</header>
-				<div class="note-editor__body">
-					<textarea bind:value={draftContent} rows={12} class="input pre-wrap" placeholder="Content"
-					></textarea>
 				</div>
+				<div class="note-detail__meta">
+					<span>Type: {note.type}</span>
+					<span>Updated: {formatNoteDate(note.updated_at)}</span>
+					<span>Created: {formatNoteDate(note.created_at)}</span>
+				</div>
+			</header>
 
-				<section class="note-editor__block">
-					<h2 class="note-editor__block-title">Categories</h2>
-					<ul class="note-editor__categories-list">
+			<div class="note-detail__body">
+				{#if browser}
+					{#key note.id}
+						{#if NoteBodyEditor}
+							<NoteBodyEditor
+								noteId={note.id}
+								initialContent={note.content}
+								onChange={onEditorContentChange}
+							/>
+						{:else}
+							<p class="card__meta">Loading editor…</p>
+						{/if}
+					{/key}
+				{/if}
+			</div>
+
+			<section class="note-detail__block">
+				<h2 class="note-detail__block-title">Categories</h2>
+				{#if filteredCategories.length > 0}
+					<ul class="note-detail__tag-list">
 						{#each filteredCategories as category (category.id)}
-							<li class="note-editor__category-item">
-								<span class="badge badge--muted">{category.name}</span>
+							<li class="note-detail__tag-row">
+								<a
+									href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
+									class="note-detail__tag-row-main"
+								>
+									<div class="note-detail__tag-row-inner">
+										<span class="note-detail__pill">{category.name}</span>
+									</div>
+								</a>
 								<button
 									type="button"
 									onclick={() => removeCategory(category.id)}
@@ -560,170 +673,79 @@
 							</li>
 						{/each}
 					</ul>
-					<div class="note-editor__add-row">
-						<select
-							bind:value={addCategoryId}
-							onchange={() => addCategoryId && addCategory()}
-							disabled={isSaving}
-							class="input ch-40"
-						>
-							<option value="">Add category…</option>
-							{#each availableCategories as cat (cat.id)}
-								<option value={cat.id}>{cat.name}</option>
-							{/each}
-						</select>
-					</div>
-				</section>
+				{:else}
+					<p class="card__meta">No categories</p>
+				{/if}
+				<div class="note-detail__add-row">
+					<select
+						bind:value={addCategoryId}
+						onchange={() => addCategoryId && addCategory()}
+						disabled={isSaving}
+						class="input ch-40"
+					>
+						<option value="">Add category…</option>
+						{#each availableCategories as cat (cat.id)}
+							<option value={cat.id}>{cat.name}</option>
+						{/each}
+					</select>
+				</div>
+			</section>
 
-				<section class="note-editor__block">
-					<h2 class="note-editor__block-title">Relationships</h2>
-					<ul class="note-editor__rel-list">
+			<section class="note-detail__block">
+				<h2 class="note-detail__block-title">Relationships</h2>
+				{#if filteredRelationships.length > 0}
+					<ul class="note-detail__tag-list">
 						{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
-							<li class="note-editor__rel-item">
-								<div class="note-editor__rel-item-inner">
-									<span class="badge badge--primary"
-										>{formatRelationshipTypeLabel(rel, note.id)}</span
-									>
-									<a href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}>
-										{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
-											`Note #${otherNoteId(rel, note.id)}`}
-									</a>
-								</div>
+							<li class="note-detail__tag-row">
+								<a
+									href={resolve(`/notes/${getOtherNoteId(rel, note.id)}`)}
+									class="note-detail__tag-row-main"
+								>
+									<div class="note-detail__tag-row-inner">
+										<span class="note-detail__pill"
+											>{formatRelationshipTypeLabel(rel, note.id)}</span
+										>
+										<span class="note-detail__tag-row-label"
+											>{relatedNoteTitles.get(getOtherNoteId(rel, note.id)) ??
+												`Note #${getOtherNoteId(rel, note.id)}`}</span
+										>
+									</div>
+								</a>
 								<button
 									type="button"
 									onclick={() => removeRelationship(rel)}
 									disabled={isSaving}
-									class="btn btn-secondary"
+									class="btn btn-secondary btn--chip"
+									title="Remove relationship"
+									aria-label="Remove relationship"
 								>
-									Remove
+									×
 								</button>
 							</li>
 						{/each}
 					</ul>
-					<div class="note-editor__add-row">
-						<select bind:value={addRelType} class="input ch-40">
-							{#each RELATIONSHIP_TYPES as t (t)}
-								<option value={t}>{formatRelationshipType(t)}</option>
-							{/each}
-						</select>
-						<div class="note-editor__actions">
-							<button
-								type="button"
-								onclick={openNoteSearchPopup}
-								disabled={isSaving}
-								class="btn btn-secondary"
-							>
-								Select note…
-							</button>
-						</div>
-					</div>
-				</section>
-
-				<section class="note-editor__block">
-					<div class="note-editor__block-actions">
+				{:else}
+					<p class="card__meta">No relationships</p>
+				{/if}
+				<div class="note-detail__add-row">
+					<select bind:value={addRelType} class="input ch-40">
+						{#each RELATIONSHIP_TYPES as t (t)}
+							<option value={t}>{formatRelationshipType(t)}</option>
+						{/each}
+					</select>
+					<div class="note-detail__actions">
 						<button
 							type="button"
-							onclick={saveNoteFields}
+							onclick={openNoteSearchPopup}
 							disabled={isSaving}
-							class="btn btn-primary">Save</button
+							class="btn btn-secondary"
 						>
-						<button
-							type="button"
-							onclick={cancelEditing}
-							disabled={isSaving}
-							class="btn btn-secondary">Cancel</button
-						>
+							Select note…
+						</button>
 					</div>
-				</section>
-			{:else}
-				<header class="note-view__header">
-					<div class="note-view__header-row">
-						<div class="note-view__header-title-wrap">
-							<h1>{note.title}</h1>
-						</div>
-						<div class="note-view__actions">
-							<button type="button" onclick={startEditing} class="btn btn-secondary">Edit</button>
-							<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger"
-								>Delete</button
-							>
-						</div>
-					</div>
-					<div class="note-view__meta">
-						<span>Type: {note.type}</span>
-						<span>Updated: {formatDate(note.updated_at)}</span>
-						<span>Created: {formatDate(note.created_at)}</span>
-					</div>
-				</header>
-
-				<div class="note-view__body">
-					{#if markdownHtml}
-						<div class="prose">{@html markdownHtml}</div>
-					{:else}
-						<pre class="pre-wrap">{note.content}</pre>
-					{/if}
 				</div>
+			</section>
 
-				<section class="note-view__block">
-					<h2 class="note-view__block-title">Categories</h2>
-					{#if filteredCategories.length > 0}
-						<ul class="note-view__categories-list">
-							{#each filteredCategories as category (category.id)}
-								<li>
-									<a
-										href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
-										class="badge badge--muted"
-									>
-										{category.name}
-									</a>
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="card__meta">No categories</p>
-					{/if}
-				</section>
-
-				<section class="note-view__block">
-					<h2 class="note-view__block-title">Relationships</h2>
-					{#if filteredRelationships.length > 0}
-						<ul class="note-view__rel-list">
-							{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
-								<li>
-									<a
-										href={resolve(`/notes/${otherNoteId(rel, note.id)}`)}
-										class="note-view__rel-item"
-									>
-										<div class="note-view__rel-item-inner">
-											<span class="badge badge--primary"
-												>{formatRelationshipTypeLabel(rel, note.id)}</span
-											>
-											<span
-												>{relatedNoteTitles.get(otherNoteId(rel, note.id)) ??
-													`Note #${otherNoteId(rel, note.id)}`}</span
-											>
-										</div>
-										<svg
-											class="icon_sm icon_sm--muted"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M9 5l7 7-7 7"
-											/>
-										</svg>
-									</a>
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="card__meta">No relationships</p>
-					{/if}
-				</section>
-			{/if}
 			{#if saveError}
 				<p class="form-group__error">{saveError}</p>
 			{/if}
@@ -731,7 +753,22 @@
 	{/if}
 </div>
 
-<!-- Note search popup (Add relationship) -->
+{#if browser && saveToastVisible}
+	<div class="note-save-toast" role="status" aria-live="polite">...updated</div>
+{/if}
+
+{#if showJumpToBottom}
+	<button
+		type="button"
+		onclick={jumpToBottom}
+		class="btn note-page__jump-bottom"
+		aria-label="Jump to bottom"
+		title="Jump to bottom"
+	>
+		Bottom
+	</button>
+{/if}
+
 {#if showNoteSearchPopup}
 	<div
 		class="modal-backdrop modal-backdrop--overlay"

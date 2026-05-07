@@ -4,7 +4,8 @@
 	import { page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { apiClient } from '$lib/api/client';
-	import { validateResetPasswordForm, sanitizeInput } from '$lib/utils/auth';
+	import { validateResetPasswordForm } from '$lib/utils/auth';
+	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
 	import { captureApiError } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import type { FormErrors } from '$lib/types/auth';
@@ -66,19 +67,20 @@
 	}
 
 	function handleFieldChange(field: 'newPassword' | 'confirmPassword', value: string) {
-		const sanitized = sanitizeInput(value);
+		const form = { newPassword, confirmPassword };
+		updateSanitizedField(form, field, value);
 		if (field === 'newPassword') {
-			newPassword = sanitized;
-			errors.newPassword = '';
+			newPassword = form.newPassword;
+			clearFieldError(errors, 'newPassword');
 		} else {
-			confirmPassword = sanitized;
-			errors.confirmPassword = '';
+			confirmPassword = form.confirmPassword;
+			clearFieldError(errors, 'confirmPassword');
 		}
 	}
 
 	function togglePasswordVisibility(which: 'new' | 'confirm') {
-		if (which === 'new') showPassword = !showPassword;
-		else showConfirmPassword = !showConfirmPassword;
+		if (which === 'new') showPassword = toggleFlag(showPassword);
+		else showConfirmPassword = toggleFlag(showConfirmPassword);
 	}
 
 	let newPasswordInput = $state<HTMLInputElement | undefined>(undefined);

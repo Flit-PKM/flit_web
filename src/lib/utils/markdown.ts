@@ -1,5 +1,8 @@
-import { marked } from 'marked';
+import { Marked } from 'marked';
 import DOMPurify from 'dompurify';
+
+// Keep note-preview parsing isolated from TipTap's Markdown extension lifecycle.
+const previewMarked = new Marked({ gfm: true });
 
 /**
  * Escapes raw text for safe HTML display when markdown parsing fails.
@@ -31,7 +34,7 @@ export function markdownToSafeHtml(raw: string, options?: { maxLines?: number })
 	}
 
 	try {
-		const parsed = marked.parse(snippet, { async: false }) as string;
+		const parsed = previewMarked.parse(snippet, { async: false }) as string;
 		return DOMPurify.sanitize(parsed);
 	} catch {
 		return escapeHtml(snippet);

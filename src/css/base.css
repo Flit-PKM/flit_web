@@ -54,7 +54,6 @@
 	hr {
 		width: 100%;
 		color: var(--color-mid-grey);
-		box-shadow: 2px 2px 2px var(--color-canvas);
 	}
 
 	input,

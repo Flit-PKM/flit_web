@@ -27,12 +27,13 @@
 
 	--color-border: color-mix(in oklab, var(--color-mid-grey) 20%, transparent);
 
-	--flit-card-bg: color-mix(in oklab, var(--color-mid-grey) 7%, transparent);
+	--flit-card-bg: color-mix(in oklab, var(--color-mid-grey) 7%, var(--color-canvas));
 	--flit-card-opaque: color-mix(in oklab, var(--color-mid-grey) 10%, var(--color-canvas));
 	--flit-footer-bg: color-mix(in oklab, var(--color-canvas), var(--color-mid-grey) 10%);
 	--flit-shadow-color: color-mix(in oklab, var(--color-ink) 15%, transparent);
 	--flit-shadow-sm: 1px 1px 3px var(--flit-shadow-color);
 	--flit-shadow-md: 4px 4px 12px var(--flit-shadow-color);
+	--flit-focus-ring: 2px solid var(--color-blue);
 
 	--font-sans: system-ui, sans-serif;
 }

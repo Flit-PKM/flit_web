@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
@@ -13,7 +13,7 @@
 	const previewHtmlByNoteId = $derived.by(() => {
 		const m: Record<number, string> = {};
 		for (const n of notes) {
-			m[n.id] = markdownToSafeHtml(n.content ?? '', { maxLines: 3 });
+			m[n.id] = markdownToSafeHtml(n.content ?? '', { maxLines: 5 });
 		}
 		return m;
 	});
@@ -27,6 +27,12 @@
 	let notes = $state<NoteRead[]>([]);
 	let categories = $state<CategoryRead[]>([]);
 	let error = $state('');
+	const PAGE_SIZE = 10;
+	let skip = $state(0);
+	let hasMore = $state(true);
+	let isLoadingMore = $state(false);
+	let loadGeneration = 0;
+	let loadMoreSentinel = $state<HTMLDivElement | null>(null);
 
 	// Search and filter state
 	let searchQuery = $state('');
@@ -44,36 +50,156 @@
 
 	// Per-note actions
 	let isAppendingNoteId = $state<number | null>(null);
+	let activeOptionsNoteId = $state<number | null>(null);
 
 	// Fetch notes with current filters
-	async function fetchNotes() {
-		if (!$isAuthenticated) return;
+	function dedupeById(existing: NoteRead[], incoming: NoteRead[]): NoteRead[] {
+		const seen = new Set(existing.map((note) => note.id));
+		return incoming.filter((note) => !seen.has(note.id));
+	}
 
-		isLoading = true;
-		error = '';
+	function sortByUpdatedAtDesc(items: NoteRead[]): NoteRead[] {
+		return items.sort(
+			(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+		);
+	}
+
+	async function loadNotesPage({ reset }: { reset: boolean }) {
+		if (!$isAuthenticated) return;
+		if (!reset && (isLoading || isLoadingMore || !hasMore)) {
+			errorLogger.logDebug('Skipping load-more request', {
+				reason: isLoading
+					? 'initial-loading'
+					: isLoadingMore
+						? 'already-loading-more'
+						: 'no-more-pages',
+				skip,
+				hasMore,
+				isLoading,
+				isLoadingMore
+			});
+			return;
+		}
+
+		const currentGeneration = reset ? ++loadGeneration : loadGeneration;
+		const pageSkip = reset ? 0 : skip;
+
+		if (reset) {
+			isLoading = true;
+			error = '';
+			notes = [];
+			skip = 0;
+			hasMore = true;
+			errorLogger.logDebug('Resetting notes pagination state', {
+				search: searchQuery || null,
+				filter: selectedCategory || null,
+				pageSize: PAGE_SIZE,
+				generation: currentGeneration
+			});
+		} else {
+			isLoadingMore = true;
+			errorLogger.logInfo('Loading more notes', {
+				component: 'NotesList',
+				operation: 'loadMoreNotes',
+				skip: pageSkip,
+				limit: PAGE_SIZE,
+				alreadyLoaded: notes.length
+			});
+			errorLogger.logDebug('Starting load-more request', {
+				skip: pageSkip,
+				pageSize: PAGE_SIZE,
+				alreadyLoaded: notes.length,
+				generation: currentGeneration
+			});
+		}
 
 		try {
-			errorLogger.logDebug('Loading notes', { search: searchQuery, filter: selectedCategory });
+			errorLogger.logDebug('Loading notes page', {
+				search: searchQuery,
+				filter: selectedCategory,
+				skip: pageSkip,
+				limit: PAGE_SIZE
+			});
 			const raw = await apiClient.getNotes({
-				limit: 1000,
+				skip: pageSkip,
+				limit: PAGE_SIZE,
 				search: searchQuery || undefined,
 				filter: selectedCategory || undefined
 			});
-			const filtered = filterNotDeleted(raw);
-			notes = filtered.sort(
-				(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-			);
-			errorLogger.logDebug('Notes loaded successfully', { count: notes.length });
+
+			if (currentGeneration !== loadGeneration) {
+				errorLogger.logDebug('Ignoring stale notes response', {
+					responseGeneration: currentGeneration,
+					activeGeneration: loadGeneration,
+					reset,
+					skip: pageSkip
+				});
+				return;
+			}
+
+			const pageNotes = sortByUpdatedAtDesc(filterNotDeleted(raw));
+			if (reset) {
+				notes = pageNotes;
+			} else {
+				notes = [...notes, ...dedupeById(notes, pageNotes)];
+			}
+
+			skip = pageSkip + pageNotes.length;
+			hasMore = pageNotes.length === PAGE_SIZE;
+			if (!reset) {
+				errorLogger.logInfo('Load-more completed', {
+					component: 'NotesList',
+					operation: 'loadMoreNotes',
+					added: pageNotes.length,
+					totalLoaded: notes.length,
+					nextSkip: skip,
+					hasMore
+				});
+			}
+			errorLogger.logDebug('Notes page loaded successfully', {
+				mode: reset ? 'reset' : 'append',
+				pageCount: pageNotes.length,
+				totalLoaded: notes.length,
+				hasMore,
+				nextSkip: skip
+			});
 		} catch (err) {
+			if (currentGeneration !== loadGeneration) return;
 			error = captureApiError(err, {
 				component: 'NotesList',
-				operation: 'loadNotes',
+				operation: reset ? 'loadNotes' : 'loadMoreNotes',
 				search: searchQuery,
-				filter: selectedCategory
+				filter: selectedCategory,
+				skip: pageSkip,
+				limit: PAGE_SIZE
 			});
 		} finally {
-			isLoading = false;
+			if (currentGeneration === loadGeneration) {
+				if (reset) {
+					isLoading = false;
+				} else {
+					isLoadingMore = false;
+				}
+			}
 		}
+	}
+
+	async function resetAndLoadNotes() {
+		errorLogger.logDebug('Requesting notes reset+load', {
+			search: searchQuery || null,
+			filter: selectedCategory || null
+		});
+		await loadNotesPage({ reset: true });
+	}
+
+	async function loadMoreNotes() {
+		errorLogger.logDebug('Requesting notes load-more', {
+			skip,
+			hasMore,
+			isLoading,
+			isLoadingMore
+		});
+		await loadNotesPage({ reset: false });
 	}
 
 	// Debounced search handler
@@ -88,21 +214,21 @@
 
 		// Debounce the search
 		searchTimeout = setTimeout(() => {
-			fetchNotes();
+			resetAndLoadNotes();
 		}, 1000);
 	}
 
 	// Category filter handler
 	function handleCategoryChange(event: Event) {
 		selectedCategory = (event.target as HTMLSelectElement).value;
-		fetchNotes();
+		resetAndLoadNotes();
 	}
 
 	// Clear all filters
 	function clearFilters() {
 		searchQuery = '';
 		selectedCategory = '';
-		fetchNotes();
+		resetAndLoadNotes();
 	}
 
 	// Check if any filters are active
@@ -176,7 +302,7 @@
 			await apiClient.deleteCategory(id);
 			selectedCategory = '';
 			await fetchCategories();
-			await fetchNotes();
+			await resetAndLoadNotes();
 			errorLogger.logDebug('Category deleted successfully', { categoryId: id });
 		} catch (err) {
 			categoryError = captureApiError(err, {
@@ -196,7 +322,6 @@
 		try {
 			errorLogger.logDebug('Creating new note');
 			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
-			await new Promise((resolve) => setTimeout(resolve, 100));
 			goto(resolve(`/notes/${created.id}?edit=1`));
 			errorLogger.logDebug('New note created successfully', { noteId: created.id });
 		} catch (err) {
@@ -216,7 +341,6 @@
 		try {
 			errorLogger.logDebug('Appending note', { appendFromNoteId: oldNoteId });
 			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
-			await new Promise((r) => setTimeout(r, 100));
 			goto(resolve(`/notes/${created.id}?edit=1&append=${oldNoteId}`));
 			errorLogger.logDebug('Append note created successfully', {
 				sourceNoteId: oldNoteId,
@@ -233,8 +357,8 @@
 		}
 	}
 
-	function navigateToEdit(noteId: number) {
-		goto(resolve(`/notes/${noteId}?edit=1`));
+	function toggleNoteOptions(noteId: number) {
+		activeOptionsNoteId = activeOptionsNoteId === noteId ? null : noteId;
 	}
 
 	async function deleteNote(noteId: number, noteTitle: string) {
@@ -245,6 +369,9 @@
 			errorLogger.logDebug('Deleting note', { noteId });
 			await apiClient.deleteNote(noteId);
 			notes = notes.filter((n) => n.id !== noteId);
+			if (hasMore && notes.length < PAGE_SIZE) {
+				await loadMoreNotes();
+			}
 			errorLogger.logDebug('Note deleted successfully', { noteId });
 		} catch (err) {
 			error = captureApiError(err, {
@@ -253,6 +380,10 @@
 				noteId
 			});
 		}
+	}
+
+	function closeNoteOptions() {
+		activeOptionsNoteId = null;
 	}
 
 	onMount(async () => {
@@ -266,13 +397,71 @@
 		if (categoryParam) {
 			selectedCategory = decodeURIComponent(categoryParam);
 		}
-		await fetchNotes();
+		await resetAndLoadNotes();
+	});
+
+	$effect(() => {
+		if (typeof IntersectionObserver === 'undefined' || !loadMoreSentinel) return;
+		errorLogger.logDebug('Setting up notes load-more observer', {
+			rootMargin: '300px 0px',
+			threshold: 0
+		});
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						errorLogger.logInfo('Load-more sentinel intersected', {
+							component: 'NotesList',
+							operation: 'observeLoadMoreSentinel',
+							skip,
+							hasMore,
+							isLoading,
+							isLoadingMore
+						});
+						errorLogger.logDebug('Load-more sentinel intersected', {
+							skip,
+							hasMore,
+							isLoading,
+							isLoadingMore
+						});
+						loadMoreNotes();
+					}
+				}
+			},
+			{
+				root: null,
+				rootMargin: '300px 0px',
+				threshold: 0
+			}
+		);
+		observer.observe(loadMoreSentinel);
+
+		return () => {
+			errorLogger.logDebug('Tearing down notes load-more observer');
+			observer.disconnect();
+		};
+	});
+
+	onDestroy(() => {
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
 	});
 </script>
 
 <svelte:head>
 	<title>Notes – Flit Web</title>
 </svelte:head>
+<svelte:window
+	onclick={() => {
+		if (activeOptionsNoteId !== null) closeNoteOptions();
+	}}
+	onkeydown={(event) => {
+		if (event.key === 'Escape' && activeOptionsNoteId !== null) {
+			closeNoteOptions();
+		}
+	}}
+/>
 
 <h1>Notes</h1>
 
@@ -432,79 +621,87 @@
 	</div>
 {:else}
 	<p class="muted">
-		{notes.length} note{notes.length === 1 ? '' : 's'} found
+		{notes.length} note{notes.length === 1 ? '' : 's'}
 	</p>
 	{#each notes as note (note.id)}
-		<div class="card">
-			<a href={resolve(`/notes/${note.id}`)}>
-				<h2>{note.title}</h2>
-				<hr />
+		<div class="card note-list__card">
+			<div class="note-list__accent" aria-hidden="true"></div>
+			<a href={resolve(`/notes/${note.id}`)} class="note-list__main-link">
+				<h2 class="note-list__title">{note.title}</h2>
+				<hr class="note-list__divider" />
 				{#if hasPreview(note.content)}
 					<div class="prose">
 						{@html previewHtmlByNoteId[note.id] ?? ''}
 					</div>
 				{/if}
 			</a>
-			<div class="card__actions" role="group" aria-label="Note actions">
+			<div class="note-list__options">
 				<button
 					type="button"
-					title="Append note"
-					disabled={isAppendingNoteId === note.id}
+					class="btn note-list__options-trigger"
+					title="Note options"
+					aria-haspopup="menu"
+					aria-expanded={activeOptionsNoteId === note.id}
+					aria-controls={`note-options-${note.id}`}
 					onclick={(e) => {
 						e.preventDefault();
 						e.stopPropagation();
-						appendNote(note.id);
+						toggleNoteOptions(note.id);
 					}}
-					class="btn"
 				>
+					<span class="visually-hidden">Open options for {note.title}</span>
 					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
 							stroke-width="2"
-							d="M12 4v16m8-8H4"
+							d="M12 6.75a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"
 						/>
 					</svg>
 				</button>
-				<button
-					type="button"
-					title="Edit note"
-					onclick={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						navigateToEdit(note.id);
-					}}
-					class="btn"
-				>
-					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-						/>
-					</svg>
-				</button>
-				<button
-					type="button"
-					title="Delete note"
-					onclick={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						deleteNote(note.id, note.title);
-					}}
-					class="btn btn-danger"
-				>
-					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-						/>
-					</svg>
-				</button>
+				{#if activeOptionsNoteId === note.id}
+					<div
+						id={`note-options-${note.id}`}
+						class="note-list__options-menu"
+						role="menu"
+						aria-label={`Actions for ${note.title}`}
+					>
+						<button
+							type="button"
+							class="note-list__menu-item"
+							role="menuitem"
+							disabled={isAppendingNoteId === note.id}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								appendNote(note.id);
+								closeNoteOptions();
+							}}
+						>
+							Append
+						</button>
+						<button
+							type="button"
+							class="note-list__menu-item note-list__menu-item--danger"
+							role="menuitem"
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								deleteNote(note.id, note.title);
+								closeNoteOptions();
+							}}
+						>
+							Delete
+						</button>
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/each}
+	{#if isLoadingMore}
+		<p class="muted">Loading more notes...</p>
+	{/if}
+	{#if hasMore && !isLoading}
+		<div bind:this={loadMoreSentinel} aria-hidden="true"></div>
+	{/if}
 {/if}

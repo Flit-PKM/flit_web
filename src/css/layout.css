@@ -290,59 +290,6 @@
 		}
 	}
 
-	.auth__state {
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		align-items: center;
-		text-align: center;
-	}
-
-	.auth__state-actions {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		width: 100%;
-	}
-
-	.auth__state-icon {
-		width: 4rem;
-		height: 4rem;
-		border-radius: 9999px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.auth__state-icon svg {
-		height: 2rem;
-		width: 2rem;
-	}
-
-	.auth__state-icon--success {
-		background: color-mix(in oklab, var(--color-ink-positive) 20%, transparent);
-	}
-
-	.auth__state-icon--success svg {
-		color: var(--color-ink-positive);
-	}
-
-	.auth__state-icon--error {
-		background: color-mix(in oklab, var(--color-ink-negative) 20%, transparent);
-	}
-
-	.auth__state-icon--error svg {
-		color: var(--color-ink-negative);
-	}
-
-	.auth__state-icon--muted {
-		background: color-mix(in oklab, var(--color-mid-grey) 20%, transparent);
-	}
-
-	.auth__state-icon--muted svg {
-		color: var(--color-mid-grey);
-	}
-
 	/* ---- Footer ---- */
 	footer {
 		border-top: 1px solid var(--color-border);

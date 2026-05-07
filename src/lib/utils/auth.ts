@@ -61,7 +61,7 @@ export function getPasswordStrengthLabel(strength: number): string {
  * Validate login form data (uses validation.ts rules)
  */
 export function validateLoginForm(data: LoginFormData): FormErrors {
-	errorLogger.logDebug('Validating login form', { data });
+	errorLogger.logDebug('Validating login form', { hasEmail: Boolean(data.email) });
 	const errors: FormErrors = {};
 	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
 	if (emailErr) errors.email = emailErr;
@@ -78,7 +78,7 @@ export function validateLoginForm(data: LoginFormData): FormErrors {
  * Validate registration form data (uses validation.ts rules)
  */
 export function validateRegisterForm(data: RegisterFormData): FormErrors {
-	errorLogger.logDebug('Validating registration form', { data });
+	errorLogger.logDebug('Validating registration form', { hasEmail: Boolean(data.email) });
 	const errors: FormErrors = {};
 	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
 	if (emailErr) errors.email = emailErr;
@@ -149,7 +149,14 @@ export function validateProfileForm(
 	data: ProfileFormData,
 	originalUser?: { username?: string; email?: string }
 ): FormErrors {
-	errorLogger.logDebug('Validating profile form', { data, originalUser });
+	errorLogger.logDebug('Validating profile form', {
+		hasUsername: Boolean(data.username),
+		hasEmail: Boolean(data.email),
+		hasCurrentPassword: Boolean(data.currentPassword),
+		hasNewPassword: Boolean(data.newPassword),
+		hasConfirmNewPassword: Boolean(data.confirmNewPassword),
+		originalUser
+	});
 	const errors: FormErrors = {};
 
 	// Username validation
@@ -211,12 +218,8 @@ export function hasFormErrors(errors: FormErrors): boolean {
  * Sanitize user input to prevent XSS
  */
 export function sanitizeInput(input: string): string {
-	return input
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#x27;')
-		.replace(/\//g, '&#x2F;');
+	// Preserve user intent (especially credentials); output is escaped at render sinks.
+	return input;
 }
 
 /**

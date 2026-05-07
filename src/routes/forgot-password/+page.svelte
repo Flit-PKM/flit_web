@@ -4,8 +4,9 @@
 	import { resolve } from '$app/paths';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient } from '$lib/api/client';
-	import { validateForgotPasswordForm, sanitizeInput } from '$lib/utils/auth';
-	import { captureApiError } from '$lib/utils/error-handler';
+	import { validateForgotPasswordForm } from '$lib/utils/auth';
+	import { clearFieldError, updateSanitizedField } from '$lib/utils/auth-forms';
+	import { captureApiError, errorLogger } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import type { FormErrors } from '$lib/types/auth';
 
@@ -69,8 +70,10 @@
 	}
 
 	function handleEmailInput(e: Event) {
-		email = sanitizeInput((e.currentTarget as HTMLInputElement).value);
-		errors.email = '';
+		const form = { email };
+		updateSanitizedField(form, 'email', (e.currentTarget as HTMLInputElement).value);
+		email = form.email;
+		clearFieldError(errors, 'email');
 	}
 
 	let emailInput = $state<HTMLInputElement | undefined>(undefined);
@@ -85,7 +88,11 @@
 			(window as Window & { onTurnstileError?: (code?: string) => void }).onTurnstileError = (
 				code
 			) => {
-				console.error('Turnstile error:', code);
+				errorLogger.logError(new Error('Turnstile error'), {
+					component: 'ForgotPassword',
+					operation: 'turnstileError',
+					code
+				});
 			};
 		}
 

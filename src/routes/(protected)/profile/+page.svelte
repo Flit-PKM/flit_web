@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { authActions, currentUser, isAuthenticated } from '$lib/stores/auth';
 	import { pendingColorScheme } from '$lib/stores/theme';
-	import { apiClient, HttpError } from '$lib/api/client';
+	import { apiClient } from '$lib/api/client';
 	import {
 		validateProfileForm,
 		sanitizeInput,
@@ -13,15 +13,18 @@
 	} from '$lib/utils/auth';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
+	import {
+		formatPlanPrice,
+		isAnnualPlan,
+		isMonthlyPlan,
+		sortSubscriptionPlans
+	} from '$lib/utils/billing';
+	import { formatProfileDate, getCheckoutErrorMessage } from '$lib/utils/profile';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import CurrentPasswordInput from '$lib/components/CurrentPasswordInput.svelte';
 	import type { ProfileFormData, FormErrors, UserUpdate } from '$lib/types/auth';
 	import type { ConnectedApp } from '$lib/types/connect';
-	import type {
-		PlanDetailResponse,
-		PlanPrice,
-		SubscriptionStatusResponse
-	} from '$lib/types/billing';
+	import type { PlanDetailResponse, SubscriptionStatusResponse } from '$lib/types/billing';
 
 	// State
 	let isLoading = $state(true);
@@ -81,23 +84,9 @@
 		$currentUser?.subscription?.current_period_end ?? subscriptionStatus?.current_period_end ?? null
 	);
 
-	// Billing: partition by plan_type prefix (backend: monthly_core_ai, annual_core_ai, etc.)
-	function isMonthlyPlan(plan: PlanDetailResponse): boolean {
-		return typeof plan.plan_type === 'string' && plan.plan_type.startsWith('monthly');
-	}
-	function isAnnualPlan(plan: PlanDetailResponse): boolean {
-		return typeof plan.plan_type === 'string' && plan.plan_type.startsWith('annual');
-	}
-
 	let subscriptionPlans = $derived.by(() => {
 		const list = plans.filter((p) => isMonthlyPlan(p) || isAnnualPlan(p));
-		return [...list].sort((a, b) => {
-			if (isMonthlyPlan(a) && !isMonthlyPlan(b)) return -1;
-			if (!isMonthlyPlan(a) && isMonthlyPlan(b)) return 1;
-			if (isAnnualPlan(a) && !isAnnualPlan(b)) return -1;
-			if (!isAnnualPlan(a) && isAnnualPlan(b)) return 1;
-			return 0;
-		});
+		return sortSubscriptionPlans(list);
 	});
 
 	// Subscription section: derived flags for clearer branching
@@ -107,6 +96,8 @@
 	let showPlansList = $derived(
 		showPlansSection && !hasActiveSubscription && subscriptionPlans.length > 0
 	);
+	let activeConnectedApps = $derived.by(() => connectedApps.filter((app) => app.is_active));
+	let inactiveConnectedApps = $derived.by(() => connectedApps.filter((app) => !app.is_active));
 
 	// Form data
 	let formData: ProfileFormData = $state({
@@ -191,7 +182,11 @@
 			try {
 				await authActions.refreshUser();
 			} catch (error) {
-				console.warn('Failed to refresh user data, using existing data:', error);
+				errorLogger.logWarning('Failed to refresh user data, using existing data', {
+					component: 'Profile',
+					operation: 'refreshUser',
+					error
+				});
 				// Don't block the page if refresh fails - allow form to work with existing data
 				generalError = 'Could not refresh user data. You can still update your profile.';
 			}
@@ -203,55 +198,48 @@
 				formData.colorScheme = $currentUser.color_scheme || 'default';
 			}
 
-			// Load connected apps
 			connectedAppsLoading = true;
 			connectedAppsError = '';
-			try {
-				errorLogger.logDebug('Loading connected apps');
-				connectedApps = await apiClient.getConnectedApps();
-				errorLogger.logDebug('Connected apps loaded successfully', { count: connectedApps.length });
-			} catch (err) {
-				connectedAppsError = captureApiError(err, {
+			subscriptionLoading = true;
+			subscriptionError = '';
+			plansLoading = true;
+			plansError = '';
+
+			const [connectedAppsResult, subscriptionResult, plansResult] = await Promise.allSettled([
+				apiClient.getConnectedApps(),
+				apiClient.getSubscription(),
+				apiClient.getBillingPlans()
+			]);
+
+			if (connectedAppsResult.status === 'fulfilled') {
+				connectedApps = connectedAppsResult.value;
+			} else {
+				connectedAppsError = captureApiError(connectedAppsResult.reason, {
 					component: 'Profile',
 					operation: 'loadConnectedApps'
 				});
-			} finally {
-				connectedAppsLoading = false;
 			}
+			connectedAppsLoading = false;
 
-			// Load subscription status
-			subscriptionLoading = true;
-			subscriptionError = '';
-			try {
-				errorLogger.logDebug('Loading subscription status');
-				subscriptionStatus = await apiClient.getSubscription();
-				errorLogger.logDebug('Subscription status loaded', {
-					status: subscriptionStatus?.status ?? null
-				});
-			} catch (err) {
-				subscriptionError = captureApiError(err, {
+			if (subscriptionResult.status === 'fulfilled') {
+				subscriptionStatus = subscriptionResult.value;
+			} else {
+				subscriptionError = captureApiError(subscriptionResult.reason, {
 					component: 'Profile',
 					operation: 'loadSubscription'
 				});
-			} finally {
-				subscriptionLoading = false;
 			}
+			subscriptionLoading = false;
 
-			// Load billing plans
-			plansLoading = true;
-			plansError = '';
-			try {
-				errorLogger.logDebug('Loading billing plans');
-				plans = await apiClient.getBillingPlans();
-				errorLogger.logDebug('Billing plans loaded', { count: plans.length });
-			} catch (err) {
-				plansError = captureApiError(err, {
+			if (plansResult.status === 'fulfilled') {
+				plans = plansResult.value;
+			} else {
+				plansError = captureApiError(plansResult.reason, {
 					component: 'Profile',
 					operation: 'loadBillingPlans'
 				});
-			} finally {
-				plansLoading = false;
 			}
+			plansLoading = false;
 		} catch (error) {
 			generalError = captureApiError(error, {
 				component: 'Profile',
@@ -275,21 +263,6 @@
 
 	// Handle form submission
 	async function handleSubmit(event: Event) {
-		console.log('[Profile] Form submitted');
-		console.log('[Profile] handleSubmit called');
-		console.log('[Profile] Form data:', {
-			username: formData.username,
-			email: formData.email,
-			hasCurrentPassword: !!formData.currentPassword,
-			hasNewPassword: !!formData.newPassword,
-			hasConfirmPassword: !!formData.confirmNewPassword
-		});
-		console.log('[Profile] Current user:', {
-			id: $currentUser?.id,
-			username: $currentUser?.username,
-			email: $currentUser?.email
-		});
-
 		event.preventDefault();
 		generalError = '';
 		successMessage = '';
@@ -299,23 +272,10 @@
 		const isChangingPassword = !!(formData.newPassword || formData.confirmNewPassword);
 
 		// Check if username, email, or color scheme changed
-		const usernameChanged = $currentUser && formData.username !== $currentUser.username;
-		const emailChanged = $currentUser && formData.email !== $currentUser.email;
-		const colorSchemeChanged =
+		const hasUsernameChange = $currentUser && formData.username !== $currentUser.username;
+		const hasEmailChange = $currentUser && formData.email !== $currentUser.email;
+		const hasColorSchemeChange =
 			$currentUser && formData.colorScheme !== ($currentUser.color_scheme || 'default');
-
-		console.log('[Profile] Change detection:', {
-			usernameChanged,
-			emailChanged,
-			colorSchemeChanged,
-			isChangingPassword,
-			originalUsername: $currentUser?.username,
-			newUsername: formData.username,
-			originalEmail: $currentUser?.email,
-			newEmail: formData.email,
-			originalColorScheme: $currentUser?.color_scheme,
-			newColorScheme: formData.colorScheme
-		});
 
 		if (isChangingPassword) {
 			formData.currentPassword = formData.currentPassword || '';
@@ -325,14 +285,19 @@
 
 		// Validate form (pass original user for change detection)
 		const validationErrors = validateProfileForm(formData, $currentUser || undefined);
-		console.log('[Profile] Validation errors:', validationErrors);
 		if (Object.keys(validationErrors).length > 0) {
-			console.log('[Profile] Validation failed, stopping submission');
 			errors = validationErrors;
 			isSaving = false;
 			return;
 		}
-		console.log('[Profile] Validation passed');
+		errorLogger.logDebug('Profile update validated', {
+			component: 'Profile',
+			operation: 'handleSubmit',
+			hasUsernameChange,
+			hasEmailChange,
+			hasColorSchemeChange,
+			isChangingPassword
+		});
 
 		try {
 			const updateData: UserUpdate = {
@@ -340,48 +305,22 @@
 				current_password: formData.currentPassword || ''
 			};
 
-			console.log('[Profile] Including current_password in update (hidden)');
-
 			// Only include changed fields
-			if (usernameChanged) {
+			if (hasUsernameChange) {
 				updateData.username = formData.username;
-				console.log('[Profile] Including username in update:', formData.username);
 			}
-			if (emailChanged) {
+			if (hasEmailChange) {
 				updateData.email = formData.email;
-				console.log('[Profile] Including email in update:', formData.email);
 			}
-			if (colorSchemeChanged) {
+			if (hasColorSchemeChange) {
 				updateData.color_scheme = formData.colorScheme;
-				console.log('[Profile] Including color_scheme in update:', formData.colorScheme);
 			}
 			if (isChangingPassword && formData.newPassword) {
 				updateData.password = formData.newPassword;
-				console.log('[Profile] Including password in update (hidden)');
 			}
 
-			console.log('[Profile] Update data object:', {
-				...updateData,
-				current_password: updateData.current_password ? '***hidden***' : undefined,
-				password: updateData.password ? '***hidden***' : undefined
-			});
-
 			// Update user profile using the current user endpoint (no user ID needed)
-			console.log('[Profile] Calling apiClient.updateCurrentUser with:', {
-				updateData: {
-					...updateData,
-					current_password: updateData.current_password ? '***hidden***' : undefined,
-					password: updateData.password ? '***hidden***' : undefined
-				}
-			});
 			const updatedUser = await apiClient.updateCurrentUser(updateData);
-
-			console.log('[Profile] API call successful');
-			console.log('[Profile] Updated user response:', {
-				id: updatedUser.id,
-				username: updatedUser.username,
-				email: updatedUser.email
-			});
 
 			// Update the auth store with new user data
 			authActions.updateUser(updatedUser);
@@ -394,14 +333,16 @@
 			showPasswordChange = false;
 
 			successMessage = 'Profile updated successfully!';
-			console.log('[Profile] Profile update completed successfully');
+			errorLogger.logInfo('Profile update completed successfully', {
+				component: 'Profile',
+				operation: 'updateProfile'
+			});
 		} catch (error) {
 			generalError = captureApiError(error, {
 				component: 'Profile',
 				operation: 'updateProfile'
 			});
 		} finally {
-			errorLogger.logDebug('[Profile] handleSubmit completed', { operation: 'updateProfile' });
 			isSaving = false;
 		}
 	}
@@ -549,10 +490,8 @@
 		feedbackSubmitting = true;
 		try {
 			const context: Record<string, unknown> = {
-				id: $currentUser?.id,
-				email: $currentUser?.email,
-				username: $currentUser?.username,
-				platform: 'web'
+				platform: 'web',
+				page: 'profile'
 			};
 			await apiClient.submitFeedback({ content, context });
 			feedbackContent = '';
@@ -566,28 +505,6 @@
 		} finally {
 			feedbackSubmitting = false;
 		}
-	}
-
-	// Billing: user-facing message for checkout errors (503, 502, or generic)
-	function getCheckoutErrorMessage(err: unknown): string {
-		if (err instanceof HttpError) {
-			if (err.status === 503) return 'Billing is temporarily unavailable.';
-			if (err.status === 502) return 'Something went wrong. Try again later.';
-		}
-		return captureApiError(err, {
-			component: 'Profile',
-			operation: 'createCheckoutSession'
-		});
-	}
-
-	// Billing: format plan price for display (cents -> $X.XX, interval)
-	function formatPlanPrice(price: PlanPrice): string {
-		const amount = (price.price / 100).toFixed(2);
-		const symbol = price.currency === 'USD' ? '$' : price.currency + ' ';
-		const count = price.payment_frequency_count ?? 1;
-		const interval = (price.payment_frequency_interval ?? 'Month').toLowerCase();
-		const intervalLabel = count === 1 ? interval : `${count} ${interval}s`;
-		return `${symbol}${amount}/${intervalLabel}`;
 	}
 
 	// Billing: create checkout session for plan and redirect to Dodo (card click or Manage Subscription)
@@ -620,17 +537,6 @@
 		} finally {
 			checkoutLoading = false;
 		}
-	}
-
-	// Format date for display
-	function formatDate(dateString: string): string {
-		return new Date(dateString).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
 	}
 </script>
 
@@ -695,457 +601,9 @@
 			</div>
 		{/if}
 
-		<div class="card">
-			<h2>Connected Apps</h2>
-
-			<!-- Connected Apps List -->
-			{#if connectedAppsError || revokeError}
-				<div class="alert alert--error" role="alert">
-					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<div class="alert__message card__block">
-						{#if connectedAppsError}
-							<p>{connectedAppsError}</p>
-						{/if}
-						{#if revokeError}
-							<p>{revokeError}</p>
-						{/if}
-					</div>
-				</div>
-			{/if}
-
-			{#if connectedAppsLoading}
-				<div class="loading loading--muted">
-					<span class="loading__spinner" aria-hidden="true">
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-							<circle
-								class="loading__spinner-inner"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="4"
-							></circle>
-							<path
-								class="loading__spinner-path"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							></path>
-						</svg>
-					</span>
-					<span>Loading connected apps...</span>
-				</div>
-			{:else if connectedApps.length > 0}
-				<div class="card__column">
-					{#each connectedApps as app (app.id)}
-						<div class="card">
-							<div class="card__column">
-								<div class="card__row card__row--between">
-									<span>
-										{app.app_name || app.device_name}
-									</span>
-									<span class="badge {app.is_active ? 'badge--positive' : 'badge--muted'}">
-										{app.is_active ? 'Active' : 'Inactive'}
-									</span>
-								</div>
-								<div class="card__row text-sm">
-									{app.device_name}
-									{#if app.platform}
-										<span class="profile-status-dot">•</span>
-										{app.platform}
-									{/if}
-								</div>
-								<div class="card__row text-xs">
-									Connected {formatDate(app.created_at)}
-								</div>
-								<div class="card__row card__row--end">
-									{#if app.is_active}
-										<button
-											type="button"
-											class="btn btn--compact"
-											onclick={() => handleRevokeConnectedApp(app.id)}
-											disabled={revokingAppId === app.id}
-											aria-label={`Revoke connected app ${app.app_name || app.device_name}`}
-										>
-											{#if revokingAppId === app.id}
-												<span class="loading__spinner" aria-hidden="true">
-													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-														<circle
-															class="loading__spinner-inner"
-															cx="12"
-															cy="12"
-															r="10"
-															stroke="currentColor"
-															stroke-width="4"
-														></circle>
-														<path
-															class="loading__spinner-path"
-															fill="currentColor"
-															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-														></path>
-													</svg>
-												</span>
-												Revoking…
-											{:else}
-												Revoke
-											{/if}
-										</button>
-									{/if}
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<div class="card__meta">No connected apps yet. Connect an app to get started.</div>
-			{/if}
-
-			{#if connectCodeError}
-				<div class="alert alert--error" role="alert">
-					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<p class="alert__message">{connectCodeError}</p>
-				</div>
-			{/if}
-
-			<div class="card__column">
-				{#if connectCode}
-					<div class="card__column card__column--center">
-						<p class="card__meta">Enter this code in the app you wish to connect to Flit - Core</p>
-						<div class="card text-md" aria-label="Connection code">
-							{connectCode}
-						</div>
-						{#if connectCodeExpiresIn != null && connectCodeExpiresIn > 0}
-							{@const minutes = Math.ceil(connectCodeExpiresIn / 60)}
-							<p class="card__meta">
-								This code expires in {minutes} minute{minutes === 1 ? '' : 's'}.
-							</p>
-						{/if}
-						<div class="auth__actions">
-							<button
-								type="button"
-								onclick={handleCopyCode}
-								class="btn"
-								aria-label="Copy connection code"
-							>
-								{connectCodeCopied ? 'Copied!' : 'Copy'}
-							</button>
-							<button
-								type="button"
-								onclick={handleConnectApp}
-								disabled={connectCodeLoading}
-								class="btn"
-								aria-label="Get new connection code"
-							>
-								Get new code
-							</button>
-							<button
-								type="button"
-								onclick={handleCloseConnectCode}
-								class="btn btn-primary"
-								aria-label="Close connection code"
-							>
-								Close
-							</button>
-						</div>
-					</div>
-				{:else}
-					<button
-						type="button"
-						onclick={handleConnectApp}
-						disabled={connectCodeLoading}
-						class="btn btn-primary"
-						aria-label="Request connection code to connect an app to Flit Core"
-					>
-						{#if connectCodeLoading}
-							<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-									<circle
-										class="loading__spinner-inner"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										stroke-width="4"
-									></circle>
-									<path
-										class="loading__spinner-path"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
-								</svg>
-							</span>
-							Requesting...
-						{:else}
-							+ Connect App
-						{/if}
-					</button>
-				{/if}
-			</div>
-		</div>
-
-		<!-- Access Code -->
-		<div class="card">
-			<h2>Access Code</h2>
-			{#if $currentUser?.access_grant}
-				<div class="alert alert--success card__block" role="status">
-					<p class="card__label">
-						Access active until {formatDate($currentUser.access_grant.expires_at)}
-					</p>
-					<p class="card__meta">
-						Includes encryption: {$currentUser.access_grant.includes_encryption ? 'Yes' : 'No'}
-					</p>
-				</div>
-			{:else}
-				<p class="card__meta">Enter an 8-character access code to activate time-limited access.</p>
-				{#if accessCodeError}
-					<div class="alert alert--error" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{accessCodeError}</p>
-					</div>
-				{/if}
-				{#if accessCodeSuccess}
-					<div class="alert alert--success alert--mb-md" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{accessCodeSuccess}</p>
-					</div>
-				{/if}
-				<form
-					onsubmit={(e) => {
-						e.preventDefault();
-						handleActivateAccessCode();
-					}}
-					class="card__row card__row--start"
-				>
-					<div class="form-group form-group--mb-none">
-						<label for="access-code-input" class="visually-hidden">Access code</label>
-						<input
-							id="access-code-input"
-							type="text"
-							maxlength="8"
-							placeholder="Enter 8-character code"
-							bind:value={accessCodeInput}
-							disabled={accessCodeActivating}
-							class="input input--code"
-							autocomplete="off"
-						/>
-					</div>
-					<button
-						type="submit"
-						class="btn btn-primary"
-						disabled={accessCodeActivating || accessCodeInput.trim().length !== 8}
-					>
-						{#if accessCodeActivating}
-							Activating…
-						{:else}
-							Activate
-						{/if}
-					</button>
-				</form>
-			{/if}
-		</div>
-
-		<!-- Billing -->
-		<div class="card">
-			<h2>Billing</h2>
-			<p class="card__meta">Manage your subscription and payment.</p>
-
-			{#if subscriptionLoading}
-				<p class="card__meta">Loading subscription…</p>
-			{:else if subscriptionError}
-				<div class="alert alert--error" role="alert">
-					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<p class="alert__message">{subscriptionError}</p>
-				</div>
-			{/if}
-
-			{#if showActivePlan}
-				<div class="alert alert--success card__block alert--mb-md" role="status">
-					<p class="card__label">You have an active subscription.</p>
-					{#if currentPlanProductId && subscriptionPlans.length > 0}
-						{@const currentPlan = subscriptionPlans.find(
-							(p) => p.product_id === currentPlanProductId
-						)}
-						{#if currentPlan?.name}
-							<p class="card__meta">Your plan: {currentPlan.name}</p>
-						{/if}
-					{/if}
-					{#if currentPeriodEnd}
-						<p class="card__meta">
-							Next billing date: {formatDate(currentPeriodEnd)}
-						</p>
-					{/if}
-					{#if currentPlanProductId}
-						<button
-							type="button"
-							onclick={() => handleCheckout(currentPlanProductId)}
-							disabled={checkoutLoading}
-							class="btn btn-primary mt-md"
-							aria-label="Manage Subscription"
-						>
-							{#if checkoutLoading}
-								<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle
-											class="loading__spinner-inner"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="loading__spinner-path"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-								</span>
-								Redirecting…
-							{:else}
-								Manage Subscription
-							{/if}
-						</button>
-					{/if}
-				</div>
-			{/if}
-
-			{#if showSubscriptionLoaded}
-				{#if checkoutError}
-					<div class="alert alert--error" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{checkoutError}</p>
-					</div>
-				{/if}
-				{#if !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
-					{@const status = subscriptionStatus?.status ?? ''}
-					{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
-					<p class="card__meta card__meta--mb-md">
-						{isPaymentIssue
-							? 'Payment issue — update your payment method or resubscribe below.'
-							: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
-					</p>
-				{:else if !hasActiveSubscription}
-					<p class="card__meta card__meta--mb-md">
-						Upgrade or manage your subscription via secure checkout.
-					</p>
-				{/if}
-
-				{#if plansLoading}
-					<p class="card__meta">Loading plans…</p>
-				{:else if plansError}
-					<div class="alert alert--error" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{plansError}</p>
-					</div>
-				{:else if plans.length === 0}
-					<p class="card__meta">No plans available at the moment.</p>
-				{:else if showPlansList}
-					<!-- Subscription plans: click card to go to checkout -->
-					<div class="grid-cards grid-cards--plans">
-						{#each subscriptionPlans as plan (plan.product_id)}
-							<button
-								type="button"
-								onclick={() => handleCheckout(plan.product_id)}
-								disabled={checkoutLoading}
-								class="plan-card"
-								aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
-							>
-								{#if plan.image}
-									<img src={plan.image} alt="" class="plan-card__image" />
-								{/if}
-								<h3 class="plan-card__title">
-									{plan.name ?? 'Subscription plan'}
-								</h3>
-								{#if plan.description}
-									<div class="plan-card__description card__meta">
-										{#each plan.description.split(/\n/).filter(Boolean) as paragraph (paragraph)}
-											<p>{paragraph}</p>
-										{/each}
-									</div>
-								{/if}
-								<div class="plan-card__price card__label text-md">
-									{formatPlanPrice(plan.price)}
-								</div>
-								{#if checkoutLoading}
-									<div class="profile-section__row card__meta mt-md text-sm">
-										<span class="loading__spinner" aria-hidden="true">
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle
-													class="loading__spinner-inner"
-													cx="12"
-													cy="12"
-													r="10"
-													stroke="currentColor"
-													stroke-width="4"
-												></circle>
-												<path
-													class="loading__spinner-path"
-													fill="currentColor"
-													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-												></path>
-											</svg>
-										</span>
-										<span>Redirecting to checkout…</span>
-									</div>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				{/if}
-			{/if}
-		</div>
-
 		<!-- Profile Form -->
 		<div>
-			<form
-				class="card"
-				onsubmit={(e) => {
-					console.log('[Profile] Form onsubmit event fired');
-					handleSubmit(e);
-				}}
-				novalidate
-			>
+			<form class="card" onsubmit={handleSubmit} novalidate>
 				<!-- Account Information Section -->
 				<h2>Account Information</h2>
 				<div class="card__column">
@@ -1203,9 +661,10 @@
 							<p>Enter your current password below and click Save to apply.</p>
 						{/if}
 						<div class="color-scheme-picker">
-							<div
+							<label
 								class="radio-card radio-card--light-preview"
 								class:radio-card--selected={formData.colorScheme === 'light'}
+								for="color-scheme-light"
 							>
 								<input
 									id="color-scheme-light"
@@ -1224,13 +683,14 @@
 											d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
 										/>
 									</svg>
-									<span>Light</span>
+									<span class="radio-card__title">Light</span>
 									<p class="muted">Bright and clear</p>
 								</div>
-							</div>
-							<div
+							</label>
+							<label
 								class="radio-card radio-card--dark-preview"
 								class:radio-card--selected={formData.colorScheme === 'dark'}
+								for="color-scheme-dark"
 							>
 								<input
 									id="color-scheme-dark"
@@ -1249,13 +709,14 @@
 											d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
 										/>
 									</svg>
-									<span>Dark</span>
+									<span class="radio-card__title">Dark</span>
 									<p class="muted">Easy on the eyes</p>
 								</div>
-							</div>
-							<div
+							</label>
+							<label
 								class="radio-card radio-card--auto-preview"
 								class:radio-card--selected={formData.colorScheme === 'default'}
+								for="color-scheme-default"
 							>
 								<input
 									id="color-scheme-default"
@@ -1274,10 +735,10 @@
 											d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
 										/>
 									</svg>
-									<span>Auto</span>
+									<span class="radio-card__title">Auto</span>
 									<p class="muted">Follow system</p>
 								</div>
-							</div>
+							</label>
 						</div>
 					</div>
 
@@ -1358,13 +819,13 @@
 						<div>
 							<span class="card__label--muted"> Member Since: </span>
 							<span class="card__meta" aria-label="Account creation date">
-								{formatDate($currentUser.created_at)}
+								{formatProfileDate($currentUser.created_at)}
 							</span>
 						</div>
 						<div>
 							<span class="card__label--muted"> Last Updated: </span>
 							<span class="card__meta" aria-label="Account last updated date">
-								{formatDate($currentUser.updated_at)}
+								{formatProfileDate($currentUser.updated_at)}
 							</span>
 						</div>
 					</div>
@@ -1577,6 +1038,479 @@
 					</button>
 				</div>
 			</form>
+		</div>
+
+		<!-- Billing -->
+		<div class="card">
+			<h2>Billing</h2>
+			<p class="card__meta">Manage your subscription and payment.</p>
+
+			{#if subscriptionLoading}
+				<p class="card__meta">Loading subscription…</p>
+			{:else if subscriptionError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<p class="alert__message">{subscriptionError}</p>
+				</div>
+			{/if}
+
+			{#if showActivePlan}
+				<div class="alert alert--success card__block alert--mb-md" role="status">
+					<p class="card__label">You have an active subscription.</p>
+					{#if currentPlanProductId && subscriptionPlans.length > 0}
+						{@const currentPlan = subscriptionPlans.find(
+							(p) => p.product_id === currentPlanProductId
+						)}
+						{#if currentPlan?.name}
+							<p class="card__meta">Your plan: {currentPlan.name}</p>
+						{/if}
+					{/if}
+					{#if currentPeriodEnd}
+						<p class="card__meta">
+							Next billing date: {formatProfileDate(currentPeriodEnd)}
+						</p>
+					{/if}
+					{#if currentPlanProductId}
+						<button
+							type="button"
+							onclick={() => handleCheckout(currentPlanProductId)}
+							disabled={checkoutLoading}
+							class="btn btn-primary mt-md"
+							aria-label="Manage Subscription"
+						>
+							{#if checkoutLoading}
+								<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle
+											class="loading__spinner-inner"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="loading__spinner-path"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+								</span>
+								Redirecting…
+							{:else}
+								Manage Subscription
+							{/if}
+						</button>
+					{/if}
+				</div>
+			{/if}
+
+			{#if showSubscriptionLoaded}
+				{#if checkoutError}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{checkoutError}</p>
+					</div>
+				{/if}
+				{#if !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
+					{@const status = subscriptionStatus?.status ?? ''}
+					{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
+					<p class="card__meta card__meta--mb-md">
+						{isPaymentIssue
+							? 'Payment issue — update your payment method or resubscribe below.'
+							: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
+					</p>
+				{:else if !hasActiveSubscription}
+					<p class="card__meta card__meta--mb-md">
+						Upgrade or manage your subscription via secure checkout.
+					</p>
+				{/if}
+
+				{#if plansLoading}
+					<p class="card__meta">Loading plans…</p>
+				{:else if plansError}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{plansError}</p>
+					</div>
+				{:else if plans.length === 0}
+					<p class="card__meta">No plans available at the moment.</p>
+				{:else if showPlansList}
+					<!-- Subscription plans: click card to go to checkout -->
+					<div class="grid-cards grid-cards--plans">
+						{#each subscriptionPlans as plan (plan.product_id)}
+							<button
+								type="button"
+								onclick={() => handleCheckout(plan.product_id)}
+								disabled={checkoutLoading}
+								class="plan-card"
+								aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
+							>
+								{#if plan.image}
+									<img src={plan.image} alt="" class="plan-card__image" />
+								{/if}
+								<h3 class="plan-card__title">
+									{plan.name ?? 'Subscription plan'}
+								</h3>
+								{#if plan.description}
+									<div class="plan-card__description card__meta">
+										{#each plan.description.split(/\n/).filter(Boolean) as paragraph (paragraph)}
+											<p>{paragraph}</p>
+										{/each}
+									</div>
+								{/if}
+								<div class="plan-card__price card__label text-md">
+									{formatPlanPrice(plan.price)}
+								</div>
+								{#if checkoutLoading}
+									<div class="profile-section__row card__meta mt-md text-sm">
+										<span class="loading__spinner" aria-hidden="true">
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+												<circle
+													class="loading__spinner-inner"
+													cx="12"
+													cy="12"
+													r="10"
+													stroke="currentColor"
+													stroke-width="4"
+												></circle>
+												<path
+													class="loading__spinner-path"
+													fill="currentColor"
+													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+												></path>
+											</svg>
+										</span>
+										<span>Redirecting to checkout…</span>
+									</div>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			{/if}
+		</div>
+
+		<!-- Access Code -->
+		<div class="card">
+			<h2>Access Code</h2>
+			{#if $currentUser?.access_grant}
+				<div class="alert alert--success card__block" role="status">
+					<p class="card__label">
+						Access active until {formatProfileDate($currentUser.access_grant.expires_at)}
+					</p>
+					<p class="card__meta">
+						Includes encryption: {$currentUser.access_grant.includes_encryption ? 'Yes' : 'No'}
+					</p>
+				</div>
+			{:else}
+				<p class="card__meta">Enter an 8-character access code to activate time-limited access.</p>
+				{#if accessCodeError}
+					<div class="alert alert--error" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{accessCodeError}</p>
+					</div>
+				{/if}
+				{#if accessCodeSuccess}
+					<div class="alert alert--success alert--mb-md" role="alert">
+						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path
+								fill-rule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="alert__message">{accessCodeSuccess}</p>
+					</div>
+				{/if}
+				<form
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleActivateAccessCode();
+					}}
+					class="card__row card__row--start"
+				>
+					<div class="form-group form-group--mb-none">
+						<label for="access-code-input" class="visually-hidden">Access code</label>
+						<input
+							id="access-code-input"
+							type="text"
+							maxlength="8"
+							placeholder="Enter 8-character code"
+							bind:value={accessCodeInput}
+							disabled={accessCodeActivating}
+							class="input input--code"
+							autocomplete="off"
+						/>
+					</div>
+					<button
+						type="submit"
+						class="btn btn-primary"
+						disabled={accessCodeActivating || accessCodeInput.trim().length !== 8}
+					>
+						{#if accessCodeActivating}
+							Activating…
+						{:else}
+							Activate
+						{/if}
+					</button>
+				</form>
+			{/if}
+		</div>
+
+		<div class="card">
+			<h2>Connected Apps</h2>
+
+			<!-- Connected Apps List -->
+			{#if connectedAppsError || revokeError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<div class="alert__message card__block">
+						{#if connectedAppsError}
+							<p>{connectedAppsError}</p>
+						{/if}
+						{#if revokeError}
+							<p>{revokeError}</p>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
+			{#if connectedAppsLoading}
+				<div class="loading loading--muted">
+					<span class="loading__spinner" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle
+								class="loading__spinner-inner"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="loading__spinner-path"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
+						</svg>
+					</span>
+					<span>Loading connected apps...</span>
+				</div>
+			{:else if connectedApps.length > 0}
+				<div class="card__column">
+					{#if activeConnectedApps.length > 0}
+						{#each activeConnectedApps as app (app.id)}
+							<div class="card">
+								<div class="card__column">
+									<div class="card__row card__row--between">
+										<span>
+											{app.app_name || app.device_name}
+										</span>
+										<span class="badge badge--positive">Active</span>
+									</div>
+									<div class="card__row text-sm">
+										{app.device_name}
+										{#if app.platform}
+											<span class="profile-status-dot">•</span>
+											{app.platform}
+										{/if}
+									</div>
+									<div class="card__row text-xs">
+										Connected {formatProfileDate(app.created_at)}
+									</div>
+									<div class="card__row card__row--end">
+										<button
+											type="button"
+											class="btn btn--compact"
+											onclick={() => handleRevokeConnectedApp(app.id)}
+											disabled={revokingAppId === app.id}
+											aria-label={`Revoke connected app ${app.app_name || app.device_name}`}
+										>
+											{#if revokingAppId === app.id}
+												<span class="loading__spinner" aria-hidden="true">
+													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+														<circle
+															class="loading__spinner-inner"
+															cx="12"
+															cy="12"
+															r="10"
+															stroke="currentColor"
+															stroke-width="4"
+														></circle>
+														<path
+															class="loading__spinner-path"
+															fill="currentColor"
+															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+														></path>
+													</svg>
+												</span>
+												Revoking…
+											{:else}
+												Revoke
+											{/if}
+										</button>
+									</div>
+								</div>
+							</div>
+						{/each}
+					{:else}
+						<div class="card__meta">No active devices.</div>
+					{/if}
+
+					{#if inactiveConnectedApps.length > 0}
+						<details>
+							<summary class="card__meta">
+								Inactive devices ({inactiveConnectedApps.length})
+							</summary>
+							<div class="card__column mt-sm">
+								{#each inactiveConnectedApps as app (app.id)}
+									<div class="card">
+										<div class="card__column">
+											<div class="card__row card__row--between">
+												<span>
+													{app.app_name || app.device_name}
+												</span>
+												<span class="badge badge--muted">Inactive</span>
+											</div>
+											<div class="card__row text-sm">
+												{app.device_name}
+												{#if app.platform}
+													<span class="profile-status-dot">•</span>
+													{app.platform}
+												{/if}
+											</div>
+											<div class="card__row text-xs">
+												Connected {formatProfileDate(app.created_at)}
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</details>
+					{/if}
+				</div>
+			{:else}
+				<div class="card__meta">No connected apps yet. Connect an app to get started.</div>
+			{/if}
+
+			{#if connectCodeError}
+				<div class="alert alert--error" role="alert">
+					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<p class="alert__message">{connectCodeError}</p>
+				</div>
+			{/if}
+
+			<div class="card__column">
+				{#if connectCode}
+					<div class="card__column card__column--center">
+						<p class="card__meta">Enter this code in the app you wish to connect to Flit - Core</p>
+						<div class="card text-md" aria-label="Connection code">
+							{connectCode}
+						</div>
+						{#if connectCodeExpiresIn != null && connectCodeExpiresIn > 0}
+							{@const minutes = Math.ceil(connectCodeExpiresIn / 60)}
+							<p class="card__meta">
+								This code expires in {minutes} minute{minutes === 1 ? '' : 's'}.
+							</p>
+						{/if}
+						<div class="auth__actions">
+							<button
+								type="button"
+								onclick={handleCopyCode}
+								class="btn"
+								aria-label="Copy connection code"
+							>
+								{connectCodeCopied ? 'Copied!' : 'Copy'}
+							</button>
+							<button
+								type="button"
+								onclick={handleConnectApp}
+								disabled={connectCodeLoading}
+								class="btn"
+								aria-label="Get new connection code"
+							>
+								Get new code
+							</button>
+							<button
+								type="button"
+								onclick={handleCloseConnectCode}
+								class="btn btn-primary"
+								aria-label="Close connection code"
+							>
+								Close
+							</button>
+						</div>
+					</div>
+				{:else}
+					<button
+						type="button"
+						onclick={handleConnectApp}
+						disabled={connectCodeLoading}
+						class="btn btn-primary"
+						aria-label="Request connection code to connect an app to Flit Core"
+					>
+						{#if connectCodeLoading}
+							<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle
+										class="loading__spinner-inner"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="loading__spinner-path"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+							</span>
+							Requesting...
+						{:else}
+							+ Connect App
+						{/if}
+					</button>
+				{/if}
+			</div>
 		</div>
 		<!-- Feedback -->
 		<div class="card">

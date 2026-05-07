@@ -6,6 +6,20 @@ export default defineConfig({
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		environment: 'node',
-		globals: true
+		environmentMatchGlobs: [
+			['src/lib/components/**/*.test.ts', 'jsdom'],
+			['src/routes/**/*.test.ts', 'jsdom']
+		],
+		globals: true,
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'html'],
+			thresholds: {
+				lines: 80,
+				functions: 80,
+				branches: 70,
+				statements: 80
+			}
+		}
 	}
 });

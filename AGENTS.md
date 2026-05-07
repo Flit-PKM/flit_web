@@ -11,6 +11,7 @@
 - **Styling**: Vanilla CSS with layers (reset, base, layout, components) and design tokens in `src/css/colors.css`. Entry: `src/css/style.css`. Reusable patterns must live in shared class-based CSS (`layout.css` and `components.css`). Do **not** use `<style>` blocks in Svelte files. Inline `style` is allowed only for truly dynamic runtime values (for example width percentages driven by state). Canonical class conventions: button variants use `btn-*` modifiers (`btn-primary`, `btn-secondary`, `btn-danger`), and card element classes use `card__*` naming.
 - **Code Quality**: ESLint 9.x + Prettier 3.x
 - **Build**: Vite 6.x
+- **Note editor**: The note detail route (`(protected)/notes/[id]`) uses Tiptap 3 (`@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/markdown`) in [NoteMarkdownEditor.svelte](src/lib/components/NoteMarkdownEditor.svelte) for visual editing with GFM-oriented markdown (tables, task lists) and a **Markdown source** mode (plain textarea) toggled in the UI; persistence is always a markdown string via `getMarkdown()` / `setContent(..., { contentType: 'markdown' })`. **`+page.svelte` must dynamically `import()` that component only when `browser` is true** so ProseMirror/Tiptap are never loaded during SSR (a static import causes a 500). [vite.config.ts](vite.config.ts) lists those packages under `optimizeDeps.include` so Vite pre-bundles them at dev start (avoids broken `.vite/deps` responses when the editor chunk loads lazily). If the browser still reports corrupted / empty MIME for `.vite/deps`, delete `node_modules/.vite` and run `npm run dev:force`. Title and body autosave to the API with a 5 second trailing debounce (`debounceTrailing` in `src/lib/utils/debounce.ts`).
 
 ## Architecture Pattern
 
@@ -19,7 +20,7 @@ Client-driven API architecture with centralized API client handling HTTP communi
 ## Key Patterns
 
 - **Svelte 5 Runes**: `$state`, `$derived`, `$effect` for reactivity
-- **API Client**: Robust HTTP client with auto token injection, retry logic (3 attempts), timeout handling
+- **API Client**: Robust HTTP client with auto token injection, retry logic for safe methods (`GET`/`HEAD`/`OPTIONS`), timeout handling
 - **Stores**: Svelte writable stores with localStorage persistence
 - **Type-First**: TypeScript interfaces in `types/` aligned with backend specs
 
@@ -37,10 +38,10 @@ src/
 ├── lib/
 │   ├── api/        # API client (ApiClient class)
 │   ├── assets/     # Static assets (favicon, etc.)
-│   ├── components/ # Reusable Svelte components (e.g. GeneralErrorAlert)
+│   ├── components/ # Reusable Svelte components (e.g. GeneralErrorAlert, NoteMarkdownEditor)
 │   ├── stores/     # Global state (authStore, pendingColorScheme, etc.)
 │   ├── types/      # TypeScript definitions
-│   └── utils/      # Helper functions (auth, validation, error-handler)
+│   └── utils/      # Helper functions (auth, validation, error-handler, debounce)
 └── routes/         # SvelteKit pages/layouts
     └── (protected)/ # Auth guard layout; profile and notes live here
 ```
@@ -48,20 +49,32 @@ src/
 ## Essential Workflows
 
 1. **Development**: `npm run dev` → checks with `npm run check` → lint with `npm run lint` → format with `npm run format`
-2. **Tests**: `npm run test` (watch) or `npm run test:run` (single run). New logic should be covered by unit tests (auth utils, error-handler, validation).
+2. **Tests**: `npm run test` (watch), `npm run test:run` (single run), or `npm run test:coverage` for thresholds/reporting. Use `npm run ci:check` before merging.
 3. **API Usage**: Always use `apiClient` methods (no raw fetch)
 4. **State**: Use `$state` for local, `authStore` for global auth state
 5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
 6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI.
-7. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`)
+7. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`). Login post-auth redirects must be parsed via `src/lib/utils/navigation.ts` to allow safe internal callback URLs (including billing return query params).
 8. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
 
 ## Critical Rules
 
 - Never hardcode secrets; use `.env` for `VITE_API_BASE_URL`
+- Configure frontend log verbosity with `VITE_LOG_PROFILE` (`debug`, `test`, `deploy`) and keep route/component logs on `errorLogger` instead of raw `console.*`
 - Implement debouncing for search/filter inputs
 - Persist tokens in localStorage only (check `browser` env)
 - Handle 401 errors by clearing token and redirecting
 - Use `flit-*` color classes and design tokens from `src/css/colors.css` and shared layout/component classes consistently; use inline styles only for dynamic runtime values
 - Keep global CSS valid vanilla CSS syntax only (no Svelte-only selectors like `:global(...)` in `src/css/*.css`)
 - New classes must be added intentionally to shared CSS before use; avoid placeholder/undefined class hooks in markup
+
+## CSS Class Audit Guardrails
+
+- Treat these as allowlisted when auditing for undefined classes:
+  - `cf-turnstile` (Cloudflare Turnstile-required class in auth forms)
+  - Dynamic interpolated class prefixes such as `strength-bar__fill--{level}` and `strength-bar__label--{level}` (verify concrete numeric variants exist in shared CSS)
+- Class-audit workflow:
+  1. Detect used-but-undefined classes across `src/**/*.svelte`
+  2. Detect defined-but-unused selectors in `src/css/*.css`
+  3. Exclude allowlisted third-party/dynamic patterns
+  4. Remove only high-confidence orphans in atomic changes

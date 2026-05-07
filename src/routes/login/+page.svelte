@@ -4,7 +4,9 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { authActions, isAuthenticated, isLoading } from '$lib/stores/auth';
-	import { validateLoginForm, loginRateLimiter, sanitizeInput } from '$lib/utils/auth';
+	import { validateLoginForm, loginRateLimiter } from '$lib/utils/auth';
+	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
+	import { parsePostLoginRedirect } from '$lib/utils/navigation';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import type { LoginFormData, FormErrors } from '$lib/types/auth';
@@ -48,8 +50,9 @@
 
 	// Handle form field changes with validation
 	function handleFieldChange(field: keyof LoginFormData, value: string) {
-		formData[field] = sanitizeInput(value);
-		errors[field] = '';
+		const fieldName = String(field);
+		updateSanitizedField(formData, fieldName, value);
+		clearFieldError(errors, fieldName);
 
 		// Debounced validation for real-time feedback
 		debouncedValidator.validateField(field as string, value, (error) => {
@@ -88,13 +91,9 @@
 		const result = await authActions.login(formData);
 
 		if (result.success) {
-			// Redirect to intended page or notes (allowlist for type-safe goto)
-			const ALLOWED_REDIRECTS = ['/profile', '/notes', '/', '/about', '/terms'] as const;
-			const requested = $page.url.searchParams.get('redirect') || '/notes';
-			const path = ALLOWED_REDIRECTS.includes(requested as (typeof ALLOWED_REDIRECTS)[number])
-				? (requested as (typeof ALLOWED_REDIRECTS)[number])
-				: '/notes';
-			goto(resolve(path) as Parameters<typeof goto>[0]);
+			const requested = $page.url.searchParams.get('redirect');
+			const path = parsePostLoginRedirect(requested);
+			goto(path as Parameters<typeof goto>[0]);
 		} else {
 			generalError = result.error || 'Login failed. Please try again.';
 		}
@@ -104,7 +103,7 @@
 
 	// Handle password visibility toggle
 	function togglePasswordVisibility() {
-		showPassword = !showPassword;
+		showPassword = toggleFlag(showPassword);
 	}
 
 	// Focus management for accessibility

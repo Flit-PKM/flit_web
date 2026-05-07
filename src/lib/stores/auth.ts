@@ -11,12 +11,13 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { apiClient, HttpError } from '../api/client';
 import { isTokenExpired } from '../utils/auth';
-import { handleApiError, formatErrorForUser } from '../utils/error-handler';
+import { handleApiError, formatErrorForUser, errorLogger } from '../utils/error-handler';
 import type { AuthState, User, LoginFormData, RegisterFormData } from '../types/auth';
 
 // Storage keys
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
+let authExpiredListenerBound = false;
 
 // Initialize state from localStorage (client-side only)
 function initializeAuthState(): AuthState {
@@ -35,7 +36,11 @@ function initializeAuthState(): AuthState {
 	try {
 		user = userJson ? JSON.parse(userJson) : null;
 	} catch (error) {
-		console.warn('Failed to parse stored user data:', error);
+		errorLogger.logWarning('Failed to parse stored user data', {
+			component: 'AuthStore',
+			operation: 'initializeAuthState',
+			error
+		});
 		localStorage.removeItem(USER_KEY);
 	}
 
@@ -191,7 +196,10 @@ export const authActions = {
 			const user = await apiClient.getCurrentUser();
 			authStore.update((state) => ({ ...state, user }));
 		} catch (error) {
-			console.error('Failed to refresh user data:', error);
+			errorLogger.logError(error instanceof Error ? error : new Error(String(error)), {
+				component: 'AuthStore',
+				operation: 'refreshUser'
+			});
 
 			// Only logout on 401 (unauthorized) - token is invalid/expired
 			if (error instanceof HttpError && error.status === 401) {
@@ -214,7 +222,8 @@ export const authActions = {
 		authStore.set(state);
 
 		// Listen for auth expiration events from API client
-		if (browser) {
+		if (browser && !authExpiredListenerBound) {
+			authExpiredListenerBound = true;
 			window.addEventListener('auth:expired', () => {
 				this.logout();
 			});

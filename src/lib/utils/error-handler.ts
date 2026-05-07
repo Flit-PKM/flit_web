@@ -21,6 +21,8 @@ export interface ErrorContext {
 	[key: string]: unknown;
 }
 
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
+
 /**
  * Application error type with enhanced context
  */
@@ -82,7 +84,14 @@ export class NetworkError extends AppError {
  */
 export class ErrorLogger {
 	private static instance: ErrorLogger;
-	private logLevel: 'debug' | 'info' | 'warn' | 'error' = 'error';
+	private logLevel: LogLevel = 'error';
+	private readonly levelPriority: Record<LogLevel, number> = {
+		debug: 10,
+		info: 20,
+		warn: 30,
+		error: 40,
+		silent: 100
+	};
 
 	private constructor() {}
 
@@ -96,8 +105,19 @@ export class ErrorLogger {
 	/**
 	 * Set log level
 	 */
-	setLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): void {
+	setLogLevel(level: LogLevel): void {
 		this.logLevel = level;
+	}
+
+	/**
+	 * Get active log level
+	 */
+	getLogLevel(): LogLevel {
+		return this.logLevel;
+	}
+
+	private shouldLog(level: Exclude<LogLevel, 'silent'>): boolean {
+		return this.levelPriority[level] >= this.levelPriority[this.logLevel];
 	}
 
 	/**
@@ -114,13 +134,8 @@ export class ErrorLogger {
 			url: browser ? window.location.href : undefined
 		};
 
-		// Log to console based on log level
-		if (this.logLevel === 'error' || this.logLevel === 'warn') {
+		if (this.shouldLog('error')) {
 			console.error('[ERROR]', errorInfo);
-		} else if (this.logLevel === 'info') {
-			console.info('[ERROR]', errorInfo);
-		} else {
-			console.debug('[ERROR]', errorInfo);
 		}
 
 		// Send to external error tracking service (if available)
@@ -139,8 +154,24 @@ export class ErrorLogger {
 			url: browser ? window.location.href : undefined
 		};
 
-		if (this.logLevel === 'warn' || this.logLevel === 'error') {
+		if (this.shouldLog('warn')) {
 			console.warn('[WARNING]', warningInfo);
+		}
+	}
+
+	/**
+	 * Log informational events
+	 */
+	logInfo(message: string, context?: ErrorContext): void {
+		if (this.shouldLog('info')) {
+			const info = {
+				timestamp: new Date().toISOString(),
+				message,
+				context,
+				userAgent: browser ? navigator.userAgent : 'server',
+				url: browser ? window.location.href : undefined
+			};
+			console.info('[INFO]', info);
 		}
 	}
 
@@ -148,7 +179,7 @@ export class ErrorLogger {
 	 * Log debug information
 	 */
 	logDebug(message: string, context?: ErrorContext): void {
-		if (this.logLevel === 'debug') {
+		if (this.shouldLog('debug')) {
 			const debugInfo = {
 				timestamp: new Date().toISOString(),
 				message,

@@ -24,11 +24,13 @@ export default defineConfig(
 			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
 			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
 			'no-undef': 'off',
-			// Disable navigation rules for SvelteKit - goto() works without resolve() in client-side navigation
-			'svelte/no-navigation-without-resolve': 'off',
-			// Disable writable derived rule - current pattern is correct for state updates in effects
-			'svelte/prefer-writable-derived': 'off'
+			// Enforce centralized logging utilities in app code
+			'no-console': 'error'
 		}
+	},
+	{
+		files: ['src/lib/utils/error-handler.ts', 'src/lib/utils/**/*.test.ts'],
+		rules: { 'no-console': 'off' }
 	},
 	// Sanitized {@html} (markdownToSafeHtml) in notes pages
 	{
@@ -39,6 +41,14 @@ export default defineConfig(
 	{
 		files: ['src/routes/(protected)/notes/**/+page.svelte'],
 		rules: { 'svelte/no-unnecessary-state-wrap': 'off' }
+	},
+	{
+		files: ['src/routes/**/*.svelte'],
+		rules: { 'svelte/no-navigation-without-resolve': 'off' }
+	},
+	{
+		files: ['src/routes/**/+page.svelte', 'src/routes/**/+layout.svelte'],
+		rules: { 'svelte/prefer-writable-derived': 'off' }
 	},
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],

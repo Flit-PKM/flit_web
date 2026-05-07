@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import { isAuthenticated, currentUser } from '$lib/stores/auth';
 	import { apiClient, HttpError } from '$lib/api/client';
+	import { buildLoginRedirect, parseRootRedirectTarget } from '$lib/utils/navigation';
 
 	let billingCompleteStarted = false;
 
@@ -26,7 +27,7 @@
 					goto(resolve('/profile') + '?subscription=success');
 				} catch (err) {
 					if (err instanceof HttpError && err.status === 401) {
-						goto(resolve('/login') + '?redirect=' + encodeURIComponent(returnPath));
+						goto(buildLoginRedirect(returnPath) as Parameters<typeof goto>[0]);
 					} else {
 						goto(resolve('/profile') + '?subscription=error');
 					}
@@ -37,22 +38,12 @@
 
 		if (hasBillingParams && !$isAuthenticated) {
 			const returnPath = $page.url.pathname + $page.url.search;
-			goto(resolve('/login') + '?redirect=' + encodeURIComponent(returnPath));
+			goto(buildLoginRedirect(returnPath) as Parameters<typeof goto>[0]);
 			return;
 		}
 
-		if (!$isAuthenticated) {
-			const target = params.get('redirect')?.toLowerCase();
-			if (target === 'login') {
-				goto(resolve('/login'));
-			} else if (target === 'register') {
-				goto(resolve('/register'));
-			}
-			return;
-		}
-
-		// Logged in, no billing params: go to Notes
-		goto(resolve('/notes'));
+		const target = parseRootRedirectTarget($isAuthenticated, params.get('redirect'));
+		if (target) goto(target as Parameters<typeof goto>[0]);
 	});
 </script>
 
@@ -62,7 +53,7 @@
 
 <header class="hero">
 	<h1>Flit</h1>
-	<h2>Note Taking & Personal Knowledge Management</h2>
+	<h2>Personal Note Taking & Knowledge Management</h2>
 	<p class="card__meta">Butterfly on the web of consciousness, Flutter.</p>
 	<p>
 		Welcome to the Flit-PKM ecosystem — your secure, personal space to capture thoughts, weave ideas
