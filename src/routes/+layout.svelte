@@ -86,11 +86,34 @@
 
 <svelte:head>
 	<link rel="icon" type="image/svg+xml" href={asset('/images/flit_app_logo.svg')} />
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+	<link rel="manifest" href="/site.webmanifest" />
+	<link rel="canonical" href="https://core.flit-pkm.com/" />
+
 	<title>Flit Web</title>
 	<meta
 		name="description"
 		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
 	/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Flit Core" />
+	<meta property="og:title" content="Flit" />
+	<meta
+		property="og:description"
+		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
+	/>
+	<meta property="og:url" content="https://core.flit-pkm.com/" />
+	<meta property="og:image" content="https://core.flit-pkm.com/images/flit_core_logo.svg" />
+
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Flit" />
+	<meta
+		name="twitter:description"
+		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
+	/>
+	<meta name="twitter:image" content="https://core.flit-pkm.com/images/flit_core_logo.svg" />
 
 	{#if isProd}
 		<script
