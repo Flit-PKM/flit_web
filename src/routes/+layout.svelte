@@ -119,7 +119,7 @@
 		<script
 			defer
 			src="https://analytics.bmd-studios.com/script.js"
-			data-website-id="a2c2a395-85ef-4245-b680-4bc920056956"
+			data-website-id="90bda04d-f880-47b0-ada3-2f54db6d45bb"
 		></script>
 	{/if}
 </svelte:head>

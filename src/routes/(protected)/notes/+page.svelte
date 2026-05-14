@@ -25,6 +25,8 @@
 
 	let isLoading = $state(true);
 	let notes = $state<NoteRead[]>([]);
+	let pinnedNotes = $derived(notes.filter((n) => n.pinned));
+	let unpinnedNotes = $derived(notes.filter((n) => !n.pinned));
 	let categories = $state<CategoryRead[]>([]);
 	let error = $state('');
 	const PAGE_SIZE = 10;
@@ -50,18 +52,28 @@
 
 	// Per-note actions
 	let isAppendingNoteId = $state<number | null>(null);
+	let isPinningNoteId = $state<number | null>(null);
 	let activeOptionsNoteId = $state<number | null>(null);
 
 	// Fetch notes with current filters
+	function normalizeNoteRead(n: NoteRead): NoteRead {
+		return { ...n, pinned: n.pinned === true };
+	}
+
+	function normalizeNotesPage(raw: NoteRead[]): NoteRead[] {
+		return filterNotDeleted(raw).map(normalizeNoteRead);
+	}
+
 	function dedupeById(existing: NoteRead[], incoming: NoteRead[]): NoteRead[] {
 		const seen = new Set(existing.map((note) => note.id));
 		return incoming.filter((note) => !seen.has(note.id));
 	}
 
-	function sortByUpdatedAtDesc(items: NoteRead[]): NoteRead[] {
-		return items.sort(
-			(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-		);
+	function sortNotesPinnedThenUpdated(items: NoteRead[]): NoteRead[] {
+		return [...items].sort((a, b) => {
+			if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+			return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+		});
 	}
 
 	async function loadNotesPage({ reset }: { reset: boolean }) {
@@ -137,7 +149,7 @@
 				return;
 			}
 
-			const pageNotes = sortByUpdatedAtDesc(filterNotDeleted(raw));
+			const pageNotes = normalizeNotesPage(raw);
 			if (reset) {
 				notes = pageNotes;
 			} else {
@@ -386,6 +398,33 @@
 		activeOptionsNoteId = null;
 	}
 
+	async function togglePin(noteItem: NoteRead) {
+		if (!$isAuthenticated) return;
+		if (isPinningNoteId != null) return;
+		isPinningNoteId = noteItem.id;
+		error = '';
+		try {
+			errorLogger.logDebug('Toggling note pin', {
+				noteId: noteItem.id,
+				nextPinned: !noteItem.pinned
+			});
+			const updated = await apiClient.updateNote(noteItem.id, { pinned: !noteItem.pinned });
+			notes = sortNotesPinnedThenUpdated(
+				notes.map((n) => (n.id === noteItem.id ? normalizeNoteRead({ ...n, ...updated }) : n))
+			);
+			closeNoteOptions();
+			errorLogger.logDebug('Note pin toggled', { noteId: noteItem.id });
+		} catch (err) {
+			error = captureApiError(err, {
+				component: 'NotesList',
+				operation: 'togglePin',
+				noteId: noteItem.id
+			});
+		} finally {
+			isPinningNoteId = null;
+		}
+	}
+
 	onMount(async () => {
 		if (!$isAuthenticated) {
 			isLoading = false;
@@ -462,6 +501,95 @@
 		}
 	}}
 />
+
+{#snippet noteListCard(note: NoteRead)}
+	<div class="card note-list__card">
+		<div class="note-list__accent" aria-hidden="true"></div>
+		<a href={resolve(`/notes/${note.id}`)} class="note-list__main-link">
+			<h2 class="note-list__title">{note.title}</h2>
+			<hr class="note-list__divider" />
+			{#if hasPreview(note.content)}
+				<div class="prose">
+					{@html previewHtmlByNoteId[note.id] ?? ''}
+				</div>
+			{/if}
+		</a>
+		<div class="note-list__options">
+			<button
+				type="button"
+				class="btn note-list__options-trigger"
+				title="Note options"
+				aria-haspopup="menu"
+				aria-expanded={activeOptionsNoteId === note.id}
+				aria-controls={`note-options-${note.id}`}
+				onclick={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					toggleNoteOptions(note.id);
+				}}
+			>
+				<span class="visually-hidden">Open options for {note.title}</span>
+				<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 6.75a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"
+					/>
+				</svg>
+			</button>
+			{#if activeOptionsNoteId === note.id}
+				<div
+					id={`note-options-${note.id}`}
+					class="note-list__options-menu"
+					role="menu"
+					aria-label={`Actions for ${note.title}`}
+				>
+					<button
+						type="button"
+						class="note-list__menu-item"
+						role="menuitem"
+						disabled={isPinningNoteId != null}
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							void togglePin(note);
+						}}
+					>
+						{note.pinned ? 'Unpin' : 'Pin'}
+					</button>
+					<button
+						type="button"
+						class="note-list__menu-item"
+						role="menuitem"
+						disabled={isAppendingNoteId === note.id}
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							appendNote(note.id);
+							closeNoteOptions();
+						}}
+					>
+						Append
+					</button>
+					<button
+						type="button"
+						class="note-list__menu-item note-list__menu-item--danger"
+						role="menuitem"
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							deleteNote(note.id, note.title);
+							closeNoteOptions();
+						}}
+					>
+						Delete
+					</button>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/snippet}
 
 <h1>Notes</h1>
 
@@ -623,80 +751,18 @@
 	<p class="muted">
 		{notes.length} note{notes.length === 1 ? '' : 's'}
 	</p>
-	{#each notes as note (note.id)}
-		<div class="card note-list__card">
-			<div class="note-list__accent" aria-hidden="true"></div>
-			<a href={resolve(`/notes/${note.id}`)} class="note-list__main-link">
-				<h2 class="note-list__title">{note.title}</h2>
-				<hr class="note-list__divider" />
-				{#if hasPreview(note.content)}
-					<div class="prose">
-						{@html previewHtmlByNoteId[note.id] ?? ''}
-					</div>
-				{/if}
-			</a>
-			<div class="note-list__options">
-				<button
-					type="button"
-					class="btn note-list__options-trigger"
-					title="Note options"
-					aria-haspopup="menu"
-					aria-expanded={activeOptionsNoteId === note.id}
-					aria-controls={`note-options-${note.id}`}
-					onclick={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						toggleNoteOptions(note.id);
-					}}
-				>
-					<span class="visually-hidden">Open options for {note.title}</span>
-					<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 6.75a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"
-						/>
-					</svg>
-				</button>
-				{#if activeOptionsNoteId === note.id}
-					<div
-						id={`note-options-${note.id}`}
-						class="note-list__options-menu"
-						role="menu"
-						aria-label={`Actions for ${note.title}`}
-					>
-						<button
-							type="button"
-							class="note-list__menu-item"
-							role="menuitem"
-							disabled={isAppendingNoteId === note.id}
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								appendNote(note.id);
-								closeNoteOptions();
-							}}
-						>
-							Append
-						</button>
-						<button
-							type="button"
-							class="note-list__menu-item note-list__menu-item--danger"
-							role="menuitem"
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								deleteNote(note.id, note.title);
-								closeNoteOptions();
-							}}
-						>
-							Delete
-						</button>
-					</div>
-				{/if}
+	{#if pinnedNotes.length > 0}
+		<section class="notes-pinned" aria-label="Pinned notes">
+			<h2 class="notes-pinned__title">Pinned</h2>
+			<div class="notes-pinned__list">
+				{#each pinnedNotes as note (note.id)}
+					{@render noteListCard(note)}
+				{/each}
 			</div>
-		</div>
+		</section>
+	{/if}
+	{#each unpinnedNotes as note (note.id)}
+		{@render noteListCard(note)}
 	{/each}
 	{#if isLoadingMore}
 		<p class="muted">Loading more notes...</p>

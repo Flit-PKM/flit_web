@@ -105,6 +105,13 @@ export interface AuthToken {
 }
 
 /**
+ * Request body for POST /auth/login-google (Sign In With Google credential JWT).
+ */
+export interface GoogleIdTokenLogin {
+	id_token: string;
+}
+
+/**
  * Request body for POST /password-reset/request.
  */
 export interface PasswordResetRequest {

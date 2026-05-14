@@ -513,6 +513,45 @@
 		color: var(--color-ink-meta);
 	}
 
+	/* Pinned notes strip (list page) */
+	.notes-pinned {
+		position: relative;
+		margin-bottom: 1.75rem;
+		padding: 1.35rem 1.1rem 1.15rem;
+		border-radius: 0.65rem;
+		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 14%, transparent);
+		background: color-mix(in oklab, var(--color-blue) 4.5%, var(--color-canvas));
+		box-shadow: none;
+	}
+
+	.notes-pinned__title {
+		position: absolute;
+		top: 0.1rem;
+		right: 1.5rem;
+		margin: 0;
+		font-size: 0.65rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-ink-meta);
+		line-height: 1.2;
+	}
+
+	.notes-pinned__list {
+		padding-top: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+
+	.notes-pinned__list > .note-list__card {
+		margin-bottom: 1.25rem;
+	}
+
+	.notes-pinned__list > .note-list__card:last-child {
+		margin-bottom: 0;
+	}
+
 	.note-list__divider {
 		border: 0;
 		border-top: 1px solid color-mix(in oklab, var(--color-mid-grey) 20%, transparent);
@@ -1516,6 +1555,58 @@
 			background-color: var(--canvas-dark);
 			border-color: color-mix(in oklab, var(--ink-dark) 45%, transparent);
 		}
+	}
+
+	/* ---- Auth: Google Sign-In (GIS) ---- */
+	.auth__google-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		width: 100%;
+		margin-bottom: 0.5rem;
+	}
+
+	.auth__google-host {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		width: 80%;
+		max-width: 100%;
+		min-height: 2.75rem;
+	}
+
+	.auth__google-host iframe {
+		max-width: 100%;
+		border-radius: 9999px;
+	}
+
+	.auth__divider {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		width: 100%;
+		margin: 0.25rem 0 0.5rem;
+	}
+
+	/* Must follow .auth__divider: that rule's margin shorthand was resetting --google margins. */
+	.auth__divider.auth__divider--google {
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.auth__divider-line {
+		flex: 1;
+		height: 1px;
+		background: var(--color-border);
+	}
+
+	.auth__divider-label {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-mid-grey);
+		white-space: nowrap;
 	}
 }
 

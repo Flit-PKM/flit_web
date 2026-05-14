@@ -9,7 +9,10 @@
 	import { parsePostLoginRedirect } from '$lib/utils/navigation';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
 	import type { LoginFormData, FormErrors } from '$lib/types/auth';
+
+	const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
 
 	// Form state
 	let formData: LoginFormData = $state({
@@ -99,6 +102,12 @@
 		}
 
 		isSubmitting = false;
+	}
+
+	function handleGoogleSuccess() {
+		const requested = $page.url.searchParams.get('redirect');
+		const path = parsePostLoginRedirect(requested);
+		goto(path as Parameters<typeof goto>[0]);
 	}
 
 	// Handle password visibility toggle
@@ -259,6 +268,21 @@
 						{/if}
 					</button>
 				</div>
+
+				{#if googleClientId}
+					<div class="auth__divider auth__divider--google" role="presentation">
+						<span class="auth__divider-line" aria-hidden="true"></span>
+						<span class="auth__divider-label">or</span>
+						<span class="auth__divider-line" aria-hidden="true"></span>
+					</div>
+					<GoogleSignInButton
+						disabled={isSubmitting || $isLoading}
+						onSuccess={handleGoogleSuccess}
+						onError={(msg: string) => {
+							generalError = msg;
+						}}
+					/>
+				{/if}
 
 				<div class="auth__links">
 					<p class="card__meta">

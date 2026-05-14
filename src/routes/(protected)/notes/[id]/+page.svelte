@@ -120,6 +120,7 @@
 				title: updated.title,
 				content: updated.content,
 				type: updated.type,
+				pinned: updated.pinned === true,
 				version: updated.version,
 				updated_at: updated.updated_at
 			};
@@ -183,9 +184,9 @@
 				const raw = await apiClient.getNotes(
 					q.trim() ? { search: q.trim(), limit: 50 } : { limit: 20 }
 				);
-				noteSearchResults = filterNotDeleted(raw).filter(
-					(n) => currentNoteId == null || n.id !== currentNoteId
-				);
+				noteSearchResults = filterNotDeleted(raw)
+					.filter((n) => currentNoteId == null || n.id !== currentNoteId)
+					.map((n) => ({ ...n, pinned: n.pinned === true }));
 			} catch {
 				noteSearchResults = [];
 			} finally {
@@ -210,8 +211,12 @@
 		};
 		try {
 			const noteData = await apiClient.getNote(noteId);
-			const relatedTitles = await buildRelatedTitleMap(apiClient, noteData);
-			return { data: noteData, error: '', relatedTitles };
+			const normalized: NoteDetail = {
+				...noteData,
+				pinned: noteData.pinned === true
+			};
+			const relatedTitles = await buildRelatedTitleMap(apiClient, normalized);
+			return { data: normalized, error: '', relatedTitles };
 		} catch (err) {
 			if (err instanceof HttpError && err.status === 404) {
 				return { ...empty, error: 'Note not found.' };
@@ -527,6 +532,36 @@
 		}
 	}
 
+	async function toggleNotePinned() {
+		if (!note) return;
+		if (isSaving) return;
+		saveError = '';
+		isSaving = true;
+		try {
+			await autosave.flush();
+			errorLogger.logDebug('Toggling note pin from detail', {
+				noteId: note.id,
+				nextPinned: !note.pinned
+			});
+			const updated = await apiClient.updateNote(note.id, { pinned: !note.pinned });
+			note = {
+				...note,
+				pinned: updated.pinned === true,
+				version: updated.version,
+				updated_at: updated.updated_at
+			};
+			errorLogger.logDebug('Note pin toggled from detail', { noteId: note.id });
+		} catch (err) {
+			saveError = captureApiError(err, {
+				component: 'NoteDetail',
+				operation: 'toggleNotePinned',
+				noteId: note.id
+			});
+		} finally {
+			isSaving = false;
+		}
+	}
+
 	function updateJumpToBottomVisibility() {
 		if (!browser || isLoading || !!error || !note) {
 			showJumpToBottom = false;
@@ -617,6 +652,14 @@
 							class="btn"
 						>
 							Append
+						</button>
+						<button
+							type="button"
+							onclick={() => void toggleNotePinned()}
+							disabled={isSaving}
+							class="btn"
+						>
+							{note.pinned ? 'Unpin' : 'Pin'}
 						</button>
 						<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
 							Delete

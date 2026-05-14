@@ -15,6 +15,7 @@ import type {
 	UserCreate,
 	UserUpdate,
 	AuthToken,
+	GoogleIdTokenLogin,
 	VerifySendResponse,
 	PasswordResetRequestResponse,
 	PasswordResetConfirm,
@@ -275,6 +276,21 @@ export class ApiClient {
 		});
 
 		// Automatically set the token for future requests
+		this.setToken(response.data.access_token);
+
+		return response.data;
+	}
+
+	/**
+	 * Sign in or register with a Google ID token (GIS credential JWT). POST /auth/login-google.
+	 */
+	async loginWithGoogle(idToken: string): Promise<AuthToken> {
+		const body: GoogleIdTokenLogin = { id_token: idToken };
+		const response = await this.request<AuthToken>('/auth/login-google', {
+			method: 'POST',
+			body
+		});
+
 		this.setToken(response.data.access_token);
 
 		return response.data;

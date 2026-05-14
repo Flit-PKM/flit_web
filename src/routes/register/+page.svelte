@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { isAuthenticated, authActions } from '$lib/stores/auth';
+	import { isAuthenticated, isLoading, authActions } from '$lib/stores/auth';
 	import {
 		validateRegisterForm,
 		getPasswordStrength,
@@ -12,7 +12,10 @@
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import { errorLogger } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
 	import type { RegisterFormData, FormErrors } from '$lib/types/auth';
+
+	const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
 
 	// Form state
 	let formData: RegisterFormData = $state({
@@ -123,6 +126,10 @@
 		isSubmitting = false;
 	}
 
+	function handleGoogleSuccess() {
+		goto(resolve('/profile'));
+	}
+
 	// Toggle password visibility
 	function togglePasswordVisibility() {
 		showPassword = toggleFlag(showPassword);
@@ -174,7 +181,7 @@
 	<div class="auth__inner">
 		<div class="auth__header">
 			<h1>Create your account</h1>
-			<p>Join the Flit-PKM ecosystem and manage your knowledge graph.</p>
+			<p>Sign Up and start building your personal knowledge base.</p>
 		</div>
 		<div class="card">
 			<form onsubmit={handleSubmit} novalidate>
@@ -380,6 +387,21 @@
 						{/if}
 					</button>
 				</div>
+
+				{#if googleClientId}
+					<div class="auth__divider auth__divider--google" role="presentation">
+						<span class="auth__divider-line" aria-hidden="true"></span>
+						<span class="auth__divider-label">or</span>
+						<span class="auth__divider-line" aria-hidden="true"></span>
+					</div>
+					<GoogleSignInButton
+						disabled={isSubmitting || $isLoading}
+						onSuccess={handleGoogleSuccess}
+						onError={(msg: string) => {
+							generalError = msg;
+						}}
+					/>
+				{/if}
 
 				<p class="card__meta">
 					Already have an account?

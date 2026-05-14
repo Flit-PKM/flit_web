@@ -120,6 +120,35 @@ export const authActions = {
 	},
 
 	/**
+	 * Sign in or register with a Google ID token (GIS).
+	 */
+	async loginWithGoogle(idToken: string): Promise<{ success: boolean; error?: string }> {
+		authStore.update((state) => ({ ...state, isLoading: true }));
+
+		try {
+			const tokenResponse = await apiClient.loginWithGoogle(idToken);
+			const userData = await apiClient.getCurrentUser();
+
+			authStore.set({
+				token: tokenResponse.access_token,
+				user: userData,
+				isLoading: false
+			});
+
+			return { success: true };
+		} catch (error) {
+			authStore.update((state) => ({
+				...state,
+				isLoading: false
+			}));
+			const errorMessage = formatErrorForUser(
+				handleApiError(error, { operation: 'loginWithGoogle' })
+			);
+			return { success: false, error: errorMessage };
+		}
+	},
+
+	/**
 	 * Register a new user account
 	 */
 	async register(userData: RegisterFormData): Promise<{ success: boolean; error?: string }> {
