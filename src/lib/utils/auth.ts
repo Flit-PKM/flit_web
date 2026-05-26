@@ -7,7 +7,7 @@
 
 import type { FormErrors, LoginFormData, RegisterFormData, ProfileFormData } from '../types/auth';
 import { errorLogger } from './error-handler';
-import { validateField, validationRules } from './validation';
+import { passwordMeetsComplexity, validateField, validationRules } from './validation';
 
 /**
  * Email validation (delegates to validation.ts)
@@ -30,11 +30,15 @@ export function isValidPassword(password: string): boolean {
 }
 
 /**
- * Get password strength score (0-4) based on length tiers.
+ * Get password strength score (0-4) aligned with validationRules.password.
+ * 0 empty, 1 short (<8), 2 length ok but missing complexity, 3 complex <12 chars, 4 complex 12+.
  */
 export function getPasswordStrength(password: string): number {
 	if (password.length === 0) return 0;
-	return Math.min(4, password.length);
+	if (password.length < 8) return 1;
+	if (!passwordMeetsComplexity(password)) return 2;
+	if (password.length < 12) return 3;
+	return 4;
 }
 
 /**
@@ -174,20 +178,13 @@ export function validateProfileForm(
 	const emailErr = validateField(data.email, { required: true, rules: [validationRules.email()] });
 	if (emailErr) errors.email = emailErr;
 
-	// Check if username or email changed (requires current password)
-	const _usernameChanged = originalUser && data.username !== originalUser.username;
-	const _emailChanged = originalUser && data.email !== originalUser.email;
 	const passwordChanging = !!(data.newPassword || data.confirmNewPassword);
-	void _usernameChanged;
-	void _emailChanged;
 
-	// Require current password for all updates (backend requirement)
-	if (!data.currentPassword?.trim()) {
-		errors.currentPassword = 'Current password is required to update your profile';
-	}
-
-	// Password change validation (only if user is actually changing password); uses validation.ts
+	// Password change validation (only when setting a new password); uses validation.ts
 	if (passwordChanging) {
+		if (!data.currentPassword?.trim()) {
+			errors.currentPassword = 'Current password is required to change your password';
+		}
 		const newPasswordErr = validateField(data.newPassword ?? '', {
 			required: true,
 			rules: [validationRules.minLength(8), validationRules.password()]
@@ -215,10 +212,12 @@ export function hasFormErrors(errors: FormErrors): boolean {
 }
 
 /**
- * Sanitize user input to prevent XSS
+ * Preserve user input as-is for form state (especially credentials).
+ *
+ * @security Do not use for HTML output. Svelte `{text}` bindings auto-escape.
+ * The only `{@html}` in this app must go through `markdownToSafeHtml` (DOMPurify).
  */
 export function sanitizeInput(input: string): string {
-	// Preserve user intent (especially credentials); output is escaped at render sinks.
 	return input;
 }
 
@@ -296,7 +295,7 @@ export function generateSecureRandomString(length: number = 32): string {
 }
 
 /**
- * Rate limiting helper for login attempts
+ * Client-side login attempt pacing (UX only; not a security control).
  */
 export class RateLimiter {
 	private attempts: Map<string, number[]> = new Map();
@@ -309,7 +308,21 @@ export class RateLimiter {
 		this.windowMs = windowMs;
 	}
 
+	/** Drop identifiers with no attempts in the current window. */
+	prune(): void {
+		const now = Date.now();
+		for (const [id, attempts] of this.attempts) {
+			const recent = attempts.filter((time) => now - time < this.windowMs);
+			if (recent.length === 0) {
+				this.attempts.delete(id);
+			} else if (recent.length !== attempts.length) {
+				this.attempts.set(id, recent);
+			}
+		}
+	}
+
 	isAllowed(identifier: string): boolean {
+		this.prune();
 		const now = Date.now();
 		const attempts = this.attempts.get(identifier) || [];
 

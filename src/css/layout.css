@@ -47,8 +47,17 @@
 	@media (min-width: 640px) {
 		.nav__links {
 			display: flex;
-			margin-left: 1.5rem;
-			margin-right: 1.5rem;
+		}
+
+		.nav__links--center {
+			flex: 1;
+			justify-content: center;
+			margin-left: 1rem;
+			margin-right: 1rem;
+		}
+
+		.nav__links--end {
+			margin-left: auto;
 		}
 	}
 
@@ -108,7 +117,20 @@
 		}
 	}
 
+	.nav__mobile-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		border: none;
+		padding: 0;
+		margin: 0;
+		background-color: color-mix(in oklab, var(--color-ink) 35%, transparent);
+		cursor: pointer;
+	}
+
 	.nav__mobile {
+		position: relative;
+		z-index: 41;
 		display: block;
 	}
 

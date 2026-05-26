@@ -6,8 +6,10 @@ import {
 	getPasswordStrengthLabel,
 	validateLoginForm,
 	validateRegisterForm,
+	validateProfileForm,
 	isTokenExpired,
-	hasFormErrors
+	hasFormErrors,
+	RateLimiter
 } from './auth';
 
 describe('isValidEmail', () => {
@@ -47,11 +49,12 @@ describe('getPasswordStrength', () => {
 		expect(getPasswordStrength('')).toBe(0);
 	});
 
-	it('returns 1-4 based on criteria', () => {
+	it('scores by length and complexity', () => {
 		expect(getPasswordStrength('a')).toBe(1);
-		expect(getPasswordStrength('ab')).toBe(2);
-		expect(getPasswordStrength('Ab1')).toBe(3);
-		expect(getPasswordStrength('Abcdef1!')).toBe(4);
+		expect(getPasswordStrength('abcdefgh')).toBe(2);
+		expect(getPasswordStrength('Abcdef1!')).toBe(3);
+		expect(getPasswordStrength('Abcdef1!extra')).toBe(4);
+		expect(getPasswordStrength('aaaaaaaa')).toBe(2);
 	});
 });
 
@@ -108,6 +111,45 @@ describe('validateRegisterForm', () => {
 			confirmPassword: 'Abcdef2!'
 		});
 		expect(result.confirmPassword).toBeDefined();
+	});
+});
+
+describe('validateProfileForm', () => {
+	beforeEach(() => {
+		vi.stubGlobal('console', { ...console, debug: vi.fn() });
+	});
+
+	const baseProfile = {
+		username: 'user1',
+		email: 'u@example.com',
+		colorScheme: 'default' as const,
+		currentPassword: '',
+		newPassword: '',
+		confirmNewPassword: ''
+	};
+
+	it('does not require current password for account-only updates', () => {
+		const result = validateProfileForm({ ...baseProfile, colorScheme: 'dark' });
+		expect(result.currentPassword).toBeUndefined();
+		expect(hasFormErrors(result)).toBe(false);
+	});
+
+	it('requires current password when changing password', () => {
+		const result = validateProfileForm({
+			...baseProfile,
+			newPassword: 'NewSecure1!',
+			confirmNewPassword: 'NewSecure1!'
+		});
+		expect(result.currentPassword).toBe('Current password is required to change your password');
+	});
+});
+
+describe('RateLimiter', () => {
+	it('prune removes stale identifiers', () => {
+		const limiter = new RateLimiter(5, 1000);
+		limiter.recordAttempt('a@b.com');
+		limiter.prune();
+		expect(limiter.isAllowed('a@b.com')).toBe(true);
 	});
 });
 

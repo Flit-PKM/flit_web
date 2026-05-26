@@ -5,15 +5,23 @@
 	import { page } from '$app/stores';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient } from '$lib/api/client';
+	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import NoteListCard from '$lib/components/notes/NoteListCard.svelte';
+	import NotesCategoryManager from '$lib/components/notes/NotesCategoryManager.svelte';
+	import NotesSearchFilters from '$lib/components/notes/NotesSearchFilters.svelte';
 	import { filterNotDeleted } from '$lib/utils/filter';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
-	import { markdownToSafeHtml } from '$lib/utils/markdown';
+	import { getCachedNotePreviewHtml } from '$lib/utils/markdown-preview-cache';
+	import { normalizeNoteRead, normalizeNotesPage } from '$lib/utils/notes';
+	import { debounceTrailing } from '$lib/utils/debounce';
+	import { confirmAction } from '$lib/stores/confirmDialog';
+	import { createNoteAndNavigate } from '$lib/utils/note-create';
 	import type { NoteRead, CategoryRead } from '$lib/types/note';
 
 	const previewHtmlByNoteId = $derived.by(() => {
 		const m: Record<number, string> = {};
 		for (const n of notes) {
-			m[n.id] = markdownToSafeHtml(n.content ?? '', { maxLines: 5 });
+			m[n.id] = getCachedNotePreviewHtml(n.id, n.content ?? '');
 		}
 		return m;
 	});
@@ -39,7 +47,7 @@
 	// Search and filter state
 	let searchQuery = $state('');
 	let selectedCategory = $state('');
-	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+	const reloadNotesDebounced = debounceTrailing(() => resetAndLoadNotes(), 400);
 
 	// Category create/delete
 	let showCreateCategory = $state(false);
@@ -49,20 +57,12 @@
 
 	// New note
 	let isCreatingNote = $state(false);
+	let failedCreateNoteId = $state<number | null>(null);
 
 	// Per-note actions
 	let isAppendingNoteId = $state<number | null>(null);
 	let isPinningNoteId = $state<number | null>(null);
 	let activeOptionsNoteId = $state<number | null>(null);
-
-	// Fetch notes with current filters
-	function normalizeNoteRead(n: NoteRead): NoteRead {
-		return { ...n, pinned: n.pinned === true };
-	}
-
-	function normalizeNotesPage(raw: NoteRead[]): NoteRead[] {
-		return filterNotDeleted(raw).map(normalizeNoteRead);
-	}
 
 	function dedupeById(existing: NoteRead[], incoming: NoteRead[]): NoteRead[] {
 		const seen = new Set(existing.map((note) => note.id));
@@ -214,26 +214,14 @@
 		await loadNotesPage({ reset: false });
 	}
 
-	// Debounced search handler
 	function handleSearchInput(event: Event) {
-		const value = (event.target as HTMLInputElement).value;
-		searchQuery = value;
-
-		// Clear existing timeout
-		if (searchTimeout) {
-			clearTimeout(searchTimeout);
-		}
-
-		// Debounce the search
-		searchTimeout = setTimeout(() => {
-			resetAndLoadNotes();
-		}, 1000);
+		searchQuery = (event.target as HTMLInputElement).value;
+		reloadNotesDebounced.schedule();
 	}
 
-	// Category filter handler
 	function handleCategoryChange(event: Event) {
 		selectedCategory = (event.target as HTMLSelectElement).value;
-		resetAndLoadNotes();
+		reloadNotesDebounced.schedule();
 	}
 
 	// Clear all filters
@@ -306,7 +294,7 @@
 		const id = selectedCategoryId;
 		const name = selectedCategory;
 		if (id === undefined || !name) return;
-		if (!confirm(`Delete category "${name}"?`)) return;
+		if (!(await confirmAction(`Delete category "${name}"?`))) return;
 		isCategoryBusy = true;
 		categoryError = '';
 		try {
@@ -331,42 +319,66 @@
 		if (!$isAuthenticated) return;
 		isCreatingNote = true;
 		error = '';
-		try {
-			errorLogger.logDebug('Creating new note');
-			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
-			goto(resolve(`/notes/${created.id}?edit=1`));
-			errorLogger.logDebug('New note created successfully', { noteId: created.id });
-		} catch (err) {
-			error = captureApiError(err, {
+		failedCreateNoteId = null;
+		errorLogger.logDebug('Creating new note');
+		const result = await createNoteAndNavigate({ apiClient, goto, resolve });
+		if (result.success) {
+			errorLogger.logDebug('New note created successfully', { noteId: result.note.id });
+		} else {
+			error = captureApiError(new Error(result.error), {
 				component: 'NotesList',
 				operation: 'createNote'
 			});
-		} finally {
-			isCreatingNote = false;
+			if (result.createdNoteId != null) failedCreateNoteId = result.createdNoteId;
 		}
+		isCreatingNote = false;
 	}
 
 	async function appendNote(oldNoteId: number) {
 		if (!$isAuthenticated || isAppendingNoteId != null) return;
 		isAppendingNoteId = oldNoteId;
 		error = '';
-		try {
-			errorLogger.logDebug('Appending note', { appendFromNoteId: oldNoteId });
-			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
-			goto(resolve(`/notes/${created.id}?edit=1&append=${oldNoteId}`));
+		failedCreateNoteId = null;
+		errorLogger.logDebug('Appending note', { appendFromNoteId: oldNoteId });
+		const result = await createNoteAndNavigate({
+			apiClient,
+			goto,
+			resolve,
+			appendFromNoteId: oldNoteId
+		});
+		if (result.success) {
 			errorLogger.logDebug('Append note created successfully', {
 				sourceNoteId: oldNoteId,
-				newNoteId: created.id
+				newNoteId: result.note.id
 			});
-		} catch (err) {
-			error = captureApiError(err, {
+		} else {
+			error = captureApiError(new Error(result.error), {
 				component: 'NotesList',
 				operation: 'appendNote',
 				sourceNoteId: oldNoteId
 			});
-		} finally {
-			isAppendingNoteId = null;
+			if (result.createdNoteId != null) failedCreateNoteId = result.createdNoteId;
 		}
+		isAppendingNoteId = null;
+	}
+
+	async function deleteFailedDraftNote() {
+		if (failedCreateNoteId == null) return;
+		try {
+			await apiClient.deleteNote(failedCreateNoteId);
+			failedCreateNoteId = null;
+			error = '';
+		} catch (err) {
+			error = captureApiError(err, {
+				component: 'NotesList',
+				operation: 'deleteFailedDraftNote'
+			});
+		}
+	}
+
+	function openFailedDraftNote() {
+		if (failedCreateNoteId == null) return;
+		void goto(resolve(`/notes/${failedCreateNoteId}?edit=1`));
 	}
 
 	function toggleNoteOptions(noteId: number) {
@@ -375,7 +387,7 @@
 
 	async function deleteNote(noteId: number, noteTitle: string) {
 		if (!$isAuthenticated) return;
-		if (!confirm(`Delete note "${noteTitle}"? This cannot be undone.`)) return;
+		if (!(await confirmAction(`Delete note "${noteTitle}"? This cannot be undone.`))) return;
 		error = '';
 		try {
 			errorLogger.logDebug('Deleting note', { noteId });
@@ -482,9 +494,7 @@
 	});
 
 	onDestroy(() => {
-		if (searchTimeout) {
-			clearTimeout(searchTimeout);
-		}
+		reloadNotesDebounced.cancel();
 	});
 </script>
 
@@ -502,196 +512,31 @@
 	}}
 />
 
-{#snippet noteListCard(note: NoteRead)}
-	<div class="card note-list__card">
-		<div class="note-list__accent" aria-hidden="true"></div>
-		<a href={resolve(`/notes/${note.id}`)} class="note-list__main-link">
-			<h2 class="note-list__title">{note.title}</h2>
-			<hr class="note-list__divider" />
-			{#if hasPreview(note.content)}
-				<div class="prose">
-					{@html previewHtmlByNoteId[note.id] ?? ''}
-				</div>
-			{/if}
-		</a>
-		<div class="note-list__options">
-			<button
-				type="button"
-				class="btn note-list__options-trigger"
-				title="Note options"
-				aria-haspopup="menu"
-				aria-expanded={activeOptionsNoteId === note.id}
-				aria-controls={`note-options-${note.id}`}
-				onclick={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					toggleNoteOptions(note.id);
-				}}
-			>
-				<span class="visually-hidden">Open options for {note.title}</span>
-				<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 6.75a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm0 6.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"
-					/>
-				</svg>
-			</button>
-			{#if activeOptionsNoteId === note.id}
-				<div
-					id={`note-options-${note.id}`}
-					class="note-list__options-menu"
-					role="menu"
-					aria-label={`Actions for ${note.title}`}
-				>
-					<button
-						type="button"
-						class="note-list__menu-item"
-						role="menuitem"
-						disabled={isPinningNoteId != null}
-						onclick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							void togglePin(note);
-						}}
-					>
-						{note.pinned ? 'Unpin' : 'Pin'}
-					</button>
-					<button
-						type="button"
-						class="note-list__menu-item"
-						role="menuitem"
-						disabled={isAppendingNoteId === note.id}
-						onclick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							appendNote(note.id);
-							closeNoteOptions();
-						}}
-					>
-						Append
-					</button>
-					<button
-						type="button"
-						class="note-list__menu-item note-list__menu-item--danger"
-						role="menuitem"
-						onclick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							deleteNote(note.id, note.title);
-							closeNoteOptions();
-						}}
-					>
-						Delete
-					</button>
-				</div>
-			{/if}
-		</div>
-	</div>
-{/snippet}
-
 <h1>Notes</h1>
 
 <section class="card">
-	<div class="notes-toolbar">
-		<div class="notes-toolbar__row">
-			<span class="notes-toolbar__icon" aria-hidden="true">
-				<svg fill="none" class="icon_md" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-					/>
-				</svg>
-			</span>
-			<div class="notes-toolbar__grow">
-				<input
-					type="text"
-					placeholder="Search notes..."
-					value={searchQuery}
-					oninput={handleSearchInput}
-					class="input wide"
-				/>
-			</div>
-		</div>
-
-		<div class="notes-toolbar__row">
-			<label for="category-filter" class="notes-toolbar__label nowrap">Category</label>
-			<div class="notes-toolbar__grow">
-				<select
-					id="category-filter"
-					value={selectedCategory}
-					onchange={handleCategoryChange}
-					class="input wide"
-				>
-					<option value="">All categories</option>
-					{#each categories as category (category.id)}
-						<option value={category.name}>{category.name}</option>
-					{/each}
-				</select>
-			</div>
-			<div class="profile-section__row">
-				<button
-					type="button"
-					onclick={openCreateCategory}
-					disabled={isCategoryBusy}
-					class="btn"
-					title="Create category">+</button
-				>
-				<button
-					type="button"
-					onclick={deleteSelectedCategory}
-					disabled={selectedCategoryId === undefined || isCategoryBusy}
-					class="btn"
-					title="Delete selected category">−</button
-				>
-				{#if hasActiveFilters}
-					<button type="button" onclick={clearFilters} class="btn"> Clear </button>
-				{/if}
-			</div>
-		</div>
-	</div>
-
-	{#if showCreateCategory}
-		<div class="card__row card__row--start">
-			<input
-				type="text"
-				bind:value={newCategoryName}
-				placeholder="New category name"
-				class="input"
-				onkeydown={(e) => e.key === 'Enter' && submitCreateCategory()}
-			/>
-			<button
-				type="button"
-				onclick={submitCreateCategory}
-				disabled={isCategoryBusy}
-				class="btn btn-primary">Create</button
-			>
-			<button
-				type="button"
-				onclick={cancelCreateCategory}
-				disabled={isCategoryBusy}
-				class="btn btn-secondary">Cancel</button
-			>
-			{#if categoryError}
-				<span class="form-group__error">{categoryError}</span>
-			{/if}
-		</div>
-	{/if}
-
-	{#if hasActiveFilters}
-		<div class="profile-section__row mt-sm">
-			<span>Filtering by:</span>
-			{#if searchQuery}
-				<span class="badge badge--primary">Search: "{searchQuery}"</span>
-			{/if}
-			{#if selectedCategory}
-				<span class="badge badge--primary">Category: {selectedCategory}</span>
-			{/if}
-		</div>
-	{/if}
+	<NotesSearchFilters
+		{searchQuery}
+		{selectedCategory}
+		{categories}
+		{hasActiveFilters}
+		{isCategoryBusy}
+		{selectedCategoryId}
+		onSearchInput={handleSearchInput}
+		onCategoryChange={handleCategoryChange}
+		onClearFilters={clearFilters}
+		onOpenCreateCategory={openCreateCategory}
+		onDeleteSelectedCategory={deleteSelectedCategory}
+	/>
+	<NotesCategoryManager
+		{showCreateCategory}
+		{newCategoryName}
+		{categoryError}
+		{isCategoryBusy}
+		onNameInput={(v) => (newCategoryName = v)}
+		onSubmit={submitCreateCategory}
+		onCancel={cancelCreateCategory}
+	/>
 </section>
 
 <div class="card__row card__row--end mt-md">
@@ -702,29 +547,23 @@
 
 {#if isLoading}
 	<div class="loading">
-		<span class="loading__spinner" aria-hidden="true">
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-				<circle
-					class="loading__spinner-inner"
-					cx="12"
-					cy="12"
-					r="10"
-					stroke="currentColor"
-					stroke-width="4"
-				></circle>
-				<path
-					class="loading__spinner-path"
-					fill="currentColor"
-					d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-				></path>
-			</svg>
-		</span>
+		<LoadingSpinner />
 		<span>Loading notes...</span>
 	</div>
 {:else if error}
 	<div class="card card__block">
 		<p class="section-title">Could not load notes</p>
 		<p class="card__meta">{error}</p>
+		{#if failedCreateNoteId != null}
+			<div class="card__actions">
+				<button type="button" class="btn btn-secondary" onclick={openFailedDraftNote}>
+					Open draft note
+				</button>
+				<button type="button" class="btn btn-danger" onclick={deleteFailedDraftNote}>
+					Delete draft
+				</button>
+			</div>
+		{/if}
 	</div>
 {:else if notes.length === 0}
 	<div class="card card__column card__column--center">
@@ -756,16 +595,67 @@
 			<h2 class="notes-pinned__title">Pinned</h2>
 			<div class="notes-pinned__list">
 				{#each pinnedNotes as note (note.id)}
-					{@render noteListCard(note)}
+					<NoteListCard
+						{note}
+						previewHtml={previewHtmlByNoteId[note.id] ?? ''}
+						showPreview={hasPreview(note.content)}
+						isOptionsOpen={activeOptionsNoteId === note.id}
+						isPinning={isPinningNoteId != null}
+						isAppending={isAppendingNoteId === note.id}
+						onToggleOptions={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							toggleNoteOptions(note.id);
+						}}
+						onTogglePin={() => void togglePin(note)}
+						onAppend={() => {
+							appendNote(note.id);
+							closeNoteOptions();
+						}}
+						onDelete={() => {
+							deleteNote(note.id, note.title);
+							closeNoteOptions();
+						}}
+						onCloseOptions={closeNoteOptions}
+					/>
 				{/each}
 			</div>
 		</section>
 	{/if}
 	{#each unpinnedNotes as note (note.id)}
-		{@render noteListCard(note)}
+		<NoteListCard
+			{note}
+			previewHtml={previewHtmlByNoteId[note.id] ?? ''}
+			showPreview={hasPreview(note.content)}
+			isOptionsOpen={activeOptionsNoteId === note.id}
+			isPinning={isPinningNoteId != null}
+			isAppending={isAppendingNoteId === note.id}
+			onToggleOptions={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				toggleNoteOptions(note.id);
+			}}
+			onTogglePin={() => void togglePin(note)}
+			onAppend={() => {
+				appendNote(note.id);
+				closeNoteOptions();
+			}}
+			onDelete={() => {
+				deleteNote(note.id, note.title);
+				closeNoteOptions();
+			}}
+			onCloseOptions={closeNoteOptions}
+		/>
 	{/each}
 	{#if isLoadingMore}
 		<p class="muted">Loading more notes...</p>
+	{/if}
+	{#if hasMore && !isLoading && !isLoadingMore}
+		<div class="card__row card__row--center mt-sm">
+			<button type="button" class="btn btn-secondary" onclick={() => loadMoreNotes()}>
+				Load more notes
+			</button>
+		</div>
 	{/if}
 	{#if hasMore && !isLoading}
 		<div bind:this={loadMoreSentinel} aria-hidden="true"></div>

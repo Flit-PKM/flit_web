@@ -37,6 +37,22 @@ export interface ValidationResult {
 	firstError?: string;
 }
 
+/** Password complexity checks (shared with strength meter in auth.ts). */
+export const PASSWORD_HAS_UPPER = /[A-Z]/;
+export const PASSWORD_HAS_LOWER = /[a-z]/;
+export const PASSWORD_HAS_DIGIT = /\d/;
+/** Symbols allowed as "special" for password rules (non-alphanumeric punctuation). */
+export const PASSWORD_HAS_SPECIAL = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
+
+export function passwordMeetsComplexity(value: string): boolean {
+	return (
+		PASSWORD_HAS_UPPER.test(value) &&
+		PASSWORD_HAS_LOWER.test(value) &&
+		PASSWORD_HAS_DIGIT.test(value) &&
+		PASSWORD_HAS_SPECIAL.test(value)
+	);
+}
+
 /**
  * Common validation rules
  */
@@ -68,13 +84,8 @@ export const validationRules = {
 		(
 			message: string = 'Password must contain uppercase, lowercase, number, and special character'
 		): ValidationRule =>
-		(value: string) => {
-			const hasUpperCase = /[A-Z]/.test(value);
-			const hasLowerCase = /[a-z]/.test(value);
-			const hasNumbers = /\d/.test(value);
-			const hasSpecialChar = /[!@#$%^&*()_+\-=[[\]{};':"\\|,.<>/?]/.test(value);
-			return !hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar ? message : null;
-		},
+		(value: string) =>
+			passwordMeetsComplexity(value) ? null : message,
 
 	match:
 		(otherValue: string, message: string = 'Values do not match'): ValidationRule =>

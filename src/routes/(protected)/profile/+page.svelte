@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { base, resolve } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { authActions, currentUser, isAuthenticated } from '$lib/stores/auth';
 	import { pendingColorScheme } from '$lib/stores/theme';
@@ -13,19 +13,13 @@
 	} from '$lib/utils/auth';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
-	import {
-		formatPlanPrice,
-		isAnnualPlan,
-		isMonthlyPlan,
-		sortSubscriptionPlans
-	} from '$lib/utils/billing';
-	import { formatProfileDate, getCheckoutErrorMessage } from '$lib/utils/profile';
+	import { formatProfileDate } from '$lib/utils/profile';
+	import { buildUserUpdatePayload, getProfileChangeFlags } from '$lib/utils/profile-page';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import NotesImportExportSection from '$lib/components/profile/NotesImportExportSection.svelte';
 	import CurrentPasswordInput from '$lib/components/CurrentPasswordInput.svelte';
-	import type { ProfileFormData, FormErrors, UserUpdate } from '$lib/types/auth';
+	import type { ProfileFormData, FormErrors } from '$lib/types/auth';
 	import type { ConnectedApp } from '$lib/types/connect';
-	import type { PlanDetailResponse, SubscriptionStatusResponse } from '$lib/types/billing';
-
 	// State
 	let isLoading = $state(true);
 	let isSaving = $state(false);
@@ -46,12 +40,6 @@
 	let connectedAppsLoading = $state(false);
 	let connectedAppsError = $state('');
 
-	// Access code state
-	let accessCodeInput = $state('');
-	let accessCodeActivating = $state(false);
-	let accessCodeError = $state('');
-	let accessCodeSuccess = $state('');
-
 	// Verify email state
 	let verifyEmailLoading = $state(false);
 	let verifyEmailSuccess = $state('');
@@ -63,39 +51,6 @@
 	let feedbackError = $state('');
 	let feedbackSuccess = $state('');
 
-	// Billing / checkout state
-	let checkoutLoading = $state(false);
-	let checkoutError = $state('');
-	let subscriptionStatus = $state<SubscriptionStatusResponse | null>(null);
-	let subscriptionLoading = $state(false);
-	let subscriptionError = $state('');
-	let plans = $state<PlanDetailResponse[]>([]);
-	let plansLoading = $state(false);
-	let plansError = $state('');
-	// Derived: active subscription from user (prefer) or from GET /billing/subscription
-	let hasActiveSubscription = $derived(
-		$currentUser?.subscription?.status === 'active' ||
-			$currentUser?.subscription?.status === 'trialing' ||
-			subscriptionStatus?.status === 'active' ||
-			subscriptionStatus?.status === 'trialing'
-	);
-	let currentPlanProductId = $derived($currentUser?.subscription?.product_id ?? null);
-	let currentPeriodEnd = $derived(
-		$currentUser?.subscription?.current_period_end ?? subscriptionStatus?.current_period_end ?? null
-	);
-
-	let subscriptionPlans = $derived.by(() => {
-		const list = plans.filter((p) => isMonthlyPlan(p) || isAnnualPlan(p));
-		return sortSubscriptionPlans(list);
-	});
-
-	// Subscription section: derived flags for clearer branching
-	let showSubscriptionLoaded = $derived(!subscriptionLoading);
-	let showActivePlan = $derived(showSubscriptionLoaded && !!hasActiveSubscription);
-	let showPlansSection = $derived(showSubscriptionLoaded && !plansLoading && !plansError);
-	let showPlansList = $derived(
-		showPlansSection && !hasActiveSubscription && subscriptionPlans.length > 0
-	);
 	let activeConnectedApps = $derived.by(() => connectedApps.filter((app) => app.is_active));
 	let inactiveConnectedApps = $derived.by(() => connectedApps.filter((app) => !app.is_active));
 
@@ -113,44 +68,14 @@
 	let newPasswordStrength = $state(0);
 	let newPasswordStrengthLabel = $state('Very Weak');
 
-	// Derived: has any change that requires current password to save
-	let usernameChanged = $derived(
-		$currentUser !== null && formData.username !== ($currentUser?.username ?? '')
-	);
-	let emailChanged = $derived(
-		$currentUser !== null && formData.email !== ($currentUser?.email ?? '')
-	);
-	let colorSchemeChanged = $derived(
-		$currentUser !== null && formData.colorScheme !== ($currentUser?.color_scheme || 'default')
-	);
-	// Form validator
-	let validator: FormValidator<ProfileFormData>;
-	let debouncedValidator: ReturnType<typeof createDebouncedValidator>;
-
-	// Initialize validator
-	$effect(() => {
-		validator = new FormValidator({
-			username: {
-				required: true,
-				rules: [] // Username validation handled by validateProfileForm
-			},
-			email: {
-				required: true,
-				rules: [] // Email validation handled by validateProfileForm
-			},
-			currentPassword: {
-				required: false // Only required when changing password/username/email
-			},
-			newPassword: {
-				required: false // Only required when changing password
-			},
-			confirmNewPassword: {
-				required: false // Only required when changing password
-			}
-		});
-
-		debouncedValidator = createDebouncedValidator(validator);
+	const validator = new FormValidator<ProfileFormData>({
+		username: { required: true, rules: [] },
+		email: { required: true, rules: [] },
+		currentPassword: { required: false },
+		newPassword: { required: false },
+		confirmNewPassword: { required: false }
 	});
+	const debouncedValidator = createDebouncedValidator(validator);
 
 	// Update password strength when new password changes
 	$effect(() => {
@@ -200,16 +125,8 @@
 
 			connectedAppsLoading = true;
 			connectedAppsError = '';
-			subscriptionLoading = true;
-			subscriptionError = '';
-			plansLoading = true;
-			plansError = '';
 
-			const [connectedAppsResult, subscriptionResult, plansResult] = await Promise.allSettled([
-				apiClient.getConnectedApps(),
-				apiClient.getSubscription(),
-				apiClient.getBillingPlans()
-			]);
+			const [connectedAppsResult] = await Promise.allSettled([apiClient.getConnectedApps()]);
 
 			if (connectedAppsResult.status === 'fulfilled') {
 				connectedApps = connectedAppsResult.value;
@@ -220,26 +137,6 @@
 				});
 			}
 			connectedAppsLoading = false;
-
-			if (subscriptionResult.status === 'fulfilled') {
-				subscriptionStatus = subscriptionResult.value;
-			} else {
-				subscriptionError = captureApiError(subscriptionResult.reason, {
-					component: 'Profile',
-					operation: 'loadSubscription'
-				});
-			}
-			subscriptionLoading = false;
-
-			if (plansResult.status === 'fulfilled') {
-				plans = plansResult.value;
-			} else {
-				plansError = captureApiError(plansResult.reason, {
-					component: 'Profile',
-					operation: 'loadBillingPlans'
-				});
-			}
-			plansLoading = false;
 		} catch (error) {
 			generalError = captureApiError(error, {
 				component: 'Profile',
@@ -249,6 +146,21 @@
 			isLoading = false;
 		}
 	});
+
+	async function retryLoadConnectedApps() {
+		connectedAppsLoading = true;
+		connectedAppsError = '';
+		try {
+			connectedApps = await apiClient.getConnectedApps();
+		} catch (err) {
+			connectedAppsError = captureApiError(err, {
+				component: 'Profile',
+				operation: 'loadConnectedApps'
+			});
+		} finally {
+			connectedAppsLoading = false;
+		}
+	}
 
 	// Handle form field changes with validation
 	function handleFieldChange(field: keyof ProfileFormData, value: string) {
@@ -268,14 +180,8 @@
 		successMessage = '';
 		isSaving = true;
 
-		// Determine if password change is requested (only if new password fields are filled)
-		const isChangingPassword = !!(formData.newPassword || formData.confirmNewPassword);
-
-		// Check if username, email, or color scheme changed
-		const hasUsernameChange = $currentUser && formData.username !== $currentUser.username;
-		const hasEmailChange = $currentUser && formData.email !== $currentUser.email;
-		const hasColorSchemeChange =
-			$currentUser && formData.colorScheme !== ($currentUser.color_scheme || 'default');
+		const flags = getProfileChangeFlags(formData, $currentUser);
+		const { hasUsernameChange, hasEmailChange, hasColorSchemeChange, isChangingPassword } = flags;
 
 		if (isChangingPassword) {
 			formData.currentPassword = formData.currentPassword || '';
@@ -300,26 +206,7 @@
 		});
 
 		try {
-			const updateData: UserUpdate = {
-				// current_password is always required by backend
-				current_password: formData.currentPassword || ''
-			};
-
-			// Only include changed fields
-			if (hasUsernameChange) {
-				updateData.username = formData.username;
-			}
-			if (hasEmailChange) {
-				updateData.email = formData.email;
-			}
-			if (hasColorSchemeChange) {
-				updateData.color_scheme = formData.colorScheme;
-			}
-			if (isChangingPassword && formData.newPassword) {
-				updateData.password = formData.newPassword;
-			}
-
-			// Update user profile using the current user endpoint (no user ID needed)
+			const updateData = buildUserUpdatePayload(formData, flags);
 			const updatedUser = await apiClient.updateCurrentUser(updateData);
 
 			// Update the auth store with new user data
@@ -433,32 +320,6 @@
 		}
 	}
 
-	// Access code: activate code for current user
-	async function handleActivateAccessCode() {
-		const code = accessCodeInput.trim();
-		accessCodeError = '';
-		accessCodeSuccess = '';
-		if (code.length !== 8) {
-			accessCodeError = 'Please enter an 8-character code.';
-			return;
-		}
-		accessCodeActivating = true;
-		try {
-			await apiClient.activateAccessCode({ code });
-			accessCodeInput = '';
-			accessCodeSuccess = 'Access code activated.';
-			await authActions.refreshUser();
-			setTimeout(() => (accessCodeSuccess = ''), 4000);
-		} catch (err) {
-			accessCodeError = captureApiError(err, {
-				component: 'Profile',
-				operation: 'activateAccessCode'
-			});
-		} finally {
-			accessCodeActivating = false;
-		}
-	}
-
 	async function handleVerifyEmail() {
 		verifyEmailSuccess = '';
 		verifyEmailError = '';
@@ -506,38 +367,6 @@
 			feedbackSubmitting = false;
 		}
 	}
-
-	// Billing: create checkout session for plan and redirect to Dodo (card click or Manage Subscription)
-	async function handleCheckout(productId: string) {
-		if (!productId) return;
-		checkoutError = '';
-		checkoutLoading = true;
-		try {
-			errorLogger.logDebug('Creating checkout session', { productId });
-			const returnUrl =
-				typeof window !== 'undefined' ? `${window.location.origin}${base}/` : undefined;
-			const data = await apiClient.createCheckoutSession({
-				product_id: productId,
-				return_url: returnUrl ?? undefined
-			});
-			if (!data?.checkout_url) {
-				errorLogger.logError(new Error('Missing checkout_url in response'), {
-					operation: 'createCheckoutSession'
-				});
-				checkoutError = 'Checkout is temporarily unavailable. Please try again later.';
-				return;
-			}
-			errorLogger.logDebug('Checkout session created, redirecting');
-			window.location.href = data.checkout_url;
-		} catch (err) {
-			errorLogger.logError(err instanceof Error ? err : new Error(String(err)), {
-				operation: 'createCheckoutSession'
-			});
-			checkoutError = getCheckoutErrorMessage(err);
-		} finally {
-			checkoutLoading = false;
-		}
-	}
 </script>
 
 <svelte:head>
@@ -574,17 +403,20 @@
 {:else if $currentUser}
 	<div class="page-subhead card__row card__row--between">
 		<p class="card__meta">Manage your account information</p>
-		<button onclick={handleLogout} class="btn">
-			<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-				/>
-			</svg>
-			Sign out
-		</button>
+		<div class="card__row">
+			<a href={resolve('/billing')} class="btn btn-secondary">Billing</a>
+			<button onclick={handleLogout} class="btn">
+				<svg class="icon_sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+					/>
+				</svg>
+				Sign out
+			</button>
+		</div>
 	</div>
 
 	<div class="profile-stack">
@@ -657,9 +489,6 @@
 					<div class="card__column">
 						<span class="card__label">Color scheme</span>
 						<p class="card__meta">Choose your preferred color scheme for the interface</p>
-						{#if colorSchemeChanged && !formData.currentPassword}
-							<p>Enter your current password below and click Save to apply.</p>
-						{/if}
 						<div class="color-scheme-picker">
 							<label
 								class="radio-card radio-card--light-preview"
@@ -839,20 +668,6 @@
 							{showPasswordChange ? 'Cancel' : 'Change password'}
 						</button>
 					</div>
-
-					{#if (usernameChanged || emailChanged || colorSchemeChanged) && !showPasswordChange}
-						<CurrentPasswordInput
-							id="currentPasswordForChange"
-							name="currentPasswordForChange"
-							requiredToSave={true}
-							value={formData.currentPassword}
-							oninput={(v) => handleFieldChange('currentPassword', v)}
-							error={errors.currentPassword}
-							disabled={isSaving}
-							bind:showPassword={showCurrentPassword}
-							errorId="current-password-error-change"
-						/>
-					{/if}
 
 					{#if showPasswordChange}
 						<CurrentPasswordInput
@@ -1040,248 +855,6 @@
 			</form>
 		</div>
 
-		<!-- Billing -->
-		<div class="card">
-			<h2>Billing</h2>
-			<p class="card__meta">Manage your subscription and payment.</p>
-
-			{#if subscriptionLoading}
-				<p class="card__meta">Loading subscription…</p>
-			{:else if subscriptionError}
-				<div class="alert alert--error" role="alert">
-					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<p class="alert__message">{subscriptionError}</p>
-				</div>
-			{/if}
-
-			{#if showActivePlan}
-				<div class="alert alert--success card__block alert--mb-md" role="status">
-					<p class="card__label">You have an active subscription.</p>
-					{#if currentPlanProductId && subscriptionPlans.length > 0}
-						{@const currentPlan = subscriptionPlans.find(
-							(p) => p.product_id === currentPlanProductId
-						)}
-						{#if currentPlan?.name}
-							<p class="card__meta">Your plan: {currentPlan.name}</p>
-						{/if}
-					{/if}
-					{#if currentPeriodEnd}
-						<p class="card__meta">
-							Next billing date: {formatProfileDate(currentPeriodEnd)}
-						</p>
-					{/if}
-					{#if currentPlanProductId}
-						<button
-							type="button"
-							onclick={() => handleCheckout(currentPlanProductId)}
-							disabled={checkoutLoading}
-							class="btn btn-primary mt-md"
-							aria-label="Manage Subscription"
-						>
-							{#if checkoutLoading}
-								<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle
-											class="loading__spinner-inner"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="loading__spinner-path"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-								</span>
-								Redirecting…
-							{:else}
-								Manage Subscription
-							{/if}
-						</button>
-					{/if}
-				</div>
-			{/if}
-
-			{#if showSubscriptionLoaded}
-				{#if checkoutError}
-					<div class="alert alert--error" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{checkoutError}</p>
-					</div>
-				{/if}
-				{#if !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
-					{@const status = subscriptionStatus?.status ?? ''}
-					{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
-					<p class="card__meta card__meta--mb-md">
-						{isPaymentIssue
-							? 'Payment issue — update your payment method or resubscribe below.'
-							: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
-					</p>
-				{:else if !hasActiveSubscription}
-					<p class="card__meta card__meta--mb-md">
-						Upgrade or manage your subscription via secure checkout.
-					</p>
-				{/if}
-
-				{#if plansLoading}
-					<p class="card__meta">Loading plans…</p>
-				{:else if plansError}
-					<div class="alert alert--error" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{plansError}</p>
-					</div>
-				{:else if plans.length === 0}
-					<p class="card__meta">No plans available at the moment.</p>
-				{:else if showPlansList}
-					<!-- Subscription plans: click card to go to checkout -->
-					<div class="grid-cards grid-cards--plans">
-						{#each subscriptionPlans as plan (plan.product_id)}
-							<button
-								type="button"
-								onclick={() => handleCheckout(plan.product_id)}
-								disabled={checkoutLoading}
-								class="plan-card"
-								aria-label="Subscribe to {plan.name ?? 'subscription plan'} – go to checkout"
-							>
-								{#if plan.image}
-									<img src={plan.image} alt="" class="plan-card__image" />
-								{/if}
-								<h3 class="plan-card__title">
-									{plan.name ?? 'Subscription plan'}
-								</h3>
-								{#if plan.description}
-									<div class="plan-card__description card__meta">
-										{#each plan.description.split(/\n/).filter(Boolean) as paragraph (paragraph)}
-											<p>{paragraph}</p>
-										{/each}
-									</div>
-								{/if}
-								<div class="plan-card__price card__label text-md">
-									{formatPlanPrice(plan.price)}
-								</div>
-								{#if checkoutLoading}
-									<div class="profile-section__row card__meta mt-md text-sm">
-										<span class="loading__spinner" aria-hidden="true">
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle
-													class="loading__spinner-inner"
-													cx="12"
-													cy="12"
-													r="10"
-													stroke="currentColor"
-													stroke-width="4"
-												></circle>
-												<path
-													class="loading__spinner-path"
-													fill="currentColor"
-													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-												></path>
-											</svg>
-										</span>
-										<span>Redirecting to checkout…</span>
-									</div>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				{/if}
-			{/if}
-		</div>
-
-		<!-- Access Code -->
-		<div class="card">
-			<h2>Access Code</h2>
-			{#if $currentUser?.access_grant}
-				<div class="alert alert--success card__block" role="status">
-					<p class="card__label">
-						Access active until {formatProfileDate($currentUser.access_grant.expires_at)}
-					</p>
-					<p class="card__meta">
-						Includes encryption: {$currentUser.access_grant.includes_encryption ? 'Yes' : 'No'}
-					</p>
-				</div>
-			{:else}
-				<p class="card__meta">Enter an 8-character access code to activate time-limited access.</p>
-				{#if accessCodeError}
-					<div class="alert alert--error" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{accessCodeError}</p>
-					</div>
-				{/if}
-				{#if accessCodeSuccess}
-					<div class="alert alert--success alert--mb-md" role="alert">
-						<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<p class="alert__message">{accessCodeSuccess}</p>
-					</div>
-				{/if}
-				<form
-					onsubmit={(e) => {
-						e.preventDefault();
-						handleActivateAccessCode();
-					}}
-					class="card__row card__row--start"
-				>
-					<div class="form-group form-group--mb-none">
-						<label for="access-code-input" class="visually-hidden">Access code</label>
-						<input
-							id="access-code-input"
-							type="text"
-							maxlength="8"
-							placeholder="Enter 8-character code"
-							bind:value={accessCodeInput}
-							disabled={accessCodeActivating}
-							class="input input--code"
-							autocomplete="off"
-						/>
-					</div>
-					<button
-						type="submit"
-						class="btn btn-primary"
-						disabled={accessCodeActivating || accessCodeInput.trim().length !== 8}
-					>
-						{#if accessCodeActivating}
-							Activating…
-						{:else}
-							Activate
-						{/if}
-					</button>
-				</form>
-			{/if}
-		</div>
-
 		<div class="card">
 			<h2>Connected Apps</h2>
 
@@ -1298,6 +871,13 @@
 					<div class="alert__message card__block">
 						{#if connectedAppsError}
 							<p>{connectedAppsError}</p>
+							<button
+								type="button"
+								class="btn btn-secondary mt-sm"
+								onclick={retryLoadConnectedApps}
+							>
+								Retry
+							</button>
 						{/if}
 						{#if revokeError}
 							<p>{revokeError}</p>
@@ -1512,6 +1092,9 @@
 				{/if}
 			</div>
 		</div>
+
+		<NotesImportExportSection />
+
 		<!-- Feedback -->
 		<div class="card">
 			<h2>Feedback</h2>

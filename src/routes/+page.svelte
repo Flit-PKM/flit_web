@@ -3,42 +3,17 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { isAuthenticated, currentUser } from '$lib/stores/auth';
-	import { apiClient, HttpError } from '$lib/api/client';
-	import { buildLoginRedirect, parseRootRedirectTarget } from '$lib/utils/navigation';
+	import { parseRootRedirectTarget } from '$lib/utils/navigation';
 
-	let billingCompleteStarted = false;
-
-	// Billing return: if subscription_id and status are in URL, POST to backend then redirect. Otherwise normal root redirects.
+	// Billing checkout may still return to /; forward to /billing handler.
 	$effect(() => {
 		const params = $page.url.searchParams;
 		const subscriptionId = params.get('subscription_id');
 		const status = params.get('status');
 		const hasBillingParams = Boolean(subscriptionId && status);
 
-		if (hasBillingParams && $isAuthenticated && !billingCompleteStarted) {
-			billingCompleteStarted = true;
-			const returnPath = $page.url.pathname + $page.url.search;
-			(async () => {
-				try {
-					await apiClient.postBillingComplete({
-						subscription_id: subscriptionId!,
-						status: status!
-					});
-					goto(resolve('/profile') + '?subscription=success');
-				} catch (err) {
-					if (err instanceof HttpError && err.status === 401) {
-						goto(buildLoginRedirect(returnPath) as Parameters<typeof goto>[0]);
-					} else {
-						goto(resolve('/profile') + '?subscription=error');
-					}
-				}
-			})();
-			return;
-		}
-
-		if (hasBillingParams && !$isAuthenticated) {
-			const returnPath = $page.url.pathname + $page.url.search;
-			goto(buildLoginRedirect(returnPath) as Parameters<typeof goto>[0]);
+		if (hasBillingParams) {
+			goto((resolve('/billing') + $page.url.search) as Parameters<typeof goto>[0]);
 			return;
 		}
 

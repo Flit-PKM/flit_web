@@ -6,9 +6,10 @@
 	import { authActions, isAuthenticated, isLoading } from '$lib/stores/auth';
 	import { validateLoginForm, loginRateLimiter } from '$lib/utils/auth';
 	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
-	import { parsePostLoginRedirect } from '$lib/utils/navigation';
+	import { resolvePostLoginDestination } from '$lib/utils/navigation';
 	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
 	import type { LoginFormData, FormErrors } from '$lib/types/auth';
 
@@ -25,29 +26,23 @@
 	let isSubmitting = $state(false);
 	let showPassword = $state(false);
 
-	// Form validator
-	let validator: FormValidator<LoginFormData>;
-	let debouncedValidator: ReturnType<typeof createDebouncedValidator>;
-
-	// Initialize validator
-	$effect(() => {
-		validator = new FormValidator({
-			email: {
-				required: true,
-				rules: [] // Email validation handled by validateLoginForm
-			},
-			password: {
-				required: true
-			}
-		});
-
-		debouncedValidator = createDebouncedValidator(validator);
+	const validator = new FormValidator<LoginFormData>({
+		email: {
+			required: true,
+			rules: []
+		},
+		password: {
+			required: true
+		}
 	});
+	const debouncedValidator = createDebouncedValidator(validator);
 
 	// Redirect if already authenticated
 	$effect(() => {
 		if ($isAuthenticated) {
-			goto(resolve('/notes'));
+			const requested = $page.url.searchParams.get('redirect');
+			const path = resolvePostLoginDestination(requested);
+			goto(path as Parameters<typeof goto>[0]);
 		}
 	});
 
@@ -93,11 +88,7 @@
 		// Attempt login
 		const result = await authActions.login(formData);
 
-		if (result.success) {
-			const requested = $page.url.searchParams.get('redirect');
-			const path = parsePostLoginRedirect(requested);
-			goto(path as Parameters<typeof goto>[0]);
-		} else {
+		if (!result.success) {
 			generalError = result.error || 'Login failed. Please try again.';
 		}
 
@@ -105,9 +96,7 @@
 	}
 
 	function handleGoogleSuccess() {
-		const requested = $page.url.searchParams.get('redirect');
-		const path = parsePostLoginRedirect(requested);
-		goto(path as Parameters<typeof goto>[0]);
+		// Redirect handled by $effect when isAuthenticated becomes true.
 	}
 
 	// Handle password visibility toggle
@@ -245,23 +234,7 @@
 						class="btn btn-primary btn--block"
 					>
 						{#if isSubmitting || $isLoading}
-							<span class="loading__spinner" aria-hidden="true">
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-									<circle
-										class="loading__spinner-inner"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										stroke-width="4"
-									></circle>
-									<path
-										class="loading__spinner-path"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
-								</svg>
-							</span>
+							<LoadingSpinner class="loading__spinner--mr-md" />
 							Signing in...
 						{:else}
 							Sign in

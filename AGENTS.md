@@ -54,8 +54,24 @@ src/
 4. **State**: Use `$state` for local, `authStore` for global auth state
 5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
 6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI.
-7. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`). Login post-auth redirects must be parsed via `src/lib/utils/navigation.ts` to allow safe internal callback URLs (including billing return query params).
-8. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
+7. **Billing**: Public route [`src/routes/billing/+page.svelte`](src/routes/billing/+page.svelte) — guests see About/Terms/Billing in the top bar and pick Free or paid plans (selection stored in `sessionStorage` via [`billing-selection.ts`](src/lib/utils/billing-selection.ts), then `/register` → `/login` → `/notes` or checkout). Logged-in users open billing only from the Profile page button; checkout `return_url` is `/billing`. Components: [`src/lib/components/billing/`](src/lib/components/billing/).
+8. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`). Login post-auth redirects use [`navigation.ts`](src/lib/utils/navigation.ts) (`resolvePostLoginDestination`) for safe internal paths and billing callback query params. Legacy checkout returns to `/` forward to `/billing`.
+9. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
+
+## HTML rendering and XSS
+
+- **Never** use `{@html}` with raw user input or API strings.
+- The only allowed `{@html}` sink is note list previews via `markdownToSafeHtml()` in [`src/lib/utils/markdown.ts`](src/lib/utils/markdown.ts) (Marked + DOMPurify). ESLint allows `@html` only on [`notes/+page.svelte`](<src/routes/(protected)/notes/+page.svelte>).
+- All other dynamic text uses `{expression}` bindings (Svelte auto-escapes).
+- `sanitizeInput()` in auth utils does **not** strip HTML; it preserves credentials for forms.
+
+## Third-party scripts
+
+Google Sign-In and Cloudflare Turnstile are loaded without SRI (vendors do not ship stable integrity hashes). Prefer CSP `script-src` allowlists for `accounts.google.com` and `challenges.cloudflare.com` when deploying CSP.
+
+## Client-side login rate limit
+
+`loginRateLimiter` in [`src/lib/utils/auth.ts`](src/lib/utils/auth.ts) is a **UX deterrent only** (localStorage/session timing). Server-side rate limits are authoritative.
 
 ## Critical Rules
 

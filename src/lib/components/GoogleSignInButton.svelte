@@ -101,6 +101,7 @@
 	});
 </script>
 
+<!-- Google GSI has no stable SRI hash; load only from accounts.google.com (see AGENTS.md). -->
 <svelte:head>
 	{#if clientId}
 		<script src="https://accounts.google.com/gsi/client" async defer></script>

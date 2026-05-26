@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { isAuthenticated, isLoading, authActions } from '$lib/stores/auth';
+	import { resolvePostLoginDestination } from '$lib/utils/navigation';
 	import {
 		validateRegisterForm,
 		getPasswordStrength,
@@ -35,29 +36,12 @@
 	const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 	let turnstileReady = $state(!turnstileSiteKey);
 
-	// Form validator
-	let validator: FormValidator<RegisterFormData>;
-	let debouncedValidator: ReturnType<typeof createDebouncedValidator>;
-
-	// Initialize validator
-	$effect(() => {
-		validator = new FormValidator({
-			email: {
-				required: true,
-				rules: [] // Email validation handled by validateRegisterForm
-			},
-			password: {
-				required: true,
-				rules: [] // Password validation handled by validateRegisterForm
-			},
-			confirmPassword: {
-				required: true,
-				rules: [] // Confirmation validation handled by validateRegisterForm
-			}
-		});
-
-		debouncedValidator = createDebouncedValidator(validator);
+	const validator = new FormValidator<RegisterFormData>({
+		email: { required: true, rules: [] },
+		password: { required: true, rules: [] },
+		confirmPassword: { required: true, rules: [] }
 	});
+	const debouncedValidator = createDebouncedValidator(validator);
 
 	// Update password strength when password changes
 	$effect(() => {
@@ -68,7 +52,8 @@
 	// Redirect if already authenticated
 	$effect(() => {
 		if ($isAuthenticated) {
-			goto(resolve('/profile'));
+			const path = resolvePostLoginDestination(null);
+			goto(path as Parameters<typeof goto>[0]);
 		}
 	});
 
@@ -127,7 +112,8 @@
 	}
 
 	function handleGoogleSuccess() {
-		goto(resolve('/profile'));
+		const path = resolvePostLoginDestination(null);
+		goto(path as Parameters<typeof goto>[0]);
 	}
 
 	// Toggle password visibility
@@ -172,6 +158,7 @@
 <svelte:head>
 	<title>Sign Up - Flit Web</title>
 	<meta name="description" content="Create your Flit Web account to access your knowledge graph." />
+	<!-- Cloudflare Turnstile has no stable SRI hash; see AGENTS.md third-party scripts. -->
 	{#if turnstileSiteKey}
 		<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 	{/if}

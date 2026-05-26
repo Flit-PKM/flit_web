@@ -25,16 +25,17 @@ export default defineConfig(
 			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
 			'no-undef': 'off',
 			// Enforce centralized logging utilities in app code
-			'no-console': 'error'
+			'no-console': 'error',
+			'svelte/no-at-html-tags': 'error'
 		}
 	},
 	{
 		files: ['src/lib/utils/error-handler.ts', 'src/lib/utils/**/*.test.ts'],
 		rules: { 'no-console': 'off' }
 	},
-	// Sanitized {@html} (markdownToSafeHtml) in notes pages
+	// Sanitized {@html} (markdownToSafeHtml) in notes list UI only
 	{
-		files: ['**/notes/**/+page.svelte'],
+		files: ['**/notes/**/+page.svelte', 'src/lib/components/notes/NoteListCard.svelte'],
 		rules: { 'svelte/no-at-html-tags': 'off' }
 	},
 	// SvelteMap/SvelteSet need $state for assignment updates to trigger reactivity

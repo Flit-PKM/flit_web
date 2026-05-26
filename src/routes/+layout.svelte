@@ -7,11 +7,20 @@
 	import { authActions, currentUser, isAuthenticated } from '$lib/stores/auth';
 	import { pendingColorScheme } from '$lib/stores/theme';
 	import { initializeLogging } from '$lib/utils/log-config';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	const isProd = import.meta.env.MODE === 'production';
 
 	let { children } = $props();
 	let showMobileMenu = $state(false);
+
+	function closeMobileMenu() {
+		showMobileMenu = false;
+	}
+
+	function handleMobileMenuKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') closeMobileMenu();
+	}
 
 	let isLoggedIn = $derived($isAuthenticated && $currentUser);
 
@@ -51,13 +60,17 @@
 		authActions.logout();
 	}
 
-	// Navigation items - only show when authenticated
-	type NavHref = '/notes' | '/profile';
-	const navItems: { href: NavHref; label: string }[] = [
+	type NavHref = '/notes' | '/profile' | '/about' | '/terms' | '/billing';
+	const authNavItems: { href: NavHref; label: string }[] = [
 		{ href: '/notes', label: 'Notes' },
 		{ href: '/profile', label: 'Profile' }
 	];
-	let visibleNavItems = $derived($isAuthenticated ? navItems : []);
+	const guestNavItems: { href: NavHref; label: string }[] = [
+		{ href: '/about', label: 'About' },
+		{ href: '/terms', label: 'Terms' },
+		{ href: '/billing', label: 'Billing' }
+	];
+	let centerNavItems = $derived($isAuthenticated ? authNavItems : guestNavItems);
 
 	// Close mobile menu when route changes
 	$effect(() => {
@@ -78,6 +91,15 @@
 			return true;
 		}
 		if (href !== '/' && href !== '/notes' && $page.url.pathname.startsWith(href)) {
+			return true;
+		}
+		if (href === '/billing' && $page.url.pathname === '/billing') {
+			return true;
+		}
+		if (href === '/about' && $page.url.pathname === '/about') {
+			return true;
+		}
+		if (href === '/terms' && $page.url.pathname === '/terms') {
 			return true;
 		}
 		return false;
@@ -124,22 +146,24 @@
 	{/if}
 </svelte:head>
 
+<svelte:window onkeydown={handleMobileMenuKeydown} />
+
 <div class="app">
 	<nav>
 		<div class="nav__container">
-			<a href={resolve('/')} class="nav__links nav__brand">
+			<a href={resolve('/')} class="nav__brand">
 				<img src={asset('/images/flit_app_logo.svg')} alt="Flit" class="icon_md" />
 				<span class="heavy">Flit Web</span>
 			</a>
-			<div class="nav__links">
-				{#each visibleNavItems as item (item.href)}
+			<div class="nav__links nav__links--center">
+				{#each centerNavItems as item (item.href)}
 					<a href={resolve(item.href)} class="link {isActive(item.href) ? 'link--active' : ''}">
 						{item.label}
 					</a>
 				{/each}
 			</div>
 
-			<div class="nav__links">
+			<div class="nav__links nav__links--end">
 				{#if isLoggedIn}
 					<span class="nav__auth-welcome">
 						Welcome, <span>{$currentUser?.username}</span>
@@ -178,19 +202,24 @@
 			</button>
 
 			{#if showMobileMenu}
+				<button
+					type="button"
+					class="nav__mobile-backdrop"
+					aria-label="Close menu"
+					onclick={closeMobileMenu}
+				></button>
 				<div class="nav__mobile">
-					{#if $isAuthenticated}
-						<div class="nav__mobile-nav-list">
-							{#each visibleNavItems as item (item.href)}
-								<a
-									href={resolve(item.href)}
-									class="nav__mobile-link {isActive(item.href) ? 'nav__mobile-link--active' : ''}"
-								>
-									{item.label}
-								</a>
-							{/each}
-						</div>
-					{/if}
+					<div class="nav__mobile-nav-list">
+						{#each centerNavItems as item (item.href)}
+							<a
+								href={resolve(item.href)}
+								class="nav__mobile-link {isActive(item.href) ? 'nav__mobile-link--active' : ''}"
+								onclick={closeMobileMenu}
+							>
+								{item.label}
+							</a>
+						{/each}
+					</div>
 					<div class="nav__mobile-user">
 						{#if isLoggedIn}
 							<div class="nav__mobile-user-inner">
@@ -221,6 +250,7 @@
 	<main class="main">
 		{@render children()}
 	</main>
+	<ConfirmDialog />
 	<footer>
 		<div class="container">
 			<div class="footer__links">

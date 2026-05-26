@@ -1,7 +1,15 @@
 import { SvelteMap } from 'svelte/reactivity';
-import type { NoteDetail, RelationshipRead } from '$lib/types/note';
+import type { NoteDetail, NoteRead, RelationshipRead } from '$lib/types/note';
 import type { ApiClient } from '$lib/api/client';
 import { filterNotDeleted } from '$lib/utils/filter';
+
+export function normalizeNoteRead(n: NoteRead): NoteRead {
+	return { ...n, pinned: n.pinned === true };
+}
+
+export function normalizeNotesPage(raw: NoteRead[]): NoteRead[] {
+	return filterNotDeleted(raw).map(normalizeNoteRead);
+}
 
 export function getOtherNoteId(rel: RelationshipRead, currentId: number): number {
 	return rel.note_a_id === currentId ? rel.note_b_id : rel.note_a_id;

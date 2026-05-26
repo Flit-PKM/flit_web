@@ -41,6 +41,7 @@ import type {
 	SubscriptionStatusResponse
 } from '../types/billing';
 import type { FeedbackCreate, FeedbackRead } from '../types/feedback';
+import type { VaultMarkdownImportResult } from '../types/vault';
 import { errorLogger, handleApiError } from '$lib/utils/error-handler';
 
 /**
@@ -69,6 +70,24 @@ function endpointWithQuery(
 }
 
 const RETRY_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/** Extract filename from Content-Disposition header, if present. */
+function parseContentDispositionFilename(header: string | null): string | null {
+	if (!header) return null;
+	const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+	if (utf8Match?.[1]) {
+		try {
+			return decodeURIComponent(utf8Match[1].trim());
+		} catch {
+			return utf8Match[1].trim();
+		}
+	}
+	const quotedMatch = header.match(/filename="([^"]+)"/i);
+	if (quotedMatch?.[1]) return quotedMatch[1];
+	const plainMatch = header.match(/filename=([^;]+)/i);
+	if (plainMatch?.[1]) return plainMatch[1].trim();
+	return null;
+}
 
 /**
  * Resolve API base URL: same origin in production (browser), else dev env or localhost.
@@ -125,27 +144,31 @@ export class ApiClient {
 		options: RequestOptions = {}
 	): Promise<ApiResponse<T>> {
 		const url = `${this.config.baseUrl}${endpoint}`;
+		const isFormData = options.body instanceof FormData;
 
 		const headers: Record<string, string> = {
-			'Content-Type': 'application/json',
 			...options.headers
 		};
+
+		if (!isFormData) {
+			headers['Content-Type'] = 'application/json';
+		}
 
 		// Add authorization header if token is available
 		if (this.token) {
 			headers['Authorization'] = `Bearer ${this.token}`;
 		}
 
+		let body: BodyInit | null | undefined = options.body as BodyInit | null | undefined;
+		if (options.body && typeof options.body === 'object' && !isFormData) {
+			body = JSON.stringify(options.body);
+		}
+
 		const config: RequestInit = {
 			method: options.method || 'GET',
 			headers,
-			body: options.body as BodyInit | null | undefined
+			body
 		};
-
-		// Convert body to JSON if it's an object
-		if (options.body && typeof options.body === 'object') {
-			config.body = JSON.stringify(options.body);
-		}
 
 		let lastError: Error = new Error('Request failed');
 
@@ -611,6 +634,70 @@ export class ApiClient {
 		await this.request<void>(`/note-categories/${noteId}/${categoryId}`, {
 			method: 'DELETE'
 		});
+	}
+
+	/**
+	 * Export the authenticated user's markdown vault as a ZIP archive.
+	 * GET /vault/markdown-export. Requires Bearer auth.
+	 */
+	async exportMarkdownVault(): Promise<{ blob: Blob; filename: string }> {
+		const url = `${this.config.baseUrl}/vault/markdown-export`;
+		const headers: Record<string, string> = {};
+		if (this.token) {
+			headers['Authorization'] = `Bearer ${this.token}`;
+		}
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+		try {
+			const response = await fetch(url, {
+				method: 'GET',
+				headers,
+				signal: controller.signal
+			});
+
+			if (response.status === 401) {
+				this.clearToken();
+				if (typeof window !== 'undefined') {
+					window.dispatchEvent(new CustomEvent('auth:expired'));
+				}
+				throw new HttpError('Authentication required', response.status);
+			}
+
+			if (!response.ok) {
+				let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+				try {
+					const errorData: { detail: string } = await response.json();
+					errorMessage = errorData.detail || errorMessage;
+				} catch {
+					// use default message
+				}
+				throw new HttpError(errorMessage, response.status);
+			}
+
+			const blob = await response.blob();
+			const filename =
+				parseContentDispositionFilename(response.headers.get('content-disposition')) ??
+				'flit-vault-export.zip';
+			return { blob, filename };
+		} finally {
+			clearTimeout(timeoutId);
+		}
+	}
+
+	/**
+	 * Import a markdown vault ZIP archive.
+	 * POST /vault/markdown-import (multipart/form-data, field: file). Requires Bearer auth.
+	 */
+	async importMarkdownVault(file: File): Promise<VaultMarkdownImportResult> {
+		const formData = new FormData();
+		formData.append('file', file);
+		const response = await this.request<VaultMarkdownImportResult>('/vault/markdown-import', {
+			method: 'POST',
+			body: formData
+		});
+		return response.data;
 	}
 }
 

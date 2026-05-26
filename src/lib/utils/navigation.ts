@@ -1,6 +1,12 @@
+import {
+	consumePendingBillingPlan,
+	peekPendingBillingPlan,
+	resolvePostAuthBillingDestination
+} from './billing-selection';
+
 const DEFAULT_AUTH_REDIRECT = '/notes';
 
-const SAFE_REDIRECT_PATHS = new Set(['/profile', '/notes', '/', '/about', '/terms']);
+const SAFE_REDIRECT_PATHS = new Set(['/profile', '/notes', '/', '/about', '/terms', '/billing']);
 
 export function parsePostLoginRedirect(rawRedirect: string | null): string {
 	if (!rawRedirect) return DEFAULT_AUTH_REDIRECT;
@@ -16,7 +22,10 @@ export function parsePostLoginRedirect(rawRedirect: string | null): string {
 		}
 
 		// Allow billing callback route with query params from checkout return.
-		if (parsed.pathname === '/' && parsed.searchParams.has('subscription_id')) {
+		if (
+			(parsed.pathname === '/' || parsed.pathname === '/billing') &&
+			parsed.searchParams.has('subscription_id')
+		) {
 			return pathWithQuery;
 		}
 	} catch {
@@ -24,6 +33,16 @@ export function parsePostLoginRedirect(rawRedirect: string | null): string {
 	}
 
 	return DEFAULT_AUTH_REDIRECT;
+}
+
+/** After login/register: pending billing plan wins, else safe ?redirect= path. */
+export function resolvePostLoginDestination(requestedRedirect: string | null): string {
+	const pending = peekPendingBillingPlan();
+	if (pending) {
+		consumePendingBillingPlan();
+		return resolvePostAuthBillingDestination(pending);
+	}
+	return parsePostLoginRedirect(requestedRedirect);
 }
 
 export function buildLoginRedirect(returnPath: string): string {

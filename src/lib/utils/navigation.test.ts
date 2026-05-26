@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('$app/environment', () => ({ browser: true }));
+
 import {
 	buildLoginRedirect,
 	getProtectedRouteRedirect,
 	parsePostLoginRedirect,
-	parseRootRedirectTarget
+	parseRootRedirectTarget,
+	resolvePostLoginDestination
 } from './navigation';
 
 describe('parsePostLoginRedirect', () => {
@@ -14,6 +18,15 @@ describe('parsePostLoginRedirect', () => {
 	it('allows billing callback path with query params', () => {
 		const redirect = parsePostLoginRedirect('/?subscription_id=sub_1&status=active');
 		expect(redirect).toBe('/?subscription_id=sub_1&status=active');
+	});
+
+	it('allows billing page callback with query params', () => {
+		const redirect = parsePostLoginRedirect('/billing?subscription_id=sub_1&status=active');
+		expect(redirect).toBe('/billing?subscription_id=sub_1&status=active');
+	});
+
+	it('allows /billing as redirect target', () => {
+		expect(parsePostLoginRedirect('/billing')).toBe('/billing');
 	});
 
 	it('rejects external redirects', () => {
@@ -42,6 +55,21 @@ describe('parseRootRedirectTarget', () => {
 	it('returns null for unsupported guest redirects', () => {
 		expect(parseRootRedirectTarget(false, 'notes')).toBeNull();
 		expect(parseRootRedirectTarget(false, null)).toBeNull();
+	});
+});
+
+describe('resolvePostLoginDestination', () => {
+	beforeEach(() => {
+		sessionStorage.clear();
+	});
+
+	it('prefers pending billing plan over redirect param', () => {
+		sessionStorage.setItem('flit_pending_billing_plan', 'prod_x');
+		expect(resolvePostLoginDestination('/profile')).toBe('/billing');
+	});
+
+	it('uses redirect when no pending plan', () => {
+		expect(resolvePostLoginDestination('/profile')).toBe('/profile');
 	});
 });
 

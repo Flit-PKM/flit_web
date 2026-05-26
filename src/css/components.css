@@ -471,6 +471,193 @@
 		width: 100%;
 	}
 
+	/* Import/export notes on profile */
+	.notes-transfer__header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.notes-transfer__header--balanced {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: start;
+	}
+
+	.notes-transfer__header-title {
+		grid-column: 2;
+		text-align: center;
+	}
+
+	.notes-transfer__help-btn {
+		flex-shrink: 0;
+		grid-column: 3;
+		justify-self: end;
+	}
+
+	.notes-transfer {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1rem;
+	}
+
+	@media (min-width: 768px) {
+		.notes-transfer {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.notes-transfer__panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1rem;
+		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 22%, transparent);
+		border-radius: 0.625rem;
+		background: color-mix(in oklab, var(--color-mid-grey) 6%, transparent);
+		min-height: 100%;
+	}
+
+	.notes-transfer__panel-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		align-self: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 0.5rem;
+		background: color-mix(in oklab, var(--color-blue) 14%, transparent);
+		color: var(--color-blue);
+	}
+
+	.notes-transfer__panel-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--color-ink);
+		margin: 0;
+		text-align: center;
+	}
+
+	.notes-transfer__action {
+		margin-top: auto;
+		align-self: center;
+	}
+
+	.notes-transfer__file-input {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.notes-transfer__dropzone {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem;
+		min-height: 8.5rem;
+		padding: 1rem;
+		border: 2px dashed color-mix(in oklab, var(--color-mid-grey) 35%, transparent);
+		border-radius: 0.5rem;
+		background: var(--color-canvas);
+		cursor: pointer;
+		text-align: center;
+		transition:
+			border-color 0.15s ease,
+			background-color 0.15s ease;
+	}
+
+	.notes-transfer__dropzone:focus-visible {
+		outline: 2px solid color-mix(in oklab, var(--color-blue) 45%, transparent);
+		outline-offset: 2px;
+	}
+
+	.notes-transfer__dropzone--active {
+		border-color: var(--color-blue);
+		background: color-mix(in oklab, var(--color-blue) 8%, var(--color-canvas));
+	}
+
+	.notes-transfer__dropzone--has-file {
+		border-style: solid;
+		border-color: color-mix(in oklab, var(--color-blue) 35%, transparent);
+		background: color-mix(in oklab, var(--color-blue) 6%, var(--color-canvas));
+	}
+
+	.notes-transfer__dropzone-title {
+		font-weight: 500;
+		color: var(--color-ink);
+		margin: 0;
+	}
+
+	.notes-transfer__dropzone-filename {
+		font-weight: 600;
+		color: var(--color-ink);
+		margin: 0;
+		word-break: break-all;
+	}
+
+	.notes-transfer__browse {
+		color: var(--color-blue);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.notes-transfer__formats {
+		margin: 0.25rem 0 0;
+		font-size: 0.75rem;
+		color: var(--color-mid-grey);
+	}
+
+	.notes-transfer-help {
+		max-width: 32rem;
+		width: 100%;
+		max-height: min(85vh, 36rem);
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+		padding: 1.25rem;
+		overflow: hidden;
+	}
+
+	.notes-transfer-help__body {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		overflow-y: auto;
+		margin-block: 1rem;
+		padding-right: 0.25rem;
+	}
+
+	.notes-transfer-help__heading {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--color-ink);
+		margin: 0 0 0.375rem;
+	}
+
+	.notes-transfer-help__list {
+		margin: 0;
+		padding-left: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		color: var(--color-ink);
+		font-size: 0.875rem;
+		line-height: 1.45;
+	}
+
+	.notes-transfer-help__list code {
+		font-size: 0.8125rem;
+	}
+
 	/* Page sub-head (e.g. profile meta + primary action under title) */
 	.page-subhead {
 		margin-top: 0.5rem;
@@ -1044,6 +1231,30 @@
 		outline-offset: 2px;
 	}
 
+	.confirm-dialog {
+		max-width: 28rem;
+		margin: auto;
+		padding: 1.25rem;
+	}
+
+	.confirm-dialog__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+
+	.note-save-status {
+		font-size: 0.875rem;
+		color: var(--color-mid-grey);
+		align-self: center;
+		margin-right: 0.5rem;
+	}
+
+	.note-detail__save-error {
+		margin-top: 0.5rem;
+	}
+
 	.note-save-toast {
 		position: fixed;
 		left: 50%;
@@ -1278,29 +1489,34 @@
 	}
 
 	.plan-card {
+		position: relative;
 		display: flex;
 		flex-direction: column;
-		min-height: 200px;
+		gap: 0.75rem;
+		width: 100%;
+		min-height: 0;
 		text-align: left;
-		border-radius: 0.75rem;
-		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 30%, transparent);
+		border-radius: 0.875rem;
+		border: 1px solid var(--color-border);
 		background-color: var(--flit-card-bg);
-		padding: 1rem;
+		padding: 1rem 1.25rem;
 		box-shadow: var(--flit-shadow-sm);
 		transition:
 			border-color 0.2s,
 			background-color 0.2s,
-			box-shadow 0.2s;
+			box-shadow 0.2s,
+			transform 0.15s ease;
 		cursor: pointer;
 	}
 
 	.plan-card:hover:not(:disabled) {
-		border-color: color-mix(in oklab, var(--color-blue) 40%, transparent);
-		background-color: color-mix(in oklab, var(--color-mid-grey) 5%, var(--color-canvas));
-		box-shadow: var(--flit-shadow-sm);
+		border-color: color-mix(in oklab, var(--color-blue) 45%, var(--color-border));
+		background-color: var(--color-canvas-lv1);
+		box-shadow: var(--flit-shadow-md);
+		transform: translateY(-2px);
 	}
 
-	.plan-card:focus {
+	.plan-card:focus-visible {
 		outline: none;
 		box-shadow:
 			0 0 0 2px var(--color-canvas),
@@ -1309,37 +1525,116 @@
 
 	.plan-card:disabled {
 		cursor: not-allowed;
-		opacity: 0.8;
+		opacity: 0.75;
+		transform: none;
 	}
 
 	.plan-card:disabled:hover {
-		border-color: color-mix(in oklab, var(--color-mid-grey) 30%, transparent);
+		border-color: var(--color-border);
 		background-color: var(--flit-card-bg);
 		box-shadow: var(--flit-shadow-sm);
 	}
 
+	.plan-card--free {
+		border-color: color-mix(in oklab, var(--color-green) 35%, var(--color-border));
+		background-color: color-mix(in oklab, var(--color-green) 6%, var(--flit-card-bg));
+	}
+
+	.plan-card--free:hover:not(:disabled) {
+		border-color: color-mix(in oklab, var(--color-green) 50%, var(--color-border));
+		background-color: color-mix(in oklab, var(--color-green) 10%, var(--flit-card-bg));
+	}
+
+	.plan-card--current {
+		border-width: 2px;
+		border-color: var(--color-blue);
+		background-color: color-mix(in oklab, var(--color-blue) 10%, var(--flit-card-bg));
+		box-shadow: var(--flit-shadow-md);
+	}
+
+	.plan-card--current:hover:not(:disabled) {
+		border-color: var(--color-blue);
+		background-color: color-mix(in oklab, var(--color-blue) 14%, var(--flit-card-bg));
+	}
+
+	.plan-card__badge {
+		position: absolute;
+		top: 0.75rem;
+		right: 0.75rem;
+		z-index: 1;
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+		color: var(--color-blue);
+		background-color: color-mix(in oklab, var(--color-blue) 16%, var(--color-canvas));
+		border: 1px solid color-mix(in oklab, var(--color-blue) 35%, transparent);
+		pointer-events: none;
+	}
+
+	.plan-card--current .plan-card__cta {
+		background-color: color-mix(in oklab, var(--color-blue) 22%, var(--color-canvas));
+		border-color: color-mix(in oklab, var(--color-blue) 45%, transparent);
+		font-weight: 700;
+	}
+
+	.plan-card--muted {
+		opacity: 0.72;
+		cursor: default;
+	}
+
+	.plan-card--muted:hover {
+		transform: none;
+		border-color: var(--color-border);
+		background-color: var(--flit-card-bg);
+		box-shadow: var(--flit-shadow-sm);
+	}
+
+	.plan-card__main {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	.plan-card__head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.35rem 1rem;
+	}
+
 	.plan-card__image {
-		height: 4rem;
+		height: 2.75rem;
 		width: auto;
+		max-width: 100%;
 		object-fit: contain;
-		border-radius: 0.25rem;
-		margin-bottom: 0.75rem;
+		border-radius: 0.375rem;
+		flex-shrink: 0;
 	}
 
 	.plan-card__title {
-		font-size: 1rem;
+		font-size: 1.0625rem;
 		font-weight: 600;
+		line-height: 1.3;
 		color: var(--color-ink);
-		margin: 0 0 0.25rem;
+		margin: 0;
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 
 	.plan-card__description {
-		font-size: 0.875rem;
-		margin-top: 0.25rem;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: var(--color-ink-meta);
 	}
 
 	.plan-card__description p {
-		margin: 0 0 0.25em;
+		margin: 0 0 0.35em;
 	}
 
 	.plan-card__description p:last-child {
@@ -1347,47 +1642,176 @@
 	}
 
 	.plan-card__price {
-		margin-top: 0.75rem;
+		margin: 0;
+		font-size: 1.125rem;
+		font-weight: 700;
+		line-height: 1.2;
+		color: var(--color-blue);
+		white-space: nowrap;
+		flex-shrink: 0;
 	}
 
-	/* Billing plan grid: placed after .plan-card so centering wins over text-align: left */
-	.grid-cards--plans {
+	.plan-card--free .plan-card__price {
+		color: var(--color-ink-positive);
+	}
+
+	.plan-card__cta {
+		display: flex;
+		align-items: center;
 		justify-content: center;
-		justify-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--color-ink);
+		background-color: color-mix(in oklab, var(--color-blue) 12%, var(--color-canvas));
+		border: 1px solid color-mix(in oklab, var(--color-blue) 25%, transparent);
+		transition:
+			background-color 0.2s,
+			border-color 0.2s,
+			color 0.2s;
 	}
 
-	.grid-cards.grid-cards--plans {
+	.plan-card:hover:not(:disabled) .plan-card__cta {
+		background-color: color-mix(in oklab, var(--color-blue) 22%, var(--color-canvas));
+		border-color: color-mix(in oklab, var(--color-blue) 40%, transparent);
+		color: var(--color-ink);
+	}
+
+	.plan-card--free .plan-card__cta {
+		background-color: color-mix(in oklab, var(--color-green) 14%, var(--color-canvas));
+		border-color: color-mix(in oklab, var(--color-green) 30%, transparent);
+	}
+
+	.plan-card--free:hover:not(:disabled) .plan-card__cta {
+		background-color: color-mix(in oklab, var(--color-green) 22%, var(--color-canvas));
+		border-color: color-mix(in oklab, var(--color-green) 45%, transparent);
+	}
+
+	.plan-card__cta-loading {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.plan-card__cta-loading .loading__spinner {
+		width: 1rem;
+		height: 1rem;
+	}
+
+	.grid-cards.grid-cards--plans-single {
 		grid-template-columns: minmax(0, 22rem);
+		justify-content: center;
+		justify-items: stretch;
 	}
 
-	@media (min-width: 640px) {
+	/* Billing plans: stacked rows on small screens, column grid on large */
+	.grid-cards.grid-cards--plans {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.875rem;
+		width: 100%;
+		max-width: none;
+		justify-items: stretch;
+	}
+
+	@media (min-width: 768px) {
 		.grid-cards.grid-cards--plans {
-			grid-template-columns: repeat(auto-fit, minmax(17rem, 22rem));
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 1.25rem;
+			align-items: stretch;
 		}
 	}
 
-	.grid-cards--plans .plan-card {
-		width: 100%;
-		max-width: 22rem;
-		text-align: center;
-		align-items: center;
+	@media (min-width: 1024px) {
+		.grid-cards.grid-cards--plans {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 1.5rem;
+		}
 	}
 
-	.grid-cards--plans .plan-card__image {
-		margin-inline: auto;
+	/* Mobile: compact horizontal row per plan */
+	@media (max-width: 767px) {
+		.grid-cards--plans .plan-card {
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
+			padding: 1rem;
+			gap: 0.75rem 1rem;
+		}
+
+		.grid-cards--plans .plan-card__main {
+			flex: 1 1 12rem;
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.5rem 0.75rem;
+		}
+
+		.grid-cards--plans .plan-card__image {
+			height: 2.25rem;
+			margin: 0;
+		}
+
+		.grid-cards--plans .plan-card__head {
+			flex: 1 1 8rem;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.15rem;
+		}
+
+		.grid-cards--plans .plan-card__description {
+			flex: 1 1 100%;
+			font-size: 0.75rem;
+		}
+
+		.grid-cards--plans .plan-card__cta {
+			flex: 0 0 auto;
+			width: auto;
+			min-width: 7.5rem;
+			padding: 0.45rem 0.85rem;
+		}
+
+		.grid-cards--plans .plan-card__badge {
+			position: static;
+			flex: 1 1 100%;
+			width: fit-content;
+			margin-bottom: 0.15rem;
+		}
 	}
 
-	.grid-cards--plans .plan-card__description {
-		text-align: center;
-		width: 100%;
-	}
+	/* Desktop: tall cards in columns */
+	@media (min-width: 768px) {
+		.grid-cards--plans .plan-card {
+			min-height: 13.5rem;
+			padding: 1.25rem 1.375rem;
+		}
 
-	.grid-cards--plans .plan-card__description p {
-		text-align: center;
-	}
+		.grid-cards--plans .plan-card__main {
+			flex: 1;
+		}
 
-	.grid-cards--plans .plan-card .profile-section__row {
-		justify-content: center;
+		.grid-cards--plans .plan-card__head {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.5rem;
+		}
+
+		.grid-cards--plans .plan-card__image {
+			height: 3.25rem;
+			margin-bottom: 0.25rem;
+		}
+
+		.grid-cards--plans .plan-card__description {
+			flex: 1;
+			font-size: 0.875rem;
+		}
+
+		.grid-cards--plans .plan-card__cta {
+			margin-top: auto;
+		}
 	}
 
 	.radio-card {

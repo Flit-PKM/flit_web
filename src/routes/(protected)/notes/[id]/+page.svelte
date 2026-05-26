@@ -11,15 +11,22 @@
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
 	import { debounceTrailing } from '$lib/utils/debounce';
 	import { filterNotDeleted } from '$lib/utils/filter';
-	import { buildRelatedTitleMap, getOtherNoteId } from '$lib/utils/notes';
+	import { APPEND_RELATIONSHIP_TYPE } from '$lib/constants/notes';
 	import {
-		formatNoteDate,
-		formatRelationshipType,
-		formatRelationshipTypeLabel,
-		normalizeNoteContent,
-		normalizeNoteTitle,
-		RELATIONSHIP_TYPES
-	} from '$lib/utils/note-detail';
+		cleanupDraftNoteIfUnused,
+		clearDraftNote,
+		createNoteAndNavigate,
+		isDefaultNewNote
+	} from '$lib/utils/note-create';
+	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import NoteCategoriesPanel from '$lib/components/notes/NoteCategoriesPanel.svelte';
+	import NoteDetailHeader from '$lib/components/notes/NoteDetailHeader.svelte';
+	import NoteRelationshipsPanel from '$lib/components/notes/NoteRelationshipsPanel.svelte';
+	import NoteSearchPopup from '$lib/components/notes/NoteSearchPopup.svelte';
+	import { confirmAction } from '$lib/stores/confirmDialog';
+	import { buildRelatedTitleMap } from '$lib/utils/notes';
+	import { normalizeNoteRead } from '$lib/utils/notes';
+	import { normalizeNoteContent, normalizeNoteTitle } from '$lib/utils/note-detail';
 	import type {
 		NoteDetail,
 		NoteRead,
@@ -67,6 +74,7 @@
 	let noteSearchQuery = $state('');
 	let noteSearchResults = $state<NoteRead[]>([]);
 	let noteSearchLoading = $state(false);
+	let noteSearchError = $state('');
 	let noteSearchDebounce: ReturnType<typeof setTimeout> | null = null;
 	let noteSearchInputEl = $state<HTMLInputElement | null>(null);
 
@@ -78,6 +86,7 @@
 	let saveToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let saveRequestId = 0;
+	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
 	function isDirtyAgainstBaseline(): boolean {
 		return (
@@ -111,6 +120,7 @@
 		const id = ++saveRequestId;
 		saveError = '';
 		isSaving = true;
+		saveStatus = 'saving';
 		try {
 			errorLogger.logDebug('Autosaving note', { noteId: note.id });
 			const updated = await apiClient.updateNote(note.id, { title, content });
@@ -126,8 +136,12 @@
 			};
 			lastSyncedTitle = updated.title;
 			lastSyncedContent = updated.content;
+			if (!isDefaultNewNote(updated.title, updated.content)) {
+				clearDraftNote(note.id);
+			}
 			errorLogger.logDebug('Note autosaved', { noteId: note.id });
 			pulseSaveToast();
+			saveStatus = 'saved';
 		} catch (err) {
 			if (id === saveRequestId) {
 				saveError = captureApiError(err, {
@@ -135,6 +149,7 @@
 					operation: 'autosaveNote',
 					noteId: note.id
 				});
+				saveStatus = 'error';
 			}
 		} finally {
 			if (id === saveRequestId) isSaving = false;
@@ -143,8 +158,19 @@
 
 	const autosave = debounceTrailing(flushNoteToServer, AUTOSAVE_DEBOUNCE_MS);
 
-	beforeNavigate(async () => {
+	beforeNavigate(async ({ cancel }) => {
 		await autosave.flush();
+		if (note && isDirtyAgainstBaseline() && saveError) {
+			if (
+				!confirm('Changes could not be saved. Leave this page anyway? Unsaved edits will be lost.')
+			) {
+				cancel();
+				return;
+			}
+		}
+		if (note && !isDirtyAgainstBaseline()) {
+			await cleanupDraftNoteIfUnused(apiClient, note.id, liveTitle, latestContent);
+		}
 	});
 
 	function scheduleAutosave() {
@@ -160,6 +186,13 @@
 		latestContent = value;
 		scheduleAutosave();
 	}
+
+	$effect(() => {
+		if (!note) return;
+		if (!isDefaultNewNote(liveTitle, latestContent)) {
+			clearDraftNote(note.id);
+		}
+	});
 
 	$effect(() => {
 		const id = note?.id ?? null;
@@ -186,7 +219,7 @@
 				);
 				noteSearchResults = filterNotDeleted(raw)
 					.filter((n) => currentNoteId == null || n.id !== currentNoteId)
-					.map((n) => ({ ...n, pinned: n.pinned === true }));
+					.map(normalizeNoteRead);
 			} catch {
 				noteSearchResults = [];
 			} finally {
@@ -258,6 +291,7 @@
 					current.url.searchParams.get('edit') === '1' ||
 					current.url.searchParams.get('edit') === 'true';
 				if (!wantsAppendFlow) return;
+				// One-shot append: query params are stripped after run; refresh will not re-create the link.
 				const appendParam = current.url.searchParams.get('append');
 				const appendId = appendParam ? Number(appendParam) : NaN;
 				if (Number.isInteger(appendId) && appendId !== noteId) {
@@ -265,7 +299,7 @@
 						const newRel = await apiClient.createRelationship({
 							note_a_id: appendId,
 							note_b_id: noteId,
-							type: 'FOLLOWS_ON'
+							type: APPEND_RELATIONSHIP_TYPE
 						});
 						if (get(page).params.id === String(noteId) && note) {
 							note = {
@@ -342,6 +376,7 @@
 		showNoteSearchPopup = true;
 		noteSearchQuery = '';
 		noteSearchResults = [];
+		noteSearchError = '';
 		setTimeout(() => noteSearchInputEl?.focus(), 0);
 	}
 
@@ -349,13 +384,19 @@
 		showNoteSearchPopup = false;
 		noteSearchQuery = '';
 		noteSearchResults = [];
+		noteSearchError = '';
 	}
 
 	async function selectNoteFromSearch(selected: NoteRead) {
 		addRelNoteId = String(selected.id);
 		addRelNoteTitle = selected.title;
-		await addRelationship();
-		closeNoteSearchPopup();
+		noteSearchError = '';
+		const ok = await addRelationship();
+		if (ok) {
+			closeNoteSearchPopup();
+		} else {
+			noteSearchError = saveError || 'Could not add relationship.';
+		}
 	}
 
 	function handleNoteSearchKeydown(e: KeyboardEvent) {
@@ -366,23 +407,26 @@
 		if (!note || isAppending || isSaving) return;
 		isAppending = true;
 		saveError = '';
-		try {
-			errorLogger.logDebug('Appending note from detail', { appendFromNoteId: note.id });
-			const created = await apiClient.createNote({ title: 'New note', content: 'Note Content' });
-			goto(resolve(`/notes/${created.id}?edit=1&append=${note.id}`));
+		errorLogger.logDebug('Appending note from detail', { appendFromNoteId: note.id });
+		const result = await createNoteAndNavigate({
+			apiClient,
+			goto,
+			resolve,
+			appendFromNoteId: note.id
+		});
+		if (result.success) {
 			errorLogger.logDebug('Append note created successfully from detail', {
 				sourceNoteId: note.id,
-				newNoteId: created.id
+				newNoteId: result.note.id
 			});
-		} catch (err) {
-			saveError = captureApiError(err, {
+		} else {
+			saveError = captureApiError(new Error(result.error), {
 				component: 'NoteDetail',
 				operation: 'appendNoteFromDetail',
 				sourceNoteId: note.id
 			});
-		} finally {
-			isAppending = false;
 		}
+		isAppending = false;
 	}
 
 	async function addCategory() {
@@ -439,12 +483,12 @@
 		}
 	}
 
-	async function addRelationship() {
-		if (!note) return;
+	async function addRelationship(): Promise<boolean> {
+		if (!note) return false;
 		const otherId = Number(addRelNoteId);
 		if (!Number.isInteger(otherId) || otherId === note.id) {
 			saveError = 'Enter a valid different note ID.';
-			return;
+			return false;
 		}
 		isSaving = true;
 		saveError = '';
@@ -466,12 +510,14 @@
 			addRelNoteId = '';
 			addRelNoteTitle = '';
 			addRelType = 'RELATED_TO';
+			return true;
 		} catch (err) {
 			saveError = captureApiError(err, {
 				component: 'NoteDetail',
 				operation: 'addRelationship',
 				noteId: note.id
 			});
+			return false;
 		} finally {
 			isSaving = false;
 		}
@@ -516,7 +562,7 @@
 		if (!note) return;
 		if (isSaving) return;
 		isSaving = true;
-		if (!confirm('Delete this note? This cannot be undone.')) {
+		if (!(await confirmAction('Delete this note? This cannot be undone.'))) {
 			isSaving = false;
 			return;
 		}
@@ -605,23 +651,7 @@
 	{#if isLoading}
 		<div class="card">
 			<p class="loading loading--inline-start">
-				<span class="loading__spinner" aria-hidden="true">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-						<circle
-							class="loading__spinner-inner"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-						></circle>
-						<path
-							class="loading__spinner-path"
-							fill="currentColor"
-							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-						></path>
-					</svg>
-				</span>
+				<LoadingSpinner />
 				<span>Loading note…</span>
 			</p>
 		</div>
@@ -632,46 +662,21 @@
 		</div>
 	{:else if note}
 		<article class="note-detail">
-			<header class="note-detail__header">
-				<div class="note-detail__header-row">
-					<div class="note-detail__header-title-wrap">
-						<input
-							type="text"
-							bind:value={liveTitle}
-							class="note-detail__title-input"
-							placeholder="Title"
-							autocomplete="off"
-							oninput={scheduleAutosave}
-						/>
-					</div>
-					<div class="note-detail__actions">
-						<button
-							type="button"
-							onclick={appendNoteFromDetail}
-							disabled={isAppending || isSaving}
-							class="btn"
-						>
-							Append
-						</button>
-						<button
-							type="button"
-							onclick={() => void toggleNotePinned()}
-							disabled={isSaving}
-							class="btn"
-						>
-							{note.pinned ? 'Unpin' : 'Pin'}
-						</button>
-						<button type="button" onclick={deleteNote} disabled={isSaving} class="btn btn-danger">
-							Delete
-						</button>
-					</div>
-				</div>
-				<div class="note-detail__meta">
-					<span>Type: {note.type}</span>
-					<span>Updated: {formatNoteDate(note.updated_at)}</span>
-					<span>Created: {formatNoteDate(note.created_at)}</span>
-				</div>
-			</header>
+			<NoteDetailHeader
+				{note}
+				{liveTitle}
+				{isSaving}
+				{isAppending}
+				{saveError}
+				{saveStatus}
+				onTitleChange={(value) => {
+					liveTitle = value;
+					scheduleAutosave();
+				}}
+				onAppend={appendNoteFromDetail}
+				onTogglePin={() => void toggleNotePinned()}
+				onDelete={deleteNote}
+			/>
 
 			<div class="note-detail__body">
 				{#if browser}
@@ -689,109 +694,26 @@
 				{/if}
 			</div>
 
-			<section class="note-detail__block">
-				<h2 class="note-detail__block-title">Categories</h2>
-				{#if filteredCategories.length > 0}
-					<ul class="note-detail__tag-list">
-						{#each filteredCategories as category (category.id)}
-							<li class="note-detail__tag-row">
-								<a
-									href={resolve('/notes') + '?category=' + encodeURIComponent(category.name)}
-									class="note-detail__tag-row-main"
-								>
-									<div class="note-detail__tag-row-inner">
-										<span class="note-detail__pill">{category.name}</span>
-									</div>
-								</a>
-								<button
-									type="button"
-									onclick={() => removeCategory(category.id)}
-									disabled={isSaving}
-									class="btn btn-secondary btn--chip"
-									title="Remove category"
-									aria-label="Remove category"
-								>
-									×
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="card__meta">No categories</p>
-				{/if}
-				<div class="note-detail__add-row">
-					<select
-						bind:value={addCategoryId}
-						onchange={() => addCategoryId && addCategory()}
-						disabled={isSaving}
-						class="input ch-40"
-					>
-						<option value="">Add category…</option>
-						{#each availableCategories as cat (cat.id)}
-							<option value={cat.id}>{cat.name}</option>
-						{/each}
-					</select>
-				</div>
-			</section>
+			<NoteCategoriesPanel
+				categories={filteredCategories}
+				{availableCategories}
+				{addCategoryId}
+				{isSaving}
+				onAddCategoryIdChange={(id) => (addCategoryId = id)}
+				onAddCategory={addCategory}
+				onRemoveCategory={removeCategory}
+			/>
 
-			<section class="note-detail__block">
-				<h2 class="note-detail__block-title">Relationships</h2>
-				{#if filteredRelationships.length > 0}
-					<ul class="note-detail__tag-list">
-						{#each filteredRelationships as rel (rel.note_a_id + '-' + rel.note_b_id + '-' + rel.type)}
-							<li class="note-detail__tag-row">
-								<a
-									href={resolve(`/notes/${getOtherNoteId(rel, note.id)}`)}
-									class="note-detail__tag-row-main"
-								>
-									<div class="note-detail__tag-row-inner">
-										<span class="note-detail__pill"
-											>{formatRelationshipTypeLabel(rel, note.id)}</span
-										>
-										<span class="note-detail__tag-row-label"
-											>{relatedNoteTitles.get(getOtherNoteId(rel, note.id)) ??
-												`Note #${getOtherNoteId(rel, note.id)}`}</span
-										>
-									</div>
-								</a>
-								<button
-									type="button"
-									onclick={() => removeRelationship(rel)}
-									disabled={isSaving}
-									class="btn btn-secondary btn--chip"
-									title="Remove relationship"
-									aria-label="Remove relationship"
-								>
-									×
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="card__meta">No relationships</p>
-				{/if}
-				<div class="note-detail__add-row">
-					<select bind:value={addRelType} class="input ch-40">
-						{#each RELATIONSHIP_TYPES as t (t)}
-							<option value={t}>{formatRelationshipType(t)}</option>
-						{/each}
-					</select>
-					<div class="note-detail__actions">
-						<button
-							type="button"
-							onclick={openNoteSearchPopup}
-							disabled={isSaving}
-							class="btn btn-secondary"
-						>
-							Select note…
-						</button>
-					</div>
-				</div>
-			</section>
-
-			{#if saveError}
-				<p class="form-group__error">{saveError}</p>
-			{/if}
+			<NoteRelationshipsPanel
+				{note}
+				relationships={filteredRelationships}
+				{relatedNoteTitles}
+				{addRelType}
+				{isSaving}
+				onAddRelTypeChange={(t) => (addRelType = t)}
+				onOpenSearch={openNoteSearchPopup}
+				onRemoveRelationship={removeRelationship}
+			/>
 		</article>
 	{/if}
 </div>
@@ -812,54 +734,15 @@
 	</button>
 {/if}
 
-{#if showNoteSearchPopup}
-	<div
-		class="modal-backdrop modal-backdrop--overlay"
-		tabindex="-1"
-		onkeydown={handleNoteSearchKeydown}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="note-search-title"
-		onclick={(e) => e.target === e.currentTarget && closeNoteSearchPopup()}
-	>
-		<div class="card note-search-dialog" role="document">
-			<h2 id="note-search-title" class="section-title--muted">Select note to link</h2>
-			<input
-				bind:this={noteSearchInputEl}
-				type="text"
-				bind:value={noteSearchQuery}
-				placeholder="Search notes…"
-				class="input"
-			/>
-			<div class="note-search-dialog__scroll">
-				{#if noteSearchLoading}
-					<p class="card__empty">Loading…</p>
-				{:else if noteSearchResults.length === 0}
-					<p class="card__empty">
-						{noteSearchQuery.trim() ? 'No notes found.' : 'Type to search.'}
-					</p>
-				{:else}
-					<ul class="note-search-dialog__list">
-						{#each noteSearchResults as n (n.id)}
-							<li>
-								<button
-									type="button"
-									onclick={() => selectNoteFromSearch(n)}
-									class="btn btn-secondary w-full flex flex-start text-left"
-								>
-									<span>{n.title}</span>
-									<span class="card__meta">#{n.id}</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</div>
-			<div class="note-search-dialog__actions">
-				<button type="button" onclick={closeNoteSearchPopup} class="btn btn-secondary">
-					Cancel
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
+<NoteSearchPopup
+	open={showNoteSearchPopup}
+	query={noteSearchQuery}
+	results={noteSearchResults}
+	loading={noteSearchLoading}
+	error={noteSearchError}
+	bind:inputEl={noteSearchInputEl}
+	onQueryChange={(v) => (noteSearchQuery = v)}
+	onSelect={selectNoteFromSearch}
+	onClose={closeNoteSearchPopup}
+	onKeydown={handleNoteSearchKeydown}
+/>
