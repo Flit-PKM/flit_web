@@ -471,6 +471,171 @@
 		width: 100%;
 	}
 
+	/* Connected apps + MCP API keys on profile */
+	.connections__header {
+		margin-bottom: 1rem;
+	}
+
+	.connections__subtitle {
+		margin: 0.25rem 0 0;
+	}
+
+	.connections__groups {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.connections__group-title {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--color-ink);
+		margin: 0 0 0.5rem;
+	}
+
+	.connections__list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.connections__row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		padding: 0.75rem 1rem;
+		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 22%, transparent);
+		border-radius: 0.5rem;
+		background: color-mix(in oklab, var(--color-mid-grey) 5%, transparent);
+	}
+
+	.connections__row-main {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		min-width: 0;
+		flex: 1 1 12rem;
+	}
+
+	.connections__row-title {
+		font-weight: 600;
+		color: var(--color-ink);
+		margin: 0;
+	}
+
+	.connections__row-meta {
+		font-size: 0.8125rem;
+		color: var(--color-mid-grey);
+		margin: 0;
+	}
+
+	.connections__row-side {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.5rem;
+		flex-shrink: 0;
+	}
+
+	.connections__native-action {
+		margin-top: 0.25rem;
+	}
+
+	.connections__mcp-intro {
+		margin: 0.25rem 0 0.5rem;
+		max-width: 42rem;
+	}
+
+	.connections__mcp-url {
+		margin: 0 0 0.75rem;
+	}
+
+	.connections__mcp-url-code {
+		display: inline-block;
+		font-family: ui-monospace, monospace;
+		font-size: 0.8125rem;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.25rem;
+		background: color-mix(in oklab, var(--color-mid-grey) 12%, transparent);
+		color: var(--color-ink);
+		word-break: break-all;
+	}
+
+	.connections__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+
+	.connections__panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 1rem;
+		padding: 1rem;
+		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 22%, transparent);
+		border-radius: 0.625rem;
+		background: color-mix(in oklab, var(--color-mid-grey) 6%, transparent);
+	}
+
+	.connections__panel-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		justify-content: center;
+	}
+
+	.connections__secret {
+		font-family: ui-monospace, monospace;
+		font-size: 1.125rem;
+		font-weight: 600;
+		text-align: center;
+		word-break: break-all;
+		padding: 0.75rem 1rem;
+		border-radius: 0.375rem;
+		background: var(--color-canvas);
+		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 25%, transparent);
+	}
+
+	.connections__scope-picker {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.75rem;
+		width: 100%;
+		margin-top: 0.5rem;
+	}
+
+	@media (min-width: 480px) {
+		.connections__scope-picker {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.connections__scope-picker .radio-card {
+		align-items: flex-start;
+		min-width: 0;
+	}
+
+	.connections__scope-picker .radio-card__content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.connections__inactive summary {
+		cursor: pointer;
+	}
+
+	.connections__inactive-list {
+		margin-top: 0.5rem;
+	}
+
 	/* Import/export notes on profile */
 	.notes-transfer__header {
 		display: flex;
@@ -760,7 +925,7 @@
 		height: 6px;
 		transform: translate(-50%, -50%);
 		border-radius: 9999px;
-		background: color-mix(in oklab, var(--color-blue) 42%, var(--flit-card-bg));
+		background: color-mix(in oklab, var(--note-accent, var(--color-blue)) 42%, var(--flit-card-bg));
 		pointer-events: none;
 	}
 
@@ -846,6 +1011,22 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+	}
+
+	.note-page--tinted {
+		background-color: color-mix(
+			in oklab,
+			var(--note-page-tint) 14%,
+			var(--color-canvas)
+		);
+		margin-inline: calc(-1 * clamp(0.75rem, 2.5vw, 1.25rem));
+		padding-inline: clamp(0.75rem, 2.5vw, 1.25rem);
+		padding-block: 0.75rem;
+		border-radius: 0.75rem;
+	}
+
+	.note-page--tinted .note-page__back-link {
+		padding-top: 0.25rem;
 	}
 
 	.note-page__back-link {
@@ -1436,6 +1617,54 @@
 		align-items: center;
 		gap: 0.5rem;
 		flex-wrap: wrap;
+	}
+
+	.note-color-slider__row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.note-color-slider__swatch {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 9999px;
+		border: 1px solid color-mix(in oklab, var(--color-mid-grey) 28%, transparent);
+		flex-shrink: 0;
+	}
+
+	.note-color-slider__input {
+		flex: 1;
+		min-width: 0;
+		width: 100%;
+		height: 0.5rem;
+		appearance: none;
+		border-radius: 9999px;
+		background: linear-gradient(
+			in oklab to right,
+			oklch(0.7 0.5 0),
+			oklch(0.7 0.5 60),
+			oklch(0.7 0.5 120),
+			oklch(0.7 0.5 180),
+			oklch(0.7 0.5 240),
+			oklch(0.7 0.5 300),
+			oklch(0.7 0.5 360)
+		);
+		accent-color: var(--color-blue);
+	}
+
+	.note-color-slider__clear {
+		flex-shrink: 0;
+	}
+
+	.note-color-slider__input:focus-visible {
+		outline: 2px solid color-mix(in oklab, var(--color-blue) 45%, transparent);
+		outline-offset: 2px;
+	}
+
+	.note-color-slider__input:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
 	}
 
 	.section-title--muted {

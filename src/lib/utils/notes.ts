@@ -2,9 +2,10 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { NoteDetail, NoteRead, RelationshipRead } from '$lib/types/note';
 import type { ApiClient } from '$lib/api/client';
 import { filterNotDeleted } from '$lib/utils/filter';
+import { normalizeNoteColor } from '$lib/utils/note-color';
 
 export function normalizeNoteRead(n: NoteRead): NoteRead {
-	return { ...n, pinned: n.pinned === true };
+	return { ...n, pinned: n.pinned === true, color: normalizeNoteColor(n.color) };
 }
 
 export function normalizeNotesPage(raw: NoteRead[]): NoteRead[] {

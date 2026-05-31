@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import type { NoteRead } from '$lib/types/note';
+	import { normalizeNoteColor } from '$lib/utils/note-color';
 	import NoteOptionsMenu from './NoteOptionsMenu.svelte';
 
 	let {
@@ -28,10 +29,17 @@
 		onDelete: () => void;
 		onCloseOptions: () => void;
 	} = $props();
+
+	let accentColor = $derived(normalizeNoteColor(note.color));
+	let accentStyle = $derived(
+		accentColor
+			? `background: color-mix(in oklab, ${accentColor} 42%, var(--flit-card-bg))`
+			: undefined
+	);
 </script>
 
 <div class="card note-list__card">
-	<div class="note-list__accent" aria-hidden="true"></div>
+	<div class="note-list__accent" style={accentStyle} aria-hidden="true"></div>
 	<a href={resolve(`/notes/${note.id}`)} class="note-list__main-link">
 		<h2 class="note-list__title">{note.title}</h2>
 		<hr class="note-list__divider" />

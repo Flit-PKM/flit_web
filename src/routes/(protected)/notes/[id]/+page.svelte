@@ -22,14 +22,18 @@
 	import NoteCategoriesPanel from '$lib/components/notes/NoteCategoriesPanel.svelte';
 	import NoteDetailHeader from '$lib/components/notes/NoteDetailHeader.svelte';
 	import NoteRelationshipsPanel from '$lib/components/notes/NoteRelationshipsPanel.svelte';
+	import NoteColorSlider from '$lib/components/notes/NoteColorSlider.svelte';
 	import NoteSearchPopup from '$lib/components/notes/NoteSearchPopup.svelte';
 	import { confirmAction } from '$lib/stores/confirmDialog';
 	import { buildRelatedTitleMap } from '$lib/utils/notes';
 	import { normalizeNoteRead } from '$lib/utils/notes';
 	import { normalizeNoteContent, normalizeNoteTitle } from '$lib/utils/note-detail';
+	import { normalizeNoteColor, noteColorInlineStyle } from '$lib/utils/note-color';
+	import { publishNoteListSync } from '$lib/stores/noteListSync';
 	import type {
 		NoteDetail,
 		NoteRead,
+		NoteUpdate,
 		RelationshipRead,
 		CategoryRead,
 		RelationshipType
@@ -51,7 +55,7 @@
 		});
 	}
 
-	const AUTOSAVE_DEBOUNCE_MS = 5000;
+	const AUTOSAVE_DEBOUNCE_MS = 30_000;
 
 	let isLoading = $state(true);
 	let note = $state<NoteDetail | null>(null);
@@ -63,6 +67,8 @@
 	let latestContent = $state('');
 	let lastSyncedTitle = $state('');
 	let lastSyncedContent = $state('');
+	let liveColor = $state('');
+	let lastSyncedColor = $state('');
 	let saveError = $state('');
 	let isSaving = $state(false);
 	let addCategoryId = $state('');
@@ -86,13 +92,39 @@
 	let saveToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let saveRequestId = 0;
+	let saveInFlight: Promise<void> | null = null;
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
+	function isTitleDirty(): boolean {
+		return normalizeNoteTitle(liveTitle) !== normalizeNoteTitle(lastSyncedTitle);
+	}
+
+	function isContentDirty(): boolean {
+		return normalizeNoteContent(latestContent) !== normalizeNoteContent(lastSyncedContent);
+	}
+
+	function isColorDirty(): boolean {
+		return normalizeNoteColor(liveColor) !== normalizeNoteColor(lastSyncedColor);
+	}
+
 	function isDirtyAgainstBaseline(): boolean {
-		return (
-			normalizeNoteTitle(liveTitle) !== normalizeNoteTitle(lastSyncedTitle) ||
-			normalizeNoteContent(latestContent) !== normalizeNoteContent(lastSyncedContent)
-		);
+		return isTitleDirty() || isContentDirty() || isColorDirty();
+	}
+
+	let notePageTinted = $derived(normalizeNoteColor(liveColor) !== '');
+	let notePageStyle = $derived(noteColorInlineStyle(liveColor));
+
+	function publishNoteToList(updated: NoteRead): void {
+		publishNoteListSync({
+			id: updated.id,
+			title: updated.title,
+			content: updated.content,
+			type: updated.type,
+			pinned: updated.pinned === true,
+			color: normalizeNoteColor(updated.color),
+			version: updated.version,
+			updated_at: updated.updated_at
+		});
 	}
 
 	function pulseSaveToast() {
@@ -106,64 +138,103 @@
 
 	async function flushNoteToServer() {
 		if (!note) return;
-		const title = liveTitle.trim();
-		const content = latestContent.trim();
 		if (!isDirtyAgainstBaseline()) return;
-		if (!title) {
-			saveError = 'Title is required.';
-			return;
+
+		const title = normalizeNoteTitle(liveTitle);
+		const content = normalizeNoteContent(latestContent);
+		const color = normalizeNoteColor(liveColor);
+		const update: NoteUpdate = {};
+
+		if (isTitleDirty()) {
+			if (!title) {
+				saveError = 'Title is required.';
+				return;
+			}
+			update.title = title;
 		}
-		if (!content) {
-			saveError = 'Content is required.';
-			return;
+		if (isContentDirty()) {
+			if (!content) {
+				saveError = 'Content is required.';
+				return;
+			}
+			update.content = content;
 		}
-		const id = ++saveRequestId;
-		saveError = '';
-		isSaving = true;
-		saveStatus = 'saving';
+		if (isColorDirty()) {
+			update.color = color;
+		}
+
+		if (Object.keys(update).length === 0) return;
+
+		const run = (async () => {
+			const id = ++saveRequestId;
+			saveError = '';
+			isSaving = true;
+			saveStatus = 'saving';
+			try {
+				errorLogger.logDebug('Autosaving note', { noteId: note!.id });
+				const updated = await apiClient.updateNote(note!.id, update);
+				if (id !== saveRequestId) return;
+				note = {
+					...note!,
+					title: updated.title,
+					content: updated.content,
+					type: updated.type,
+					pinned: updated.pinned === true,
+					color: normalizeNoteColor(updated.color),
+					version: updated.version,
+					updated_at: updated.updated_at
+				};
+				lastSyncedTitle = updated.title;
+				lastSyncedContent = updated.content;
+				lastSyncedColor = normalizeNoteColor(updated.color);
+				publishNoteToList(updated);
+				if (!isDefaultNewNote(updated.title, updated.content)) {
+					clearDraftNote(note!.id);
+				}
+				errorLogger.logDebug('Note autosaved', { noteId: note!.id });
+				pulseSaveToast();
+				saveStatus = 'saved';
+			} catch (err) {
+				if (id === saveRequestId) {
+					saveError = captureApiError(err, {
+						component: 'NoteDetail',
+						operation: 'autosaveNote',
+						noteId: note!.id
+					});
+					saveStatus = 'error';
+				}
+			} finally {
+				if (id === saveRequestId) isSaving = false;
+			}
+		})();
+		saveInFlight = run;
 		try {
-			errorLogger.logDebug('Autosaving note', { noteId: note.id });
-			const updated = await apiClient.updateNote(note.id, { title, content });
-			if (id !== saveRequestId) return;
-			note = {
-				...note,
-				title: updated.title,
-				content: updated.content,
-				type: updated.type,
-				pinned: updated.pinned === true,
-				version: updated.version,
-				updated_at: updated.updated_at
-			};
-			lastSyncedTitle = updated.title;
-			lastSyncedContent = updated.content;
-			if (!isDefaultNewNote(updated.title, updated.content)) {
-				clearDraftNote(note.id);
-			}
-			errorLogger.logDebug('Note autosaved', { noteId: note.id });
-			pulseSaveToast();
-			saveStatus = 'saved';
-		} catch (err) {
-			if (id === saveRequestId) {
-				saveError = captureApiError(err, {
-					component: 'NoteDetail',
-					operation: 'autosaveNote',
-					noteId: note.id
-				});
-				saveStatus = 'error';
-			}
+			await run;
 		} finally {
-			if (id === saveRequestId) isSaving = false;
+			if (saveInFlight === run) saveInFlight = null;
 		}
 	}
 
 	const autosave = debounceTrailing(flushNoteToServer, AUTOSAVE_DEBOUNCE_MS);
 
-	beforeNavigate(async ({ cancel }) => {
+	async function ensureNotePersisted(): Promise<void> {
 		await autosave.flush();
-		if (note && isDirtyAgainstBaseline() && saveError) {
-			if (
-				!confirm('Changes could not be saved. Leave this page anyway? Unsaved edits will be lost.')
-			) {
+		if (saveInFlight) {
+			await saveInFlight;
+			return;
+		}
+		if (isDirtyAgainstBaseline()) {
+			await flushNoteToServer();
+		}
+	}
+
+	beforeNavigate(async ({ cancel }) => {
+		await ensureNotePersisted();
+		if (note && isDirtyAgainstBaseline()) {
+			const msg = saveError
+				? 'Changes could not be saved. Leave this page anyway? Unsaved edits will be lost.'
+				: 'You have unsaved changes. Leave anyway?';
+			if (!confirm(msg)) {
 				cancel();
 				return;
 			}
@@ -201,8 +272,10 @@
 			lastHydratedNoteId = id;
 			liveTitle = note!.title;
 			latestContent = note!.content;
+			liveColor = normalizeNoteColor(note!.color);
 			lastSyncedTitle = note!.title;
 			lastSyncedContent = note!.content;
+			lastSyncedColor = normalizeNoteColor(note!.color);
 		}
 	});
 
@@ -246,7 +319,8 @@
 			const noteData = await apiClient.getNote(noteId);
 			const normalized: NoteDetail = {
 				...noteData,
-				pinned: noteData.pinned === true
+				pinned: noteData.pinned === true,
+				color: normalizeNoteColor(noteData.color)
 			};
 			const relatedTitles = await buildRelatedTitleMap(apiClient, normalized);
 			return { data: normalized, error: '', relatedTitles };
@@ -568,7 +642,7 @@
 		}
 		saveError = '';
 		try {
-			await autosave.flush();
+			await ensureNotePersisted();
 			await apiClient.deleteNote(note.id);
 			await goto(resolve('/notes'));
 		} catch (err) {
@@ -584,7 +658,7 @@
 		saveError = '';
 		isSaving = true;
 		try {
-			await autosave.flush();
+			await ensureNotePersisted();
 			errorLogger.logDebug('Toggling note pin from detail', {
 				noteId: note.id,
 				nextPinned: !note.pinned
@@ -593,9 +667,11 @@
 			note = {
 				...note,
 				pinned: updated.pinned === true,
+				color: normalizeNoteColor(updated.color),
 				version: updated.version,
 				updated_at: updated.updated_at
 			};
+			publishNoteToList(updated);
 			errorLogger.logDebug('Note pin toggled from detail', { noteId: note.id });
 		} catch (err) {
 			saveError = captureApiError(err, {
@@ -646,7 +722,7 @@
 	<title>{documentTitle}</title>
 	<meta name="description" content={note ? liveTitle.trim() || note.title : 'Note detail'} />
 </svelte:head>
-<div class="note-page">
+<div class="note-page" class:note-page--tinted={notePageTinted} style={notePageStyle}>
 	<a href={resolve('/notes')} class="mt-sm note-page__back-link">← Back to Notes</a>
 	{#if isLoading}
 		<div class="card">
@@ -713,6 +789,15 @@
 				onAddRelTypeChange={(t) => (addRelType = t)}
 				onOpenSearch={openNoteSearchPopup}
 				onRemoveRelationship={removeRelationship}
+			/>
+
+			<NoteColorSlider
+				liveColor={liveColor}
+				disabled={isSaving}
+				onColorChange={(hex) => {
+					liveColor = hex;
+					scheduleAutosave();
+				}}
 			/>
 		</article>
 	{/if}

@@ -17,9 +17,9 @@
 	import { buildUserUpdatePayload, getProfileChangeFlags } from '$lib/utils/profile-page';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import NotesImportExportSection from '$lib/components/profile/NotesImportExportSection.svelte';
+	import ConnectedAppsSection from '$lib/components/profile/ConnectedAppsSection.svelte';
 	import CurrentPasswordInput from '$lib/components/CurrentPasswordInput.svelte';
 	import type { ProfileFormData, FormErrors } from '$lib/types/auth';
-	import type { ConnectedApp } from '$lib/types/connect';
 	// State
 	let isLoading = $state(true);
 	let isSaving = $state(false);
@@ -29,16 +29,6 @@
 	let showConfirmPassword = $state(false);
 	let successMessage = $state('');
 	let generalError = $state('');
-
-	// Connect app state
-	let connectCode = $state('');
-	let connectCodeExpiresIn = $state<number | undefined>(undefined);
-	let connectCodeLoading = $state(false);
-	let connectCodeError = $state('');
-	let connectCodeCopied = $state(false);
-	let connectedApps = $state<ConnectedApp[]>([]);
-	let connectedAppsLoading = $state(false);
-	let connectedAppsError = $state('');
 
 	// Verify email state
 	let verifyEmailLoading = $state(false);
@@ -50,9 +40,6 @@
 	let feedbackSubmitting = $state(false);
 	let feedbackError = $state('');
 	let feedbackSuccess = $state('');
-
-	let activeConnectedApps = $derived.by(() => connectedApps.filter((app) => app.is_active));
-	let inactiveConnectedApps = $derived.by(() => connectedApps.filter((app) => !app.is_active));
 
 	// Form data
 	let formData: ProfileFormData = $state({
@@ -122,21 +109,6 @@
 				formData.email = $currentUser.email;
 				formData.colorScheme = $currentUser.color_scheme || 'default';
 			}
-
-			connectedAppsLoading = true;
-			connectedAppsError = '';
-
-			const [connectedAppsResult] = await Promise.allSettled([apiClient.getConnectedApps()]);
-
-			if (connectedAppsResult.status === 'fulfilled') {
-				connectedApps = connectedAppsResult.value;
-			} else {
-				connectedAppsError = captureApiError(connectedAppsResult.reason, {
-					component: 'Profile',
-					operation: 'loadConnectedApps'
-				});
-			}
-			connectedAppsLoading = false;
 		} catch (error) {
 			generalError = captureApiError(error, {
 				component: 'Profile',
@@ -146,21 +118,6 @@
 			isLoading = false;
 		}
 	});
-
-	async function retryLoadConnectedApps() {
-		connectedAppsLoading = true;
-		connectedAppsError = '';
-		try {
-			connectedApps = await apiClient.getConnectedApps();
-		} catch (err) {
-			connectedAppsError = captureApiError(err, {
-				component: 'Profile',
-				operation: 'loadConnectedApps'
-			});
-		} finally {
-			connectedAppsLoading = false;
-		}
-	}
 
 	// Handle form field changes with validation
 	function handleFieldChange(field: keyof ProfileFormData, value: string) {
@@ -251,73 +208,6 @@
 	// Handle logout
 	function handleLogout() {
 		authActions.logout();
-	}
-
-	// Connect app: request code
-	async function handleConnectApp() {
-		connectCodeError = '';
-		connectCode = '';
-		connectCodeExpiresIn = undefined;
-		connectCodeLoading = true;
-		try {
-			errorLogger.logDebug('Requesting connection code');
-			const res = await apiClient.requestConnectCode();
-			connectCode = res.connection_code;
-			connectCodeExpiresIn = res.expires_in;
-			errorLogger.logDebug('Connection code requested successfully');
-		} catch (err) {
-			connectCodeError = captureApiError(err, {
-				component: 'Profile',
-				operation: 'requestConnectCode'
-			});
-		} finally {
-			connectCodeLoading = false;
-		}
-	}
-
-	// Connect app: copy code to clipboard
-	async function handleCopyCode() {
-		if (!connectCode) return;
-		connectCodeCopied = false;
-		try {
-			await navigator.clipboard.writeText(connectCode);
-			connectCodeCopied = true;
-			setTimeout(() => (connectCodeCopied = false), 2000);
-		} catch {
-			connectCodeError = 'Could not copy to clipboard.';
-		}
-	}
-
-	// Connect app: close / clear code display
-	function handleCloseConnectCode() {
-		connectCode = '';
-		connectCodeExpiresIn = undefined;
-		connectCodeError = '';
-		connectCodeCopied = false;
-	}
-
-	// Connect app: revoke a specific connected app
-	let revokingAppId = $state<number | null>(null);
-	let revokeError = $state<string>('');
-
-	async function handleRevokeConnectedApp(appId: number) {
-		revokeError = '';
-		revokingAppId = appId;
-		try {
-			errorLogger.logDebug('Revoking connected app', { appId });
-			await apiClient.revokeConnectedApp(appId);
-			// Optimistically remove the app from the local list
-			connectedApps = connectedApps.filter((app) => app.id !== appId);
-			errorLogger.logDebug('Connected app revoked successfully', { appId });
-		} catch (err) {
-			revokeError = captureApiError(err, {
-				component: 'Profile',
-				operation: 'revokeConnectedApp',
-				appId
-			});
-		} finally {
-			revokingAppId = null;
-		}
 	}
 
 	async function handleVerifyEmail() {
@@ -855,243 +745,7 @@
 			</form>
 		</div>
 
-		<div class="card">
-			<h2>Connected Apps</h2>
-
-			<!-- Connected Apps List -->
-			{#if connectedAppsError || revokeError}
-				<div class="alert alert--error" role="alert">
-					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<div class="alert__message card__block">
-						{#if connectedAppsError}
-							<p>{connectedAppsError}</p>
-							<button
-								type="button"
-								class="btn btn-secondary mt-sm"
-								onclick={retryLoadConnectedApps}
-							>
-								Retry
-							</button>
-						{/if}
-						{#if revokeError}
-							<p>{revokeError}</p>
-						{/if}
-					</div>
-				</div>
-			{/if}
-
-			{#if connectedAppsLoading}
-				<div class="loading loading--muted">
-					<span class="loading__spinner" aria-hidden="true">
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-							<circle
-								class="loading__spinner-inner"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="4"
-							></circle>
-							<path
-								class="loading__spinner-path"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							></path>
-						</svg>
-					</span>
-					<span>Loading connected apps...</span>
-				</div>
-			{:else if connectedApps.length > 0}
-				<div class="card__column">
-					{#if activeConnectedApps.length > 0}
-						{#each activeConnectedApps as app (app.id)}
-							<div class="card">
-								<div class="card__column">
-									<div class="card__row card__row--between">
-										<span>
-											{app.app_name || app.device_name}
-										</span>
-										<span class="badge badge--positive">Active</span>
-									</div>
-									<div class="card__row text-sm">
-										{app.device_name}
-										{#if app.platform}
-											<span class="profile-status-dot">•</span>
-											{app.platform}
-										{/if}
-									</div>
-									<div class="card__row text-xs">
-										Connected {formatProfileDate(app.created_at)}
-									</div>
-									<div class="card__row card__row--end">
-										<button
-											type="button"
-											class="btn btn--compact"
-											onclick={() => handleRevokeConnectedApp(app.id)}
-											disabled={revokingAppId === app.id}
-											aria-label={`Revoke connected app ${app.app_name || app.device_name}`}
-										>
-											{#if revokingAppId === app.id}
-												<span class="loading__spinner" aria-hidden="true">
-													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-														<circle
-															class="loading__spinner-inner"
-															cx="12"
-															cy="12"
-															r="10"
-															stroke="currentColor"
-															stroke-width="4"
-														></circle>
-														<path
-															class="loading__spinner-path"
-															fill="currentColor"
-															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-														></path>
-													</svg>
-												</span>
-												Revoking…
-											{:else}
-												Revoke
-											{/if}
-										</button>
-									</div>
-								</div>
-							</div>
-						{/each}
-					{:else}
-						<div class="card__meta">No active devices.</div>
-					{/if}
-
-					{#if inactiveConnectedApps.length > 0}
-						<details>
-							<summary class="card__meta">
-								Inactive devices ({inactiveConnectedApps.length})
-							</summary>
-							<div class="card__column mt-sm">
-								{#each inactiveConnectedApps as app (app.id)}
-									<div class="card">
-										<div class="card__column">
-											<div class="card__row card__row--between">
-												<span>
-													{app.app_name || app.device_name}
-												</span>
-												<span class="badge badge--muted">Inactive</span>
-											</div>
-											<div class="card__row text-sm">
-												{app.device_name}
-												{#if app.platform}
-													<span class="profile-status-dot">•</span>
-													{app.platform}
-												{/if}
-											</div>
-											<div class="card__row text-xs">
-												Connected {formatProfileDate(app.created_at)}
-											</div>
-										</div>
-									</div>
-								{/each}
-							</div>
-						</details>
-					{/if}
-				</div>
-			{:else}
-				<div class="card__meta">No connected apps yet. Connect an app to get started.</div>
-			{/if}
-
-			{#if connectCodeError}
-				<div class="alert alert--error" role="alert">
-					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<p class="alert__message">{connectCodeError}</p>
-				</div>
-			{/if}
-
-			<div class="card__column">
-				{#if connectCode}
-					<div class="card__column card__column--center">
-						<p class="card__meta">Enter this code in the app you wish to connect to Flit - Core</p>
-						<div class="card text-md" aria-label="Connection code">
-							{connectCode}
-						</div>
-						{#if connectCodeExpiresIn != null && connectCodeExpiresIn > 0}
-							{@const minutes = Math.ceil(connectCodeExpiresIn / 60)}
-							<p class="card__meta">
-								This code expires in {minutes} minute{minutes === 1 ? '' : 's'}.
-							</p>
-						{/if}
-						<div class="auth__actions">
-							<button
-								type="button"
-								onclick={handleCopyCode}
-								class="btn"
-								aria-label="Copy connection code"
-							>
-								{connectCodeCopied ? 'Copied!' : 'Copy'}
-							</button>
-							<button
-								type="button"
-								onclick={handleConnectApp}
-								disabled={connectCodeLoading}
-								class="btn"
-								aria-label="Get new connection code"
-							>
-								Get new code
-							</button>
-							<button
-								type="button"
-								onclick={handleCloseConnectCode}
-								class="btn btn-primary"
-								aria-label="Close connection code"
-							>
-								Close
-							</button>
-						</div>
-					</div>
-				{:else}
-					<button
-						type="button"
-						onclick={handleConnectApp}
-						disabled={connectCodeLoading}
-						class="btn btn-primary"
-						aria-label="Request connection code to connect an app to Flit Core"
-					>
-						{#if connectCodeLoading}
-							<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-									<circle
-										class="loading__spinner-inner"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										stroke-width="4"
-									></circle>
-									<path
-										class="loading__spinner-path"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
-								</svg>
-							</span>
-							Requesting...
-						{:else}
-							+ Connect App
-						{/if}
-					</button>
-				{/if}
-			</div>
-		</div>
+		<ConnectedAppsSection />
 
 		<NotesImportExportSection />
 

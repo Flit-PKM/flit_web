@@ -22,6 +22,7 @@ import type {
 	PasswordResetConfirmResponse
 } from '../types/auth';
 import type { ConnectRequestCodeResponse, ConnectedApp } from '../types/connect';
+import { normalizeConnectedAppList } from '../types/connect';
 import type {
 	NoteRead,
 	NoteDetail,
@@ -42,6 +43,8 @@ import type {
 } from '../types/billing';
 import type { FeedbackCreate, FeedbackRead } from '../types/feedback';
 import type { VaultMarkdownImportResult } from '../types/vault';
+import type { McpApiKey, McpApiKeyCreate, McpApiKeyCreated } from '../types/mcp';
+import { normalizeMcpApiKey, normalizeMcpApiKeyList } from '../types/mcp';
 import { errorLogger, handleApiError } from '$lib/utils/error-handler';
 
 /**
@@ -90,15 +93,27 @@ function parseContentDispositionFilename(header: string | null): string | null {
 }
 
 /**
- * Resolve API base URL: same origin in production (browser), else dev env or localhost.
- * Backend is mounted at /api, so all requests go to baseUrl + endpoint (e.g. /api/auth/login-json).
+ * Server origin (no /api suffix): same origin in production, else VITE_API_BASE_URL or localhost.
  */
-function getApiBaseUrl(): string {
+function getServerOrigin(): string {
 	const base =
 		typeof window !== 'undefined' && import.meta.env.PROD
 			? window.location.origin
 			: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-	return base.replace(/\/$/, '') + '/api';
+	return base.replace(/\/$/, '');
+}
+
+/**
+ * Resolve API base URL: same origin in production (browser), else dev env or localhost.
+ * Backend is mounted at /api, so all requests go to baseUrl + endpoint (e.g. /api/auth/login-json).
+ */
+function getApiBaseUrl(): string {
+	return `${getServerOrigin()}/api`;
+}
+
+/** MCP HTTP endpoint for agents and tools (server origin + /mcp). */
+export function getMcpServerUrl(): string {
+	return `${getServerOrigin()}/mcp`;
 }
 
 export class ApiClient {
@@ -143,7 +158,10 @@ export class ApiClient {
 		endpoint: string,
 		options: RequestOptions = {}
 	): Promise<ApiResponse<T>> {
-		const url = `${this.config.baseUrl}${endpoint}`;
+		const url =
+			endpoint.startsWith('http://') || endpoint.startsWith('https://')
+				? endpoint
+				: `${this.config.baseUrl}${endpoint}`;
 		const isFormData = options.body instanceof FormData;
 
 		const headers: Record<string, string> = {
@@ -395,10 +413,10 @@ export class ApiClient {
 	 * GET /connected-apps. Requires Bearer auth.
 	 */
 	async getConnectedApps(): Promise<ConnectedApp[]> {
-		const response = await this.request<ConnectedApp[]>('/connected-apps', {
+		const response = await this.request<unknown>('/connected-apps', {
 			method: 'GET'
 		});
-		return response.data;
+		return normalizeConnectedAppList(response.data);
 	}
 
 	/**
@@ -409,6 +427,42 @@ export class ApiClient {
 		await this.request<void>(`/connected-apps/${connectedAppId}`, {
 			method: 'DELETE'
 		});
+	}
+
+	/**
+	 * List MCP API keys for the current user (prefixes only). GET /mcp/api-keys. Requires Bearer auth.
+	 */
+	async getMcpApiKeys(): Promise<McpApiKey[]> {
+		const response = await this.request<unknown>(`${getMcpServerUrl()}/api-keys`, {
+			method: 'GET'
+		});
+		return normalizeMcpApiKeyList(response.data);
+	}
+
+	/**
+	 * Create a user-managed MCP API key (plaintext shown once). POST /mcp/api-keys. Requires Bearer auth.
+	 */
+	async createMcpApiKey(body: McpApiKeyCreate): Promise<McpApiKeyCreated> {
+		const response = await this.request<McpApiKeyCreated & { key_id?: number }>(
+			`${getMcpServerUrl()}/api-keys`,
+			{
+				method: 'POST',
+				body
+			}
+		);
+		const created = response.data;
+		const normalized = normalizeMcpApiKey(created, 0);
+		if (!normalized) {
+			throw new Error('API key was created but the response did not include an id.');
+		}
+		return { ...created, id: normalized.id, api_key: created.api_key };
+	}
+
+	/**
+	 * Revoke an MCP API key by id. DELETE /mcp/api-keys/{key_id}. Requires Bearer auth.
+	 */
+	async deleteMcpApiKey(keyId: number): Promise<void> {
+		await this.request<void>(`${getMcpServerUrl()}/api-keys/${keyId}`, { method: 'DELETE' });
 	}
 
 	/**

@@ -12,6 +12,7 @@ export interface NoteRead {
 	content: string;
 	type: NoteType;
 	pinned: boolean;
+	color: string;
 	source_id: number | null;
 	version: number;
 	is_deleted: boolean;
@@ -52,6 +53,7 @@ export interface NoteUpdate {
 	content?: string | null;
 	type?: NoteType | null;
 	pinned?: boolean | null;
+	color?: string | null;
 }
 
 /** Request body for POST /notes. */

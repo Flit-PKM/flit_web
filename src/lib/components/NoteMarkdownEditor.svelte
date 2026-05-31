@@ -63,12 +63,15 @@
 		const ed = editor;
 		if (!ed || ed.isDestroyed || mode !== 'rich') return;
 		const nextMarkdown = ed.getMarkdown();
+		if (normalizeForCompare(nextMarkdown) === normalizeForCompare(lastEmittedMarkdown)) return;
 		lastEmittedMarkdown = nextMarkdown;
 		onChange(nextMarkdown);
 	}
 
 	function onSourceInput() {
 		autosizeSource();
+		if (normalizeForCompare(sourceText) === normalizeForCompare(lastEmittedMarkdown)) return;
+		lastEmittedMarkdown = sourceText;
 		onChange(sourceText);
 	}
 
@@ -133,8 +136,8 @@
 				}
 			}
 		});
-		ed.on('update', () => {
-			if (mode === 'rich') emitFromRich();
+		ed.on('update', ({ transaction }) => {
+			if (mode === 'rich' && transaction.docChanged) emitFromRich();
 		});
 		editor = ed;
 		editorMounted = true;

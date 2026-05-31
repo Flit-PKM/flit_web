@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiClient, HttpError } from '$lib/api/client';
@@ -15,6 +15,37 @@
 	let subscriptionNoticeVariant = $state<'success' | 'error' | null>(null);
 	let billingCompleteStarted = false;
 	let autoCheckoutProductId = $state<string | null>(null);
+	let canonicalUrl = $derived($page.url.origin + $page.url.pathname);
+	let originUrl = $derived($page.url.origin + '/');
+	let orgLogoUrl = $derived($page.url.origin + asset('/images/flit_app_logo.svg'));
+	let jsonLdString = $derived.by(() =>
+		JSON.stringify({
+			'@context': 'https://schema.org',
+			'@graph': [
+				{
+					'@type': 'Organization',
+					'@id': `${originUrl}#organization`,
+					name: 'Flit',
+					url: originUrl,
+					logo: orgLogoUrl
+				},
+				{
+					'@type': 'WebPage',
+					'@id': `${canonicalUrl}#webpage`,
+					url: canonicalUrl,
+					name: 'Billing - Flit Web',
+					description:
+						'View Flit Web subscription plans, manage billing, and activate access codes.',
+					isPartOf: {
+						'@type': 'WebSite',
+						'@id': `${originUrl}#website`,
+						url: originUrl,
+						name: 'Flit Web'
+					}
+				}
+			]
+		}).replace(/</g, '\\u003c')
+	);
 
 	$effect(() => {
 		const notice = $page.url.searchParams.get('subscription');
@@ -87,6 +118,8 @@
 		name="description"
 		content="View Flit Web subscription plans, manage billing, and activate access codes."
 	/>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags, @typescript-eslint/no-unused-expressions -->
+	{@html '<script type="application/ld+json">' + jsonLdString + '</script>'}
 </svelte:head>
 
 <h1>Billing</h1>

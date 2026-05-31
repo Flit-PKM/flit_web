@@ -3,7 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
+	import { get } from 'svelte/store';
 	import { isAuthenticated } from '$lib/stores/auth';
+	import {
+		applyNoteListSyncPatch,
+		noteListSync,
+		type NoteListSyncPatch
+	} from '$lib/stores/noteListSync';
 	import { apiClient } from '$lib/api/client';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import NoteListCard from '$lib/components/notes/NoteListCard.svelte';
@@ -17,6 +23,24 @@
 	import { confirmAction } from '$lib/stores/confirmDialog';
 	import { createNoteAndNavigate } from '$lib/utils/note-create';
 	import type { NoteRead, CategoryRead } from '$lib/types/note';
+
+	const notesListPath = resolve('/notes');
+
+	function isNotesListPath(pathname: string): boolean {
+		return pathname === notesListPath || pathname === `${notesListPath}/`;
+	}
+
+	function mergeLoadedNotes(pageNotes: NoteRead[]): NoteRead[] {
+		const patch = get(noteListSync);
+		if (!patch) return pageNotes;
+		return applyNoteListSyncPatch(pageNotes, patch) ?? pageNotes;
+	}
+
+	function applyListSyncPatch(patch: NoteListSyncPatch): void {
+		const merged = applyNoteListSyncPatch(notes, patch);
+		if (!merged) return;
+		notes = sortNotesPinnedThenUpdated(merged);
+	}
 
 	const previewHtmlByNoteId = $derived.by(() => {
 		const m: Record<number, string> = {};
@@ -63,6 +87,7 @@
 	let isAppendingNoteId = $state<number | null>(null);
 	let isPinningNoteId = $state<number | null>(null);
 	let activeOptionsNoteId = $state<number | null>(null);
+	let notesRouteActive = $state(false);
 
 	function dedupeById(existing: NoteRead[], incoming: NoteRead[]): NoteRead[] {
 		const seen = new Set(existing.map((note) => note.id));
@@ -149,7 +174,7 @@
 				return;
 			}
 
-			const pageNotes = normalizeNotesPage(raw);
+			const pageNotes = mergeLoadedNotes(normalizeNotesPage(raw));
 			if (reset) {
 				notes = pageNotes;
 			} else {
@@ -448,7 +473,24 @@
 		if (categoryParam) {
 			selectedCategory = decodeURIComponent(categoryParam);
 		}
-		await resetAndLoadNotes();
+	});
+
+	$effect(() => {
+		if (!$isAuthenticated || !isNotesListPath($page.url.pathname)) {
+			notesRouteActive = false;
+			return;
+		}
+		const returning = notesRouteActive;
+		notesRouteActive = true;
+		if (!returning) {
+			void resetAndLoadNotes();
+		}
+	});
+
+	$effect(() => {
+		const patch = $noteListSync;
+		if (!patch || notes.length === 0) return;
+		applyListSyncPatch(patch);
 	});
 
 	$effect(() => {
