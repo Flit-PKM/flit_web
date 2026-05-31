@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import type { NoteRead } from '$lib/types/note';
 import { normalizeNoteRead } from '$lib/utils/notes';
 
@@ -12,6 +12,17 @@ export const noteListSync = writable<NoteListSyncPatch | null>(null);
 
 export function publishNoteListSync(patch: NoteListSyncPatch): void {
 	noteListSync.set(patch);
+}
+
+/** Returns the pending patch and clears the store (one-shot consume). */
+export function consumeNoteListSync(): NoteListSyncPatch | null {
+	const patch = get(noteListSync);
+	noteListSync.set(null);
+	return patch;
+}
+
+export function clearNoteListSync(): void {
+	noteListSync.set(null);
 }
 
 export function applyNoteListSyncPatch(

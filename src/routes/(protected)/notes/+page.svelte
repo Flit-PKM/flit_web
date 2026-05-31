@@ -7,8 +7,8 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import {
 		applyNoteListSyncPatch,
-		noteListSync,
-		type NoteListSyncPatch
+		clearNoteListSync,
+		noteListSync
 	} from '$lib/stores/noteListSync';
 	import { apiClient } from '$lib/api/client';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
@@ -33,13 +33,10 @@
 	function mergeLoadedNotes(pageNotes: NoteRead[]): NoteRead[] {
 		const patch = get(noteListSync);
 		if (!patch) return pageNotes;
-		return applyNoteListSyncPatch(pageNotes, patch) ?? pageNotes;
-	}
-
-	function applyListSyncPatch(patch: NoteListSyncPatch): void {
-		const merged = applyNoteListSyncPatch(notes, patch);
-		if (!merged) return;
-		notes = sortNotesPinnedThenUpdated(merged);
+		const merged = applyNoteListSyncPatch(pageNotes, patch);
+		if (!merged) return pageNotes;
+		clearNoteListSync();
+		return merged;
 	}
 
 	const previewHtmlByNoteId = $derived.by(() => {
@@ -485,12 +482,6 @@
 		if (!returning) {
 			void resetAndLoadNotes();
 		}
-	});
-
-	$effect(() => {
-		const patch = $noteListSync;
-		if (!patch || notes.length === 0) return;
-		applyListSyncPatch(patch);
 	});
 
 	$effect(() => {
