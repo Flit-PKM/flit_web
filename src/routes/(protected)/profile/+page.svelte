@@ -18,7 +18,9 @@
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import NotesImportExportSection from '$lib/components/profile/NotesImportExportSection.svelte';
 	import ConnectedAppsSection from '$lib/components/profile/ConnectedAppsSection.svelte';
+	import SubscriptionStatusSection from '$lib/components/profile/SubscriptionStatusSection.svelte';
 	import CurrentPasswordInput from '$lib/components/CurrentPasswordInput.svelte';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import type { ProfileFormData, FormErrors } from '$lib/types/auth';
 	// State
 	let isLoading = $state(true);
@@ -259,13 +261,10 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Profile - Flit Web</title>
-	<meta
-		name="description"
-		content="Manage your Flit Web account profile and knowledge graph access."
-	/>
-</svelte:head>
+<SeoHead
+	title="Profile - Flit Web"
+	description="Manage your Flit Web account profile and knowledge graph access."
+/>
 
 <h1>Your Profile</h1>
 
@@ -531,6 +530,7 @@
 								{/if}
 							</div>
 						</div>
+						<SubscriptionStatusSection />
 					</div>
 
 					<!-- Account Dates -->

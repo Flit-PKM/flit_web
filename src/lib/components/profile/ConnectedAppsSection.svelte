@@ -5,14 +5,22 @@
 	import { captureApiError } from '$lib/utils/error-handler';
 	import { formatProfileDate } from '$lib/utils/profile';
 	import type { ConnectedApp } from '$lib/types/connect';
-	import { normalizeMcpApiKey, type McpApiKey, type McpApiKeyScope } from '$lib/types/mcp';
+	import {
+		buildMcpAccessList,
+		normalizeMcpApiKey,
+		type McpApiKey,
+		type McpApiKeyScope,
+		type McpConnection
+	} from '$lib/types/mcp';
 
 	type ActivePanel = 'none' | 'native-code' | 'mcp-create' | 'mcp-reveal';
 
 	let connectedApps = $state<ConnectedApp[]>([]);
+	let mcpConnections = $state<McpConnection[]>([]);
 	let mcpApiKeys = $state<McpApiKey[]>([]);
 	let listLoading = $state(true);
 	let connectedAppsError = $state('');
+	let mcpConnectionsError = $state('');
 	let mcpApiKeysError = $state('');
 	let revokeError = $state('');
 
@@ -34,10 +42,12 @@
 	let apiKeyCopied = $state(false);
 
 	let revokingAppId = $state<number | null>(null);
+	let revokingConnectionId = $state<number | null>(null);
 	let revokingKeyId = $state<number | null>(null);
 
 	let activeConnectedApps = $derived.by(() => connectedApps.filter((app) => app.is_active));
 	let inactiveConnectedApps = $derived.by(() => connectedApps.filter((app) => !app.is_active));
+	let mcpAccessItems = $derived.by(() => buildMcpAccessList(mcpConnections, mcpApiKeys));
 	const mcpServerUrl = getMcpServerUrl();
 
 	let showConnectionsHelp = $state(false);
@@ -53,10 +63,12 @@
 	async function loadConnections() {
 		listLoading = true;
 		connectedAppsError = '';
+		mcpConnectionsError = '';
 		mcpApiKeysError = '';
 
-		const [appsResult, keysResult] = await Promise.allSettled([
+		const [appsResult, connectionsResult, keysResult] = await Promise.allSettled([
 			apiClient.getConnectedApps(),
+			apiClient.getMcpConnections(),
 			apiClient.getMcpApiKeys()
 		]);
 
@@ -66,6 +78,15 @@
 			connectedAppsError = captureApiError(appsResult.reason, {
 				component: 'ConnectedAppsSection',
 				operation: 'loadConnectedApps'
+			});
+		}
+
+		if (connectionsResult.status === 'fulfilled') {
+			mcpConnections = connectionsResult.value;
+		} else {
+			mcpConnectionsError = captureApiError(connectionsResult.reason, {
+				component: 'ConnectedAppsSection',
+				operation: 'loadMcpConnections'
 			});
 		}
 
@@ -227,6 +248,34 @@
 		}
 	}
 
+	function getOAuthConnectionLabel(connection: McpConnection): string {
+		return connection.client_name ?? connection.client_id ?? 'OAuth client';
+	}
+
+	async function handleDeleteMcpConnection(connectionId: number, label: string) {
+		if (
+			!(await confirmAction(
+				`Revoke OAuth connection "${label}"? The client will need to authorize again.`
+			))
+		) {
+			return;
+		}
+		revokeError = '';
+		revokingConnectionId = connectionId;
+		try {
+			await apiClient.deleteMcpConnection(connectionId);
+			mcpConnections = mcpConnections.filter((connection) => connection.id !== connectionId);
+		} catch (err) {
+			revokeError = captureApiError(err, {
+				component: 'ConnectedAppsSection',
+				operation: 'deleteMcpConnection',
+				connectionId
+			});
+		} finally {
+			revokingConnectionId = null;
+		}
+	}
+
 	function formatLastUsed(at: string | null): string {
 		if (!at) return 'Never used';
 		return `Last used ${formatProfileDate(at)}`;
@@ -238,7 +287,8 @@
 		<div class="notes-transfer__header-title">
 			<h2>Connected Apps</h2>
 			<p class="card__meta connections__subtitle">
-				Link Flit native apps with a pairing code, or connect MCP clients with a Bearer token.
+				Link Flit native apps with a pairing code, or connect MCP clients via OAuth or Bearer
+				tokens.
 			</p>
 		</div>
 		<button
@@ -259,7 +309,7 @@
 		</button>
 	</div>
 
-	{#if connectedAppsError || mcpApiKeysError || revokeError}
+	{#if connectedAppsError || mcpConnectionsError || mcpApiKeysError || revokeError}
 		<div class="alert alert--error" role="alert">
 			<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path
@@ -272,13 +322,16 @@
 				{#if connectedAppsError}
 					<p>{connectedAppsError}</p>
 				{/if}
+				{#if mcpConnectionsError}
+					<p>{mcpConnectionsError}</p>
+				{/if}
 				{#if mcpApiKeysError}
 					<p>{mcpApiKeysError}</p>
 				{/if}
 				{#if revokeError}
 					<p>{revokeError}</p>
 				{/if}
-				{#if connectedAppsError || mcpApiKeysError}
+				{#if connectedAppsError || mcpConnectionsError || mcpApiKeysError}
 					<button type="button" class="btn btn-secondary mt-sm" onclick={() => loadConnections()}>
 						Retry
 					</button>
@@ -401,47 +454,83 @@
 				</div>
 			{/if}
 
-			<section aria-labelledby="connections-mcp-heading">
-				<h3 id="connections-mcp-heading" class="connections__group-title">MCP Bearer tokens</h3>
+			<section aria-labelledby="connections-mcp-access-heading">
+				<h3 id="connections-mcp-access-heading" class="connections__group-title">MCP Access</h3>
 				<p class="card__meta connections__mcp-intro">
 					Connect MCP-compatible agents and tools to your notes using this server URL. Authenticate
-					with a Bearer token you create below.
+					with OAuth when your tool supports it, or create a Bearer token below.
 				</p>
 				<p class="connections__mcp-url">
 					<code class="connections__mcp-url-code">{mcpServerUrl}</code>
 				</p>
-				{#if mcpApiKeys.length > 0}
+				{#if mcpAccessItems.length > 0}
 					<ul class="connections__list">
-						{#each mcpApiKeys as key, index (`mcp-${key.id}-${index}`)}
+						{#each mcpAccessItems as item, index (item.kind === 'oauth' ? `oauth-${item.connection.id}-${index}` : `bearer-${item.key.id}-${index}`)}
 							<li class="connections__row">
 								<div class="connections__row-main">
-									<p class="connections__row-title">{key.name}</p>
-									<p class="connections__row-meta">{key.key_prefix}…</p>
-									<p class="connections__row-meta">Scope: {key.scopes}</p>
-									<p class="connections__row-meta">
-										Created {formatProfileDate(key.created_at)} · {formatLastUsed(key.last_used_at)}
-									</p>
+									{#if item.kind === 'oauth'}
+										{@const label = getOAuthConnectionLabel(item.connection)}
+										<p class="connections__row-title">{label}</p>
+										<p class="connections__row-meta">Scope: {item.connection.scopes}</p>
+										<p class="connections__row-meta">
+											Connected {formatProfileDate(item.connection.created_at)} · Expires {formatProfileDate(
+												item.connection.expires_at
+											)}
+										</p>
+									{:else}
+										<p class="connections__row-title">{item.key.name}</p>
+										<p class="connections__row-meta">{item.key.key_prefix}…</p>
+										<p class="connections__row-meta">Scope: {item.key.scopes}</p>
+										<p class="connections__row-meta">
+											Created {formatProfileDate(item.key.created_at)} · {formatLastUsed(
+												item.key.last_used_at
+											)}
+										</p>
+									{/if}
 								</div>
 								<div class="connections__row-side">
-									<button
-										type="button"
-										class="btn btn--compact"
-										onclick={() => handleDeleteMcpKey(key.id, key.name)}
-										disabled={revokingKeyId === key.id}
-										aria-label={`Revoke Bearer token ${key.name}`}
+									<span
+										class="badge {item.kind === 'oauth' ? 'badge--positive' : 'badge--muted'}"
+										role="status"
 									>
-										{#if revokingKeyId === key.id}
-											Revoking…
-										{:else}
-											Revoke token
-										{/if}
-									</button>
+										{item.kind === 'oauth' ? 'OAuth' : 'Bearer'}
+									</span>
+									{#if item.kind === 'oauth'}
+										{@const label = getOAuthConnectionLabel(item.connection)}
+										<button
+											type="button"
+											class="btn btn--compact"
+											onclick={() => handleDeleteMcpConnection(item.connection.id, label)}
+											disabled={revokingConnectionId === item.connection.id}
+											aria-label={`Revoke OAuth connection ${label}`}
+										>
+											{#if revokingConnectionId === item.connection.id}
+												Revoking…
+											{:else}
+												Revoke
+											{/if}
+										</button>
+									{:else}
+										<button
+											type="button"
+											class="btn btn--compact"
+											onclick={() => handleDeleteMcpKey(item.key.id, item.key.name)}
+											disabled={revokingKeyId === item.key.id}
+											aria-label={`Revoke Bearer token ${item.key.name}`}
+										>
+											{#if revokingKeyId === item.key.id}
+												Revoking…
+											{:else}
+												Revoke token
+											{/if}
+										</button>
+									{/if}
 								</div>
 							</li>
 						{/each}
 					</ul>
 				{:else}
-					<p class="card__meta">No Bearer tokens yet.</p>
+					<p class="card__meta">No MCP access yet.</p>
 				{/if}
 			</section>
 		</div>
@@ -665,8 +754,15 @@
 					<h3 class="notes-transfer-help__heading">MCP with OAuth flow</h3>
 					<ul class="notes-transfer-help__list">
 						<li>MCP endpoints are hosted under <code>{mcpServerUrl}</code>.</li>
-						<li>Authorize your mcp tool and choose the scope you need: <code>read</code> or <code>read &amp; write</code>.</li>
+						<li>
+							Authorize your mcp tool and choose the scope you need: <code>read</code> or
+							<code>read &amp; write</code>.
+						</li>
 						<li>After login and consent, your MCP tool can connect to Flit Core.</li>
+						<li>
+							OAuth connections appear in the MCP Access list. Use <code>Revoke</code> to disconnect a
+							tool; it will need to authorize again.
+						</li>
 					</ul>
 				</section>
 
@@ -678,12 +774,10 @@
 							<code>read</code> or <code>read &amp; write</code>.
 						</li>
 						<li>
-							After creating a Bearer token, copy it immediately. Flit only shows the full token details
-							once.
+							After creating a Bearer token, copy it immediately. Flit only shows the full token
+							details once.
 						</li>
-						<li>
-							Enter the copied Bearer token details into the tool that requested them.
-						</li>
+						<li>Enter the copied Bearer token details into the tool that requested them.</li>
 						<li>To remove access, revoke the Bearer token from this page.</li>
 					</ul>
 				</section>

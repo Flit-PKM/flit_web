@@ -8,6 +8,7 @@
 	import { clearFieldError, updateSanitizedField } from '$lib/utils/auth-forms';
 	import { captureApiError, errorLogger } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import type { FormErrors } from '$lib/types/auth';
 
 	let email = $state('');
@@ -105,9 +106,12 @@
 	});
 </script>
 
+<SeoHead
+	title="Forgot Password - Flit Web"
+	description="Request a password reset link for your Flit Web account."
+	noindex
+/>
 <svelte:head>
-	<title>Forgot Password - Flit Web</title>
-	<meta name="description" content="Request a password reset link for your Flit Web account." />
 	{#if turnstileSiteKey}
 		<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 	{/if}

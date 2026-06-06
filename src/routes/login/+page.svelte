@@ -11,6 +11,7 @@
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import type { LoginFormData, FormErrors } from '$lib/types/auth';
 
 	const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
@@ -114,13 +115,11 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Sign In - Flit Web</title>
-	<meta
-		name="description"
-		content="Sign in to your Flit Web account to access your knowledge graph."
-	/>
-</svelte:head>
+<SeoHead
+	title="Sign In - Flit Web"
+	description="Sign in to your Flit Web account to access your knowledge graph."
+	noindex
+/>
 
 <div class="auth">
 	<div class="auth__inner">

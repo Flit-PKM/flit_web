@@ -3,6 +3,7 @@
 	--color-green: oklch(0.63 0.5 142);
 	--color-red: oklch(0.63 0.5 31);
 	--color-blue: oklch(0.63 0.5 240);
+	--color-gold: oklch(0.78 0.14 85);
 	--color-mid-grey: oklch(50% 0 0);
 
 	--canvas-dark: oklch(18% 0.01 176);

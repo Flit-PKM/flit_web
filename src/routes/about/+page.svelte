@@ -1,11 +1,38 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
+	import { asset } from '$app/paths';
+	import SeoHead from '$lib/components/SeoHead.svelte';
+	import JsonLd from '$lib/components/JsonLd.svelte';
+	import {
+		buildCanonicalUrl,
+		buildWebPageGraph,
+		getSiteOrigin,
+		wrapJsonLdGraph
+	} from '$lib/utils/seo';
 	// About page - generic content
+
+	const aboutDescription =
+		'Learn about Flit Web — a privacy-first personal knowledge management ecosystem with AI-powered note taking, sync, and connected apps.';
+
+	let siteOrigin = $derived(getSiteOrigin($page.url.origin));
+	let pageUrl = $derived(buildCanonicalUrl(siteOrigin, $page.url.pathname));
+	let logoUrl = $derived(`${siteOrigin}${asset('/images/flit_app_logo.svg')}`);
+	let jsonLd = $derived(
+		wrapJsonLdGraph(
+			buildWebPageGraph({
+				originUrl: `${siteOrigin}/`,
+				pageUrl,
+				pageName: 'About - Flit Web',
+				pageDescription: aboutDescription,
+				logoUrl
+			})
+		)
+	);
 </script>
 
-<svelte:head>
-	<title>About - Flit Web</title>
-</svelte:head>
+<SeoHead title="About - Flit Web" description={aboutDescription} />
+<JsonLd data={jsonLd} />
 
 <h1>About Flit-PKM</h1>
 <div class="card">

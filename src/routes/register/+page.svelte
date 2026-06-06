@@ -14,6 +14,7 @@
 	import { errorLogger } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import type { RegisterFormData, FormErrors } from '$lib/types/auth';
 
 	const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
@@ -155,9 +156,12 @@
 	});
 </script>
 
+<SeoHead
+	title="Sign Up - Flit Web"
+	description="Create your Flit Web account to access your knowledge graph."
+	noindex
+/>
 <svelte:head>
-	<title>Sign Up - Flit Web</title>
-	<meta name="description" content="Create your Flit Web account to access your knowledge graph." />
 	<!-- Cloudflare Turnstile has no stable SRI hash; see AGENTS.md third-party scripts. -->
 	{#if turnstileSiteKey}
 		<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>

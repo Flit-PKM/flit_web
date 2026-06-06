@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { resolve } from '$app/paths';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 
 	type VerificationState = 'success' | 'expired' | 'unconfigured' | 'unknown';
 
@@ -15,10 +16,11 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Email Verification - Flit Web</title>
-	<meta name="description" content="Email verification status for your Flit Web account." />
-</svelte:head>
+<SeoHead
+	title="Email Verification - Flit Web"
+	description="Email verification status for your Flit Web account."
+	noindex
+/>
 <h1>Email Verification</h1>
 <div class="card">
 	<div role={verificationState === 'success' ? 'status' : 'alert'}>

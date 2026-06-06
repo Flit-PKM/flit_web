@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import SeoHead from '$lib/components/SeoHead.svelte';
+
+	const termsDescription =
+		'Flit Web Terms of Service and Privacy Policy. Privacy-first personal knowledge management.';
 </script>
 
-<svelte:head>
-	<title>Terms of Service & Privacy Policy - Flit</title>
-	<meta
-		name="description"
-		content="Flit Terms of Service and Privacy Policy. Privacy-first personal knowledge management."
-	/>
-</svelte:head>
+<SeoHead title="Terms of Service & Privacy Policy - Flit Web" description={termsDescription} />
 
 <h1>Flit Terms of Service</h1>
 <div class="card prose">
@@ -52,8 +50,8 @@
 				through a paid subscription (details will be shown in-app when launched).
 			</li>
 			<li>
-				Payments will be processed via a third-party provider (e.g., Stripe). We do not store your
-				full payment card details; they are handled securely by the provider.
+				Payments will be processed via Dodo Payments. We do not store your full payment card
+				details; they are handled securely by the provider.
 			</li>
 			<li>
 				Subscriptions auto-renew unless cancelled. No refunds for partial periods except where

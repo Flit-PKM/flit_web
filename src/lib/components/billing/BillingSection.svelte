@@ -2,19 +2,25 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { base, resolve } from '$app/paths';
-	import { currentUser } from '$lib/stores/auth';
+	import { authActions, currentUser } from '$lib/stores/auth';
 	import { apiClient } from '$lib/api/client';
 	import { captureApiError, errorLogger } from '$lib/utils/error-handler';
 	import {
-		formatPlanPrice,
+		getPortalErrorMessage,
+		isActiveSubscriptionStatus,
 		isAnnualPlan,
+		isCancelledOrExpiredStatus,
 		isMonthlyPlan,
+		isPaymentIssueSubscriptionStatus,
+		isPortalManageableStatus,
+		redirectToCustomerPortal,
 		sortSubscriptionPlans
 	} from '$lib/utils/billing';
 	import { formatProfileDate, getCheckoutErrorMessage } from '$lib/utils/profile';
 	import { setPendingBillingPlan, type PendingBillingPlan } from '$lib/utils/billing-selection';
 	import type { PlanDetailResponse, SubscriptionStatusResponse } from '$lib/types/billing';
 	import FreePlanCard from './FreePlanCard.svelte';
+	import PaidPlanCard from './PaidPlanCard.svelte';
 
 	interface Props {
 		guestMode?: boolean;
@@ -30,6 +36,8 @@
 
 	let checkoutLoading = $state(false);
 	let checkoutError = $state('');
+	let portalLoading = $state(false);
+	let portalError = $state('');
 	let subscriptionStatus = $state<SubscriptionStatusResponse | null>(null);
 	let subscriptionLoading = $state(false);
 	let subscriptionError = $state('');
@@ -37,12 +45,12 @@
 	let plansLoading = $state(false);
 	let plansError = $state('');
 
-	let hasActiveSubscription = $derived(
-		$currentUser?.subscription?.status === 'active' ||
-			$currentUser?.subscription?.status === 'trialing' ||
-			subscriptionStatus?.status === 'active' ||
-			subscriptionStatus?.status === 'trialing'
+	let resolvedStatus = $derived(
+		$currentUser?.subscription?.status ?? subscriptionStatus?.status ?? null
 	);
+	let hasActiveSubscription = $derived(isActiveSubscriptionStatus(resolvedStatus));
+	let hasPaymentIssue = $derived(isPaymentIssueSubscriptionStatus(resolvedStatus));
+	let canManageViaPortal = $derived(isPortalManageableStatus(resolvedStatus));
 	let currentPlanProductId = $derived($currentUser?.subscription?.product_id ?? null);
 	let currentPeriodEnd = $derived(
 		$currentUser?.subscription?.current_period_end ?? subscriptionStatus?.current_period_end ?? null
@@ -83,7 +91,10 @@
 	onMount(() => {
 		void loadPlans();
 		if (!guestMode) {
-			void loadSubscription();
+			void (async () => {
+				await loadSubscription();
+				await authActions.refreshUser();
+			})();
 		}
 	});
 
@@ -135,6 +146,23 @@
 	function handleGuestPlanSelect(plan: PendingBillingPlan) {
 		setPendingBillingPlan(plan);
 		goto(resolve('/register'));
+	}
+
+	async function handleOpenPortal() {
+		if (guestMode || !canManageViaPortal) return;
+		portalError = '';
+		portalLoading = true;
+		try {
+			errorLogger.logDebug('Opening customer portal');
+			await redirectToCustomerPortal();
+		} catch (err) {
+			errorLogger.logError(err instanceof Error ? err : new Error(String(err)), {
+				operation: 'getCustomerPortal'
+			});
+			portalError = getPortalErrorMessage(err);
+		} finally {
+			portalLoading = false;
+		}
 	}
 
 	async function handleCheckout(productId: string) {
@@ -216,14 +244,65 @@
 				<p class="alert__message">{checkoutError}</p>
 			</div>
 		{/if}
-		{#if !guestMode && !hasActiveSubscription && subscriptionStatus?.status !== null && subscriptionStatus !== null}
-			{@const status = subscriptionStatus?.status ?? ''}
-			{@const isPaymentIssue = ['past_due', 'on_hold', 'failed'].includes(status)}
-			<p class="card__meta card__meta--mb-md">
-				{isPaymentIssue
-					? 'Payment issue — update your payment method or resubscribe below.'
-					: 'Subscription canceled or expired. Choose a plan to resubscribe.'}
-			</p>
+		{#if portalError}
+			<div class="alert alert--error" role="alert">
+				<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+					<path
+						fill-rule="evenodd"
+						d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+						clip-rule="evenodd"
+					/>
+				</svg>
+				<p class="alert__message">{portalError}</p>
+			</div>
+		{/if}
+		{#if !guestMode && !hasActiveSubscription && resolvedStatus !== null}
+			{#if resolvedStatus === 'on_hold'}
+				<p class="card__meta card__meta--mb-md">
+					Payment issue — update your payment method or resubscribe below.
+				</p>
+				<div class="card__meta--mb-md">
+					<button
+						type="button"
+						class="btn btn-primary"
+						onclick={handleOpenPortal}
+						disabled={portalLoading}
+					>
+						{#if portalLoading}
+							<span class="loading__spinner loading__spinner--mr-sm" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle
+										class="loading__spinner-inner"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="loading__spinner-path"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+							</span>
+							Opening customer portal…
+						{:else}
+							Update payment method
+						{/if}
+					</button>
+				</div>
+			{:else if isCancelledOrExpiredStatus(resolvedStatus)}
+				<p class="card__meta card__meta--mb-md">
+					Subscription cancelled or expired. Choose a plan to resubscribe.
+				</p>
+			{:else if hasPaymentIssue}
+				<p class="card__meta card__meta--mb-md">
+					Payment issue — update your payment method or resubscribe below.
+				</p>
+			{:else if resolvedStatus === 'pending'}
+				<p class="card__meta card__meta--mb-md">Subscription pending activation.</p>
+			{/if}
 		{:else if !guestMode && !hasActiveSubscription}
 			<p class="card__meta card__meta--mb-md">
 				Upgrade or manage your subscription via secure checkout.
@@ -250,70 +329,20 @@
 		{:else if showActiveSubscriptionOnly}
 			<div class="grid-cards grid-cards--plans grid-cards--plans-single">
 				{#if currentPlan}
-					<button
-						type="button"
-						onclick={() => handleCheckout(currentPlan.product_id)}
-						disabled={checkoutLoading}
-						class="plan-card plan-card--current"
-						aria-current="true"
-						aria-label="Current plan: {currentPlan.name ??
-							'subscription plan'} – manage subscription"
-					>
-						<span class="plan-card__badge">Current plan</span>
-						<div class="plan-card__main">
-							{#if currentPlan.image}
-								<img src={currentPlan.image} alt="" class="plan-card__image" />
-							{/if}
-							<div class="plan-card__head">
-								<h3 class="plan-card__title">
-									{currentPlan.name ?? 'Subscription plan'}
-								</h3>
-								<p class="plan-card__price">
-									{formatPlanPrice(currentPlan.price)}
-								</p>
-							</div>
-							{#if currentPlan.description}
-								<div class="plan-card__description card__meta">
-									{#each currentPlan.description
-										.split(/\n/)
-										.filter(Boolean) as paragraph (paragraph)}
-										<p>{paragraph}</p>
-									{/each}
-								</div>
-							{/if}
-						</div>
-						<span class="plan-card__cta">
-							{#if checkoutLoading}
-								<span class="plan-card__cta-loading">
-									<span class="loading__spinner" aria-hidden="true">
-										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-											<circle
-												class="loading__spinner-inner"
-												cx="12"
-												cy="12"
-												r="10"
-												stroke="currentColor"
-												stroke-width="4"
-											></circle>
-											<path
-												class="loading__spinner-path"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-											></path>
-										</svg>
-									</span>
-									Redirecting to checkout…
-								</span>
-							{:else}
-								Manage
-							{/if}
-						</span>
-					</button>
+					<PaidPlanCard
+						plan={currentPlan}
+						variant="manage"
+						isCurrent
+						loading={portalLoading}
+						loadingLabel="Opening customer portal…"
+						disabled={portalLoading}
+						onclick={handleOpenPortal}
+					/>
 				{:else if currentPlanProductId}
 					<button
 						type="button"
-						onclick={() => handleCheckout(currentPlanProductId)}
-						disabled={checkoutLoading}
+						onclick={handleOpenPortal}
+						disabled={portalLoading}
 						class="plan-card plan-card--current"
 						aria-current="true"
 						aria-label="Manage active subscription"
@@ -323,7 +352,7 @@
 							<h3 class="plan-card__title">Active subscription</h3>
 						</div>
 						<span class="plan-card__cta">
-							{#if checkoutLoading}
+							{#if portalLoading}
 								<span class="plan-card__cta-loading">
 									<span class="loading__spinner" aria-hidden="true">
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -342,10 +371,10 @@
 											></path>
 										</svg>
 									</span>
-									Redirecting to checkout…
+									Opening customer portal…
 								</span>
 							{:else}
-								Manage
+								Manage subscription
 							{/if}
 						</span>
 					</button>
@@ -360,44 +389,13 @@
 					onselect={() => handleGuestPlanSelect('free')}
 				/>
 				{#each subscriptionPlans as plan (plan.product_id)}
-					<button
-						type="button"
+					<PaidPlanCard
+						{plan}
+						{guestMode}
+						disabled={!guestMode && checkoutLoading}
 						onclick={() =>
 							guestMode ? handleGuestPlanSelect(plan.product_id) : handleCheckout(plan.product_id)}
-						disabled={!guestMode && checkoutLoading}
-						class="plan-card"
-						aria-label={guestMode
-							? `Choose ${plan.name ?? 'subscription plan'} – sign up`
-							: `Subscribe to ${plan.name ?? 'subscription plan'} – go to checkout`}
-					>
-						<div class="plan-card__main">
-							{#if plan.image}
-								<img src={plan.image} alt="" class="plan-card__image" />
-							{/if}
-							<div class="plan-card__head">
-								<h3 class="plan-card__title">
-									{plan.name ?? 'Subscription plan'}
-								</h3>
-								<p class="plan-card__price">
-									{formatPlanPrice(plan.price)}
-								</p>
-							</div>
-							{#if plan.description}
-								<div class="plan-card__description card__meta">
-									{#each plan.description.split(/\n/).filter(Boolean) as paragraph (paragraph)}
-										<p>{paragraph}</p>
-									{/each}
-								</div>
-							{/if}
-						</div>
-						<span class="plan-card__cta">
-							{#if guestMode}
-								Choose plan
-							{:else}
-								Subscribe
-							{/if}
-						</span>
-					</button>
+					/>
 				{/each}
 			</div>
 		{:else if guestMode && !plansLoading && !plansError}

@@ -38,13 +38,18 @@ import type {
 	BillingCompleteResponse,
 	CheckoutSessionRequest,
 	CheckoutSessionResponse,
+	CustomerPortalResponse,
 	PlanDetailResponse,
 	SubscriptionStatusResponse
 } from '../types/billing';
 import type { FeedbackCreate, FeedbackRead } from '../types/feedback';
 import type { VaultMarkdownImportResult } from '../types/vault';
-import type { McpApiKey, McpApiKeyCreate, McpApiKeyCreated } from '../types/mcp';
-import { normalizeMcpApiKey, normalizeMcpApiKeyList } from '../types/mcp';
+import type { McpApiKey, McpApiKeyCreate, McpApiKeyCreated, McpConnection } from '../types/mcp';
+import {
+	normalizeMcpApiKey,
+	normalizeMcpApiKeyList,
+	normalizeMcpConnectionList
+} from '../types/mcp';
 import { errorLogger, handleApiError } from '$lib/utils/error-handler';
 
 /**
@@ -466,6 +471,25 @@ export class ApiClient {
 	}
 
 	/**
+	 * List active MCP OAuth sessions for the current user. GET /mcp/connections. Requires Bearer auth.
+	 */
+	async getMcpConnections(): Promise<McpConnection[]> {
+		const response = await this.request<unknown>(`${getMcpServerUrl()}/connections`, {
+			method: 'GET'
+		});
+		return normalizeMcpConnectionList(response.data);
+	}
+
+	/**
+	 * Revoke an MCP OAuth session by id. DELETE /mcp/connections/{connection_id}. Requires Bearer auth.
+	 */
+	async deleteMcpConnection(connectionId: number): Promise<void> {
+		await this.request<void>(`${getMcpServerUrl()}/connections/${connectionId}`, {
+			method: 'DELETE'
+		});
+	}
+
+	/**
 	 * List available subscription plans. GET /billing/plans. Public; no auth required.
 	 * Returns plans with product_id, name, description, price, addons. Cached on backend.
 	 */
@@ -507,6 +531,17 @@ export class ApiClient {
 		const response = await this.request<BillingCompleteResponse>('/billing/complete', {
 			method: 'POST',
 			body
+		});
+		return response.data;
+	}
+
+	/**
+	 * Get Dodo customer portal URL for self-service subscription management.
+	 * GET /billing/portal. Requires Bearer auth.
+	 */
+	async getCustomerPortal(): Promise<CustomerPortalResponse> {
+		const response = await this.request<CustomerPortalResponse>('/billing/portal', {
+			method: 'GET'
 		});
 		return response.data;
 	}

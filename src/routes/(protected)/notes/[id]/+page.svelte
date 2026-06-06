@@ -24,6 +24,7 @@
 	import NoteRelationshipsPanel from '$lib/components/notes/NoteRelationshipsPanel.svelte';
 	import NoteColorSlider from '$lib/components/notes/NoteColorSlider.svelte';
 	import NoteSearchPopup from '$lib/components/notes/NoteSearchPopup.svelte';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import { confirmAction } from '$lib/stores/confirmDialog';
 	import { buildRelatedTitleMap } from '$lib/utils/notes';
 	import { normalizeNoteRead } from '$lib/utils/notes';
@@ -716,12 +717,10 @@
 	let documentTitle = $derived(
 		note ? `${liveTitle.trim() || note.title} – Notes` : 'Note – Flit Web'
 	);
+	let documentDescription = $derived(note ? liveTitle.trim() || note.title : 'Note detail');
 </script>
 
-<svelte:head>
-	<title>{documentTitle}</title>
-	<meta name="description" content={note ? liveTitle.trim() || note.title : 'Note detail'} />
-</svelte:head>
+<SeoHead title={documentTitle} description={documentDescription} />
 <div class="note-page" class:note-page--tinted={notePageTinted} style={notePageStyle}>
 	<a href={resolve('/notes')} class="mt-sm note-page__back-link">← Back to Notes</a>
 	{#if isLoading}
@@ -792,7 +791,7 @@
 			/>
 
 			<NoteColorSlider
-				liveColor={liveColor}
+				{liveColor}
 				disabled={isSaving}
 				onColorChange={(hex) => {
 					liveColor = hex;

@@ -120,3 +120,11 @@ export interface BillingCompleteResponse {
 	subscription_id: string | null;
 	status: string | null;
 }
+
+/**
+ * Response from GET /billing/portal (CustomerPortalResponse).
+ * Contains the URL to redirect the user to for self-service subscription management.
+ */
+export interface CustomerPortalResponse {
+	portal_url: string;
+}

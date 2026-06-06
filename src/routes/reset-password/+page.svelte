@@ -8,6 +8,7 @@
 	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
 	import { captureApiError } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import type { FormErrors } from '$lib/types/auth';
 
 	type PageState = 'expired' | 'form' | 'invalid';
@@ -90,10 +91,11 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Reset Password - Flit Web</title>
-	<meta name="description" content="Set a new password for your Flit Web account." />
-</svelte:head>
+<SeoHead
+	title="Reset Password - Flit Web"
+	description="Set a new password for your Flit Web account."
+	noindex
+/>
 
 <div class="auth">
 	<div class="auth__inner">

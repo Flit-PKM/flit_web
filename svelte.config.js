@@ -4,7 +4,8 @@ import adapter from '@sveltejs/adapter-static';
 const config = {
 	kit: {
 		adapter: adapter({
-			fallback: 'index.html'
+			// Keep prerendered index.html; serve 200.html for non-prerendered SPA routes.
+			fallback: '200.html'
 		}),
 		paths: {
 			base: '',

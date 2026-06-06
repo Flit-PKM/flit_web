@@ -22,6 +22,7 @@
 	import { debounceTrailing } from '$lib/utils/debounce';
 	import { confirmAction } from '$lib/stores/confirmDialog';
 	import { createNoteAndNavigate } from '$lib/utils/note-create';
+	import SeoHead from '$lib/components/SeoHead.svelte';
 	import type { NoteRead, CategoryRead } from '$lib/types/note';
 
 	const notesListPath = resolve('/notes');
@@ -531,9 +532,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Notes – Flit Web</title>
-</svelte:head>
+<SeoHead title="Notes – Flit Web" description="Your Flit Web notes and knowledge graph." />
 <svelte:window
 	onclick={() => {
 		if (activeOptionsNoteId !== null) closeNoteOptions();

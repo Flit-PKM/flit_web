@@ -1,9 +1,35 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import { resolve, asset } from '$app/paths';
 	import { page } from '$app/stores';
 	import { isAuthenticated, currentUser } from '$lib/stores/auth';
 	import { parseRootRedirectTarget } from '$lib/utils/navigation';
+	import SeoHead from '$lib/components/SeoHead.svelte';
+	import JsonLd from '$lib/components/JsonLd.svelte';
+	import {
+		buildCanonicalUrl,
+		buildWebPageGraph,
+		getSiteOrigin,
+		wrapJsonLdGraph
+	} from '$lib/utils/seo';
+
+	const homeDescription =
+		'Personal note taking and knowledge management. Capture thoughts, connect ideas, and sync across the Flit-PKM ecosystem.';
+
+	let siteOrigin = $derived(getSiteOrigin($page.url.origin));
+	let pageUrl = $derived(buildCanonicalUrl(siteOrigin, $page.url.pathname));
+	let logoUrl = $derived(`${siteOrigin}${asset('/images/flit_app_logo.svg')}`);
+	let jsonLd = $derived(
+		wrapJsonLdGraph(
+			buildWebPageGraph({
+				originUrl: `${siteOrigin}/`,
+				pageUrl,
+				pageName: 'Flit Web – Welcome',
+				pageDescription: homeDescription,
+				logoUrl
+			})
+		)
+	);
 
 	// Billing checkout may still return to /; forward to /billing handler.
 	$effect(() => {
@@ -22,9 +48,8 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Flit Web – Welcome</title>
-</svelte:head>
+<SeoHead title="Flit Web – Welcome" description={homeDescription} />
+<JsonLd data={jsonLd} />
 
 <header class="hero">
 	<h1>Flit</h1>

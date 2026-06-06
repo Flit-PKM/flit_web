@@ -8,6 +8,7 @@
 	import { pendingColorScheme } from '$lib/stores/theme';
 	import { initializeLogging } from '$lib/utils/log-config';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import { buildCanonicalUrl, getSiteOrigin } from '$lib/utils/seo';
 
 	const isProd = import.meta.env.MODE === 'production';
 
@@ -23,8 +24,9 @@
 	}
 
 	let isLoggedIn = $derived($isAuthenticated && $currentUser);
-	let canonicalUrl = $derived($page.url.origin + $page.url.pathname);
-	let ogImageUrl = $derived($page.url.origin + asset('/images/flit_app_logo.svg'));
+	let canonicalUrl = $derived(
+		buildCanonicalUrl(getSiteOrigin($page.url.origin), $page.url.pathname)
+	);
 
 	// Initialize auth state on app start
 	onMount(() => {
@@ -115,29 +117,6 @@
 	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 	<link rel="manifest" href="/site.webmanifest" />
 	<link rel="canonical" href={canonicalUrl} />
-
-	<title>Flit Web</title>
-	<meta
-		name="description"
-		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
-	/>
-	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content="Flit Core" />
-	<meta property="og:title" content="Flit" />
-	<meta
-		property="og:description"
-		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
-	/>
-	<meta property="og:url" content={canonicalUrl} />
-	<meta property="og:image" content={ogImageUrl} />
-
-	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Flit" />
-	<meta
-		name="twitter:description"
-		content="Flit - Note Taking & Personal Knowledge Management. Create, Edit and Delete notes, build Relationships and Categorize them for easy navigation and summarization. Part of the Flit-PKM ecosystem."
-	/>
-	<meta name="twitter:image" content={ogImageUrl} />
 
 	{#if isProd}
 		<script
