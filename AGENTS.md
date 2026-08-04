@@ -4,14 +4,22 @@
 
 **Flit Web** is a SvelteKit 2.x application with TypeScript 5.x and vanilla CSS. It provides a client-side interface for a FastAPI backend, handling authentication, notes and category management, billing/subscription, profile, and connected apps.
 
+## Principles
+
+- **YAGNI** — do not build abstractions until a third use forces them
+- **Reuse** — prefer `apiClient`, `captureApiError`, shared CSS classes, and existing utils
+- **Deletion over addition** — remove dead exports before adding wrappers
+- **Clean breaks** — prefer fixing the shared helper once over per-caller patches
+- **Security at the API** — `(protected)` layout is a UX gate only; Bearer auth on FastAPI is authoritative
+
 ## Tech Stack
 
-- **Framework**: SvelteKit 2.x (SSR + SPA)
+- **Framework**: SvelteKit 2.x with `@sveltejs/adapter-static` (prerender where marked; SPA fallback for the rest — not classic SSR)
 - **Language**: TypeScript 5.x (strict mode)
 - **Styling**: Vanilla CSS with layers (reset, base, layout, components) and design tokens in `src/css/colors.css`. Entry: `src/css/style.css`. Reusable patterns must live in shared class-based CSS (`layout.css` and `components.css`). Do **not** use `<style>` blocks in Svelte files. Inline `style` is allowed only for truly dynamic runtime values (for example width percentages driven by state). Canonical class conventions: button variants use `btn-*` modifiers (`btn-primary`, `btn-secondary`, `btn-danger`), and card element classes use `card__*` naming.
 - **Code Quality**: ESLint 9.x + Prettier 3.x
 - **Build**: Vite 6.x
-- **Note editor**: The note detail route (`(protected)/notes/[id]`) uses Tiptap 3 (`@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/markdown`) in [NoteMarkdownEditor.svelte](src/lib/components/NoteMarkdownEditor.svelte) for visual editing with GFM-oriented markdown (tables, task lists) and a **Markdown source** mode (plain textarea) toggled in the UI; persistence is always a markdown string via `getMarkdown()` / `setContent(..., { contentType: 'markdown' })`. **`+page.svelte` must dynamically `import()` that component only when `browser` is true** so ProseMirror/Tiptap are never loaded during SSR (a static import causes a 500). [vite.config.ts](vite.config.ts) lists those packages under `optimizeDeps.include` so Vite pre-bundles them at dev start (avoids broken `.vite/deps` responses when the editor chunk loads lazily). If the browser still reports corrupted / empty MIME for `.vite/deps`, delete `node_modules/.vite` and run `npm run dev:force`. Title and body autosave to the API with a 30 second trailing debounce (`debounceTrailing` in `src/lib/utils/debounce.ts`).
+- **Note editor**: The note detail route (`(protected)/notes/[id]`) uses Tiptap 3 (`@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/markdown`) in [NoteMarkdownEditor.svelte](src/lib/components/NoteMarkdownEditor.svelte) for visual editing with GFM-oriented markdown (tables, task lists) and a **Markdown source** mode (plain textarea) toggled in the UI; persistence is always a markdown string via `getMarkdown()` / `setContent(..., { contentType: 'markdown' })`. **`+page.svelte` must dynamically `import()` that component only when `browser` is true** so ProseMirror/Tiptap are never loaded during SSR (a static import causes a 500). [vite.config.ts](vite.config.ts) lists those packages under `optimizeDeps.include` so Vite pre-bundles them at dev start (avoids broken `.vite/deps` responses when the editor chunk loads lazily). If the browser still reports corrupted / empty MIME for `.vite/deps`, delete `node_modules/.vite` and run `npm run dev:force`. Title and body autosave to the API with a 30 second trailing debounce (`debounceTrailing` in `src/lib/utils/debounce.ts`), plus `beforeunload` / visibility flush on the note detail page.
 
 ## Architecture Pattern
 
@@ -21,7 +29,7 @@ Client-driven API architecture with centralized API client handling HTTP communi
 
 - **Svelte 5 Runes**: `$state`, `$derived`, `$effect` for reactivity
 - **API Client**: Robust HTTP client with auto token injection, retry logic for safe methods (`GET`/`HEAD`/`OPTIONS`), timeout handling
-- **Stores**: Svelte writable stores with localStorage persistence
+- **Stores**: `auth` persists token/user to localStorage; other stores (`theme`, `confirmDialog`, `noteListSync`) are ephemeral
 - **Type-First**: TypeScript interfaces in `types/` aligned with backend specs
 
 ## Naming Conventions
@@ -34,16 +42,17 @@ Client-driven API architecture with centralized API client handling HTTP communi
 
 ```
 src/
-├── css/            # Vanilla CSS: _reset.css, base.css, colors.css, layout.css, components.css, style.css
+├── css/            # Vanilla CSS (+ components-primitives.css); see css/AGENTS.md
 ├── lib/
-│   ├── api/        # API client (ApiClient class)
-│   ├── assets/     # Static assets (favicon, etc.)
-│   ├── components/ # Reusable Svelte components (e.g. GeneralErrorAlert, NoteMarkdownEditor)
-│   ├── stores/     # Global state (authStore, pendingColorScheme, etc.)
-│   ├── types/      # TypeScript definitions
-│   └── utils/      # Helper functions (auth, validation, error-handler, debounce)
-└── routes/         # SvelteKit pages/layouts
-    └── (protected)/ # Auth guard layout; profile and notes live here
+│   ├── api/        # ApiClient singleton — see api/AGENTS.md
+│   ├── assets/     # Optional static imports (prefer static/ for favicons)
+│   ├── components/ # billing/, notes/, profile/ — see components/AGENTS.md
+│   ├── constants/  # Shared constants (e.g. notes)
+│   ├── stores/     # auth (persisted), theme, confirmDialog, noteListSync
+│   ├── types/      # OpenAPI-aligned types — see types/AGENTS.md
+│   └── utils/      # auth, validation, error-handler, billing, debounce — see utils/AGENTS.md
+└── routes/         # Public + (protected)/ — see routes/AGENTS.md
+scripts/            # Build helpers (sitemap) — see scripts/AGENTS.md
 ```
 
 ## Essential Workflows
@@ -52,16 +61,26 @@ src/
 2. **Tests**: `npm run test` (watch), `npm run test:run` (single run), or `npm run test:coverage` for thresholds/reporting. Use `npm run ci:check` before merging.
 3. **API Usage**: Always use `apiClient` methods (no raw fetch)
 4. **State**: Use `$state` for local, `authStore` for global auth state
-5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object
-6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI.
-7. **Billing**: Public route [`src/routes/billing/+page.svelte`](src/routes/billing/+page.svelte) — guests see About/Terms/Billing in the top bar and pick Free or paid plans (selection stored in `sessionStorage` via [`billing-selection.ts`](src/lib/utils/billing-selection.ts), then `/register` → `/login` → `/notes` or checkout). Logged-in users open billing only from the Profile page button; checkout `return_url` is `/billing`. Components: [`src/lib/components/billing/`](src/lib/components/billing/).
+5. **Error Handling**: Use `captureApiError(err, context)` in catch blocks for handle + log + user message; use `handleApiError` + `formatErrorForUser` when you need the error object. Log once at the handleApiError boundary (ApiClient throws already-handled `AppError`).
+6. **Auth**: Protected routes live under `(protected)/`; layout redirects unauthenticated users to `/login`. Use `isAuthenticated` derived store for UI. Not a security boundary — API enforces Bearer auth.
+7. **Billing**: Public route [`src/routes/billing/+page.svelte`](src/routes/billing/+page.svelte) — guests see About/Terms/Billing in the top bar and pick Free or paid plans (selection stored in `sessionStorage` via [`billing-selection.ts`](src/lib/utils/billing-selection.ts), then `/register` → `/login` → `/notes` or checkout). `resolvePostLoginDestination` **peeks** paid plans (billing page **consumes** for auto-checkout); free plans are consumed at routing. Logged-in users open billing only from the Profile page button; checkout `return_url` is `/billing`. Components: [`src/lib/components/billing/`](src/lib/components/billing/).
 8. **Index redirect**: `/?redirect=login` or `/?redirect=register` redirects unauthenticated users for deep-linking from outside the SPA (e.g. `core.flit-pkm.com/?redirect=login`). Login post-auth redirects use [`navigation.ts`](src/lib/utils/navigation.ts) (`resolvePostLoginDestination`) for safe internal paths and billing callback query params. Legacy checkout returns to `/` forward to `/billing`.
 9. **OpenAPI**: Always confirm Flit-Core API endpoints using `curl http://localhost:8000/openapi.json` in the terminal
+
+## Gotchas
+
+- JWT segments are base64url — decode via `decodeJwtPayload` / helpers in `utils/auth.ts`, never raw `atob` alone
+- TipTap / ProseMirror must not be statically imported on SSR routes
+- localStorage JWT + any XSS = session theft; keep `{@html}` sinks tight and prefer CSP at the CDN
+- Pending billing plan: peek for routing, consume for checkout (or free at route resolve)
 
 ## HTML rendering and XSS
 
 - **Never** use `{@html}` with raw user input or API strings.
-- The only allowed `{@html}` sink is note list previews via `markdownToSafeHtml()` in [`src/lib/utils/markdown.ts`](src/lib/utils/markdown.ts) (Marked + DOMPurify). ESLint allows `@html` only on [`notes/+page.svelte`](<src/routes/(protected)/notes/+page.svelte>).
+- Allowed `{@html}` sinks:
+  - Note list previews via `markdownToSafeHtml()` in [`src/lib/utils/markdown.ts`](src/lib/utils/markdown.ts) (Marked + DOMPurify) — used from [`NoteListCard.svelte`](src/lib/components/notes/NoteListCard.svelte)
+  - JSON-LD via [`JsonLd.svelte`](src/lib/components/JsonLd.svelte) after `escapeJsonLd`
+- ESLint `svelte/no-at-html-tags` allowlists notes list UI; JsonLd uses a local disable with escaping.
 - All other dynamic text uses `{expression}` bindings (Svelte auto-escapes).
 - `sanitizeInput()` in auth utils does **not** strip HTML; it preserves credentials for forms.
 
@@ -71,15 +90,15 @@ Google Sign-In and Cloudflare Turnstile are loaded without SRI (vendors do not s
 
 ## Client-side login rate limit
 
-`loginRateLimiter` in [`src/lib/utils/auth.ts`](src/lib/utils/auth.ts) is a **UX deterrent only** (localStorage/session timing). Server-side rate limits are authoritative.
+`loginRateLimiter` in [`src/lib/utils/auth.ts`](src/lib/utils/auth.ts) is a **UX deterrent only** (in-memory `Map`; resets on reload). Server-side rate limits are authoritative.
 
 ## Critical Rules
 
-- Never hardcode secrets; use `.env` for `VITE_API_BASE_URL`
+- Never hardcode secrets; use `.env` for `VITE_*` public config (see `.env.example`)
 - Configure frontend log verbosity with `VITE_LOG_PROFILE` (`debug`, `test`, `deploy`) and keep route/component logs on `errorLogger` instead of raw `console.*`
 - Implement debouncing for search/filter inputs
-- Persist tokens in localStorage only (check `browser` env)
-- Handle 401 errors by clearing token and redirecting
+- Persist tokens in localStorage only (check `browser` env); require both token and user
+- Handle 401 errors by clearing token and redirecting (`auth:expired`)
 - Use `flit-*` color classes and design tokens from `src/css/colors.css` and shared layout/component classes consistently; use inline styles only for dynamic runtime values
 - Keep global CSS valid vanilla CSS syntax only (no Svelte-only selectors like `:global(...)` in `src/css/*.css`)
 - New classes must be added intentionally to shared CSS before use; avoid placeholder/undefined class hooks in markup
@@ -94,3 +113,14 @@ Google Sign-In and Cloudflare Turnstile are loaded without SRI (vendors do not s
   2. Detect defined-but-unused selectors in `src/css/*.css`
   3. Exclude allowlisted third-party/dynamic patterns
   4. Remove only high-confidence orphans in atomic changes
+
+## Index
+
+- [src/lib/api/AGENTS.md](src/lib/api/AGENTS.md)
+- [src/lib/utils/AGENTS.md](src/lib/utils/AGENTS.md)
+- [src/lib/components/AGENTS.md](src/lib/components/AGENTS.md)
+- [src/lib/stores/AGENTS.md](src/lib/stores/AGENTS.md)
+- [src/lib/types/AGENTS.md](src/lib/types/AGENTS.md)
+- [src/css/AGENTS.md](src/css/AGENTS.md)
+- [src/routes/AGENTS.md](src/routes/AGENTS.md)
+- [scripts/AGENTS.md](scripts/AGENTS.md)

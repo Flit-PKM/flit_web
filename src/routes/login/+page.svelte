@@ -7,7 +7,7 @@
 	import { validateLoginForm, loginRateLimiter } from '$lib/utils/auth';
 	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
 	import { resolvePostLoginDestination } from '$lib/utils/navigation';
-	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
+	import { FormValidator, createDebouncedValidator, validationRules } from '$lib/utils/validation';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
@@ -30,7 +30,7 @@
 	const validator = new FormValidator<LoginFormData>({
 		email: {
 			required: true,
-			rules: []
+			rules: [validationRules.email()]
 		},
 		password: {
 			required: true
@@ -83,13 +83,11 @@
 			return;
 		}
 
-		// Record login attempt
-		loginRateLimiter.recordAttempt(formData.email);
-
 		// Attempt login
 		const result = await authActions.login(formData);
 
 		if (!result.success) {
+			loginRateLimiter.recordAttempt(formData.email);
 			generalError = result.error || 'Login failed. Please try again.';
 		}
 

@@ -86,6 +86,7 @@
 	let noteSearchInputEl = $state<HTMLInputElement | null>(null);
 
 	let showJumpToBottom = $state(false);
+	let showJumpToTop = $state(false);
 	let relatedNoteTitles = $state(new SvelteMap<number, string>());
 	let lastHydratedNoteId = $state<number | null>(null);
 
@@ -222,11 +223,24 @@
 		await autosave.flush();
 		if (saveInFlight) {
 			await saveInFlight;
-			return;
 		}
-		if (isDirtyAgainstBaseline()) {
+		// Re-check: edits may have landed while a save was in flight.
+		while (isDirtyAgainstBaseline()) {
 			await flushNoteToServer();
+			if (saveError) break;
 		}
+	}
+
+	function onBeforeUnload(event: BeforeUnloadEvent): void {
+		if (!note || !isDirtyAgainstBaseline()) return;
+		event.preventDefault();
+		event.returnValue = '';
+	}
+
+	function onVisibilityChange(): void {
+		if (document.visibilityState !== 'hidden') return;
+		if (!note || !isDirtyAgainstBaseline()) return;
+		void ensureNotePersisted();
 	}
 
 	beforeNavigate(async ({ cancel }) => {
@@ -287,6 +301,7 @@
 		if (noteSearchDebounce) clearTimeout(noteSearchDebounce);
 		noteSearchDebounce = setTimeout(async () => {
 			noteSearchLoading = true;
+			noteSearchError = '';
 			try {
 				const raw = await apiClient.getNotes(
 					q.trim() ? { search: q.trim(), limit: 50 } : { limit: 20 }
@@ -294,8 +309,12 @@
 				noteSearchResults = filterNotDeleted(raw)
 					.filter((n) => currentNoteId == null || n.id !== currentNoteId)
 					.map(normalizeNoteRead);
-			} catch {
+			} catch (err) {
 				noteSearchResults = [];
+				noteSearchError = captureApiError(err, {
+					component: 'NoteDetail',
+					operation: 'searchNotes'
+				});
 			} finally {
 				noteSearchLoading = false;
 			}
@@ -404,7 +423,7 @@
 				if (get(page).params.id === String(noteId)) isLoading = false;
 			});
 		return () => {
-			autosave.cancel();
+			void autosave.flush();
 		};
 	});
 
@@ -421,14 +440,18 @@
 				// Non-blocking
 			}
 		})();
-		updateJumpToBottomVisibility();
-		const onScroll = () => updateJumpToBottomVisibility();
-		const onResize = () => updateJumpToBottomVisibility();
+		updateJumpVisibility();
+		const onScroll = () => updateJumpVisibility();
+		const onResize = () => updateJumpVisibility();
 		window.addEventListener('scroll', onScroll, { passive: true });
 		window.addEventListener('resize', onResize);
+		window.addEventListener('beforeunload', onBeforeUnload);
+		document.addEventListener('visibilitychange', onVisibilityChange);
 		return () => {
 			window.removeEventListener('scroll', onScroll);
 			window.removeEventListener('resize', onResize);
+			window.removeEventListener('beforeunload', onBeforeUnload);
+			document.removeEventListener('visibilitychange', onVisibilityChange);
 		};
 	});
 
@@ -444,7 +467,7 @@
 		void isLoading;
 		void error;
 		if (!browser) return;
-		updateJumpToBottomVisibility();
+		updateJumpVisibility();
 	});
 
 	function openNoteSearchPopup() {
@@ -685,9 +708,10 @@
 		}
 	}
 
-	function updateJumpToBottomVisibility() {
+	function updateJumpVisibility() {
 		if (!browser || isLoading || !!error || !note) {
 			showJumpToBottom = false;
+			showJumpToTop = false;
 			return;
 		}
 		const doc = document.documentElement;
@@ -697,7 +721,9 @@
 		const scrollTop = window.scrollY || doc.scrollTop || 0;
 		const isLongContent = totalHeight > viewportHeight + 120;
 		const nearBottom = scrollTop + viewportHeight >= totalHeight - 120;
+		const nearTop = scrollTop <= 120;
 		showJumpToBottom = isLongContent && !nearBottom;
+		showJumpToTop = isLongContent && !nearTop;
 	}
 
 	function jumpToBottom() {
@@ -706,6 +732,11 @@
 			top: document.documentElement.scrollHeight,
 			behavior: 'smooth'
 		});
+	}
+
+	function jumpToTop() {
+		if (!browser) return;
+		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
 	let filteredCategories = $derived(filterNotDeleted(note?.categories));
@@ -806,16 +837,47 @@
 	<div class="note-save-toast" role="status" aria-live="polite">...updated</div>
 {/if}
 
-{#if showJumpToBottom}
-	<button
-		type="button"
-		onclick={jumpToBottom}
-		class="btn note-page__jump-bottom"
-		aria-label="Jump to bottom"
-		title="Jump to bottom"
-	>
-		Bottom
-	</button>
+{#if showJumpToTop || showJumpToBottom}
+	<div class="note-page__jump-nav">
+		{#if showJumpToTop}
+			<button
+				type="button"
+				onclick={jumpToTop}
+				class="btn note-page__jump-btn"
+				aria-label="Jump to top"
+				title="Jump to top"
+			>
+				<svg class="icon_sm" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+					<path
+						d="M6 15l6-6 6 6"
+						stroke="currentColor"
+						stroke-width="1.6"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+			</button>
+		{/if}
+		{#if showJumpToBottom}
+			<button
+				type="button"
+				onclick={jumpToBottom}
+				class="btn note-page__jump-btn"
+				aria-label="Jump to bottom"
+				title="Jump to bottom"
+			>
+				<svg class="icon_sm" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+					<path
+						d="M6 9l6 6 6-6"
+						stroke="currentColor"
+						stroke-width="1.6"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+			</button>
+		{/if}
+	</div>
 {/if}
 
 <NoteSearchPopup

@@ -64,4 +64,14 @@ describe('markdownToSafeHtml', () => {
 		const html = markdownToSafeHtml(dirty);
 		expect(html).not.toContain('onerror');
 	});
+
+	it('strips javascript: and data: link schemes', () => {
+		const jsLink = markdownToSafeHtml('[x](javascript:alert(1))');
+		expect(jsLink.toLowerCase()).not.toContain('javascript:');
+
+		const dataLink = markdownToSafeHtml(
+			'[x](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)'
+		);
+		expect(dataLink.toLowerCase()).not.toContain('data:text/html');
+	});
 });

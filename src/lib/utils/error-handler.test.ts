@@ -28,6 +28,14 @@ describe('handleApiError', () => {
 		expect(handleApiError(err)).toBe(err);
 	});
 
+	it('does not re-log already-handled AppError', () => {
+		const spy = vi.spyOn(errorLogger, 'logError');
+		const err = new AppError('already handled');
+		handleApiError(err);
+		expect(spy).not.toHaveBeenCalled();
+		spy.mockRestore();
+	});
+
 	it('wraps HttpError in ApiError', () => {
 		const httpErr = new HttpError('Not found', 404);
 		const result = handleApiError(httpErr);

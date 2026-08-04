@@ -119,7 +119,7 @@
 	</div>
 {/if}
 
-<section class="card prose billing-seo-summary" aria-label="Subscription plans overview">
+<section class="card prose" aria-label="Subscription plans overview">
 	<h2 class="section-title">Subscription plans</h2>
 	<p>
 		Flit Web offers a free tier and paid Flit Core plans billed monthly or annually. Paid plans

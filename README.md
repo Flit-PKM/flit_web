@@ -1,53 +1,43 @@
-# sv
+# Flit Web
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit client for the Flit Core FastAPI backend: notes, categories, billing, profile, and connected apps.
 
-## Creating a project
+Stack: SvelteKit 2 + TypeScript 5 + vanilla CSS (`src/css/`). Production build uses `@sveltejs/adapter-static` (SPA fallback `200.html`).
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+## Setup
 
 ```sh
-# recreate this project
-npx sv create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" --install npm ./
+npm install
+cp .env.example .env
 ```
 
-## Configuration
+Configure as needed (see `.env.example`):
 
-The backend API URL can be configured via environment variables. Create a `.env` file in the project root:
+| Variable                  | Purpose                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| `VITE_API_BASE_URL`       | Dev API origin (default `http://localhost:8000`). Production uses same origin as the page. |
+| `VITE_LOG_PROFILE`        | `debug` / `test` / `deploy` log verbosity                                                  |
+| `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (register / forgot-password)                                 |
+| `VITE_GOOGLE_CLIENT_ID`   | Google Sign-In web client ID                                                               |
+| `VITE_SITE_ORIGIN`        | Canonical origin for SEO / sitemap                                                         |
 
-```sh
-# Backend API Base URL
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-If not set, it defaults to `http://localhost:8000`. See `.env.example` for the template.
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Develop
 
 ```sh
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+Backend OpenAPI (source of truth for API shapes): `curl -s http://localhost:8000/openapi.json`
 
-To create a production version of your app:
+## Check / test / build
 
 ```sh
-npm run build
+npm run check
+npm run lint
+npm run test:run          # unit tests
+npm run ci:check          # check + lint + coverage
+npm run build             # sitemap + Vite build
+npm run preview
 ```
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Agent-oriented conventions live in [AGENTS.md](AGENTS.md) and child `AGENTS.md` files under `src/`.

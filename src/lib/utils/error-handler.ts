@@ -226,11 +226,11 @@ export class ErrorLogger {
 export const errorLogger = ErrorLogger.getInstance();
 
 /**
- * Handle API errors consistently
+ * Handle API errors consistently. Logs once for new errors; already-handled
+ * AppError instances are returned without re-logging (avoids triple logs).
  */
 export function handleApiError(error: unknown, context?: ErrorContext): AppError {
 	if (error instanceof AppError) {
-		errorLogger.logError(error, context);
 		return error;
 	}
 
@@ -252,19 +252,6 @@ export function handleApiError(error: unknown, context?: ErrorContext): AppError
 	const genericError = new AppError('An unknown error occurred', 'UNKNOWN_ERROR', context);
 	errorLogger.logError(genericError, context);
 	return genericError;
-}
-
-/**
- * Handle network errors
- */
-export function handleNetworkError(error: unknown, context?: ErrorContext): NetworkError {
-	const networkError = new NetworkError(
-		error instanceof Error ? error.message : 'Network error occurred',
-		context,
-		error instanceof Error ? error : undefined
-	);
-	errorLogger.logError(networkError, context);
-	return networkError;
 }
 
 /**
@@ -303,34 +290,4 @@ export function formatErrorForUser(error: unknown): string {
 export function captureApiError(err: unknown, context?: ErrorContext): string {
 	const handledError = handleApiError(err, context);
 	return formatErrorForUser(handledError);
-}
-
-/**
- * Create a standardized error handler for API calls
- */
-export function createApiErrorHandler(context?: ErrorContext) {
-	return function (error: unknown): never {
-		const handledError = handleApiError(error, context);
-		throw handledError;
-	};
-}
-
-/**
- * Validate and handle note data for editing
- */
-export function validateNoteData(title: string, content: string, context?: ErrorContext): void {
-	if (!title || typeof title !== 'string') {
-		const error = new ValidationError('Title is required', 'title', context);
-		errorLogger.logError(error, context);
-		throw error;
-	}
-
-	if (!content || typeof content !== 'string') {
-		const error = new ValidationError('Content is required', 'content', context);
-		errorLogger.logError(error, context);
-		throw error;
-	}
-
-	// Additional validation could be added here
-	errorLogger.logDebug('Note data validation passed', context);
 }

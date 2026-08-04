@@ -10,7 +10,7 @@
 		getPasswordStrengthLabel
 	} from '$lib/utils/auth';
 	import { clearFieldError, toggleFlag, updateSanitizedField } from '$lib/utils/auth-forms';
-	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
+	import { FormValidator, createDebouncedValidator, validationRules } from '$lib/utils/validation';
 	import { errorLogger } from '$lib/utils/error-handler';
 	import GeneralErrorAlert from '$lib/components/GeneralErrorAlert.svelte';
 	import GoogleSignInButton from '$lib/components/GoogleSignInButton.svelte';
@@ -38,9 +38,12 @@
 	let turnstileReady = $state(!turnstileSiteKey);
 
 	const validator = new FormValidator<RegisterFormData>({
-		email: { required: true, rules: [] },
-		password: { required: true, rules: [] },
-		confirmPassword: { required: true, rules: [] }
+		email: { required: true, rules: [validationRules.email()] },
+		password: {
+			required: true,
+			rules: [validationRules.minLength(8), validationRules.password()]
+		},
+		confirmPassword: { required: true }
 	});
 	const debouncedValidator = createDebouncedValidator(validator);
 
@@ -113,8 +116,7 @@
 	}
 
 	function handleGoogleSuccess() {
-		const path = resolvePostLoginDestination(null);
-		goto(path as Parameters<typeof goto>[0]);
+		// Redirect handled by $effect when isAuthenticated becomes true.
 	}
 
 	// Toggle password visibility

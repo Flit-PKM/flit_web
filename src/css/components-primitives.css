@@ -263,6 +263,10 @@
 		justify-content: flex-end;
 	}
 
+	.card__row--center {
+		justify-content: center;
+	}
+
 	ul.list {
 		margin-left: 0rem;
 	}

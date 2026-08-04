@@ -215,10 +215,32 @@ export function hasFormErrors(errors: FormErrors): boolean {
  * Preserve user input as-is for form state (especially credentials).
  *
  * @security Do not use for HTML output. Svelte `{text}` bindings auto-escape.
- * The only `{@html}` in this app must go through `markdownToSafeHtml` (DOMPurify).
+ * The only `{@html}` sinks must go through `markdownToSafeHtml` (DOMPurify) or
+ * escaped JSON-LD (`escapeJsonLd`).
  */
 export function sanitizeInput(input: string): string {
 	return input;
+}
+
+/** Decode a JWT base64url segment to a UTF-8 string. */
+function decodeJwtSegment(segment: string): string {
+	const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+	const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+	return atob(padded);
+}
+
+/** Parse JWT payload object, or null if structure/decode fails. */
+export function decodeJwtPayload(token: string): Record<string, unknown> | null {
+	if (!token || typeof token !== 'string') return null;
+	const parts = token.split('.');
+	if (parts.length !== 3) return null;
+	try {
+		const decoded = JSON.parse(decodeJwtSegment(parts[1])) as unknown;
+		if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return null;
+		return decoded as Record<string, unknown>;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -231,9 +253,8 @@ export function isValidJwtToken(token: string): boolean {
 	if (parts.length !== 3) return false;
 
 	try {
-		// Check if header and payload are valid base64
-		atob(parts[0]);
-		atob(parts[1]);
+		decodeJwtSegment(parts[0]);
+		decodeJwtSegment(parts[1]);
 		return true;
 	} catch {
 		return false;
@@ -241,61 +262,21 @@ export function isValidJwtToken(token: string): boolean {
 }
 
 /**
- * Extract user ID from JWT token (if available)
- * Note: This is a basic implementation. In production, use a proper JWT library.
- */
-export function extractUserIdFromToken(token: string): number | null {
-	if (!isValidJwtToken(token)) return null;
-
-	try {
-		const payload = token.split('.')[1];
-		const decoded = JSON.parse(atob(payload));
-
-		// Check if token is expired
-		if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-			return null;
-		}
-
-		return decoded.sub || decoded.user_id || decoded.id || null;
-	} catch {
-		return null;
-	}
-}
-
-/**
  * Check if token is expired
  */
 export function isTokenExpired(token: string): boolean {
-	if (!isValidJwtToken(token)) return true;
+	const decoded = decodeJwtPayload(token);
+	if (!decoded) return true;
 
-	try {
-		const payload = token.split('.')[1];
-		const decoded = JSON.parse(atob(payload));
+	const exp = decoded.exp;
+	if (typeof exp !== 'number') return false; // No expiration claim
 
-		if (!decoded.exp) return false; // No expiration claim
-
-		return decoded.exp * 1000 < Date.now();
-	} catch {
-		return true;
-	}
-}
-
-/**
- * Generate a secure random string for CSRF tokens or state parameters
- */
-export function generateSecureRandomString(length: number = 32): string {
-	if (typeof crypto === 'undefined') {
-		// Fallback for server-side rendering
-		return Array.from({ length }, () => Math.random().toString(36)[2]).join('');
-	}
-
-	const array = new Uint8Array(length);
-	crypto.getRandomValues(array);
-	return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+	return exp * 1000 < Date.now();
 }
 
 /**
  * Client-side login attempt pacing (UX only; not a security control).
+ * In-memory only — resets on page reload.
  */
 export class RateLimiter {
 	private attempts: Map<string, number[]> = new Map();

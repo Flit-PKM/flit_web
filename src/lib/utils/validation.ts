@@ -25,7 +25,7 @@ export interface FieldValidation<T = string> {
  * Form validation configuration
  */
 export interface FormValidationConfig {
-	[key: string]: FieldValidation<unknown>;
+	[key: string]: FieldValidation;
 }
 
 /**
@@ -106,21 +106,25 @@ export const validationRules = {
 /**
  * Validate a single field
  */
-export function validateField<T = string>(value: T, validation: FieldValidation<T>): string | null {
+export function validateField(value: unknown, validation: FieldValidation): string | null {
 	// Check required first
-	if (validation.required && (!value || (typeof value === 'string' && value.trim() === ''))) {
+	if (
+		validation.required &&
+		(value == null || (typeof value === 'string' && value.trim() === ''))
+	) {
 		return validation.customMessage || 'This field is required';
 	}
 
 	// Skip other validations if value is empty and not required
-	if (!value || (typeof value === 'string' && value.trim() === '')) {
+	if (value == null || (typeof value === 'string' && value.trim() === '')) {
 		return null;
 	}
 
-	// Run validation rules
+	// Run validation rules (form fields are strings)
 	if (validation.rules) {
+		const stringValue = typeof value === 'string' ? value : String(value);
 		for (const rule of validation.rules) {
-			const error = rule(value);
+			const error = rule(stringValue);
 			if (error) {
 				return validation.customMessage || error;
 			}

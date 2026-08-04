@@ -50,7 +50,32 @@ import {
 	normalizeMcpApiKeyList,
 	normalizeMcpConnectionList
 } from '../types/mcp';
-import { errorLogger, handleApiError } from '$lib/utils/error-handler';
+import { handleApiError } from '$lib/utils/error-handler';
+
+/** Format FastAPI `detail` (string, object, or validation array) for display. */
+export function formatApiDetail(detail: unknown, fallback: string): string {
+	if (detail == null) return fallback;
+	if (typeof detail === 'string') return detail || fallback;
+	if (Array.isArray(detail)) {
+		const parts = detail.map((item) => {
+			if (typeof item === 'string') return item;
+			if (item && typeof item === 'object' && 'msg' in item) {
+				return String((item as { msg: unknown }).msg);
+			}
+			return JSON.stringify(item);
+		});
+		const joined = parts.filter(Boolean).join('; ');
+		return joined || fallback;
+	}
+	if (typeof detail === 'object') {
+		try {
+			return JSON.stringify(detail);
+		} catch {
+			return fallback;
+		}
+	}
+	return String(detail);
+}
 
 /**
  * Build query string from params (omits undefined and empty string).
@@ -225,8 +250,8 @@ export class ApiClient {
 					let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
 
 					try {
-						const errorData: { detail: string } = await response.json();
-						errorMessage = errorData.detail || errorMessage;
+						const errorData: { detail?: unknown } = await response.json();
+						errorMessage = formatApiDetail(errorData.detail, errorMessage);
 					} catch {
 						// If we can't parse the error response, use the default message
 					}
@@ -260,15 +285,6 @@ export class ApiClient {
 				};
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error));
-
-				// Log the error with context
-				errorLogger.logError(lastError, {
-					component: 'ApiClient',
-					operation: 'request',
-					endpoint,
-					attempt,
-					method: options.method || 'GET'
-				});
 
 				// Don't retry on authentication errors or client errors
 				if (
@@ -558,24 +574,6 @@ export class ApiClient {
 	}
 
 	/**
-	 * List feedback. GET /feedback. Superuser only.
-	 */
-	async listFeedback(params: { skip?: number; limit?: number } = {}): Promise<FeedbackRead[]> {
-		const endpoint = endpointWithQuery('/feedback', params);
-		const response = await this.request<FeedbackRead[]>(endpoint, { method: 'GET' });
-		return response.data;
-	}
-
-	/**
-	 * Delete feedback. DELETE /feedback/{id}. Superuser only.
-	 */
-	async deleteFeedback(feedbackId: number): Promise<void> {
-		await this.request<void>(`/feedback/${feedbackId}`, {
-			method: 'DELETE'
-		});
-	}
-
-	/**
 	 * Get current user profile using the authentication token
 	 * Calls GET /user/ endpoint which uses the Bearer token to identify the current user
 	 */
@@ -757,8 +755,8 @@ export class ApiClient {
 			if (!response.ok) {
 				let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
 				try {
-					const errorData: { detail: string } = await response.json();
-					errorMessage = errorData.detail || errorMessage;
+					const errorData: { detail?: unknown } = await response.json();
+					errorMessage = formatApiDetail(errorData.detail, errorMessage);
 				} catch {
 					// use default message
 				}
@@ -807,6 +805,3 @@ export class HttpError extends Error {
  * Singleton instance for the application
  */
 export const apiClient = new ApiClient();
-
-// Export factory function for testing
-export const createApiClient = (config?: Partial<ApiConfig>) => new ApiClient(config);

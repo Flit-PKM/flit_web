@@ -269,18 +269,6 @@
 		margin-bottom: 0;
 	}
 
-	.text-sm {
-		font-size: 0.875rem;
-	}
-
-	.text-md {
-		font-size: 1.125rem;
-	}
-
-	.text-xs {
-		font-size: 0.75rem;
-	}
-
 	.mt-xs {
 		margin-top: 0.25rem;
 	}
@@ -309,10 +297,6 @@
 		text-align: left;
 	}
 
-	.overflow-auto {
-		overflow: auto;
-	}
-
 	.nowrap {
 		white-space: nowrap;
 	}
@@ -339,14 +323,6 @@
 
 	.modal-backdrop--overlay {
 		background: rgba(0, 0, 0, 0.5);
-	}
-
-	.modal-dialog {
-		max-width: 28rem;
-		width: 100%;
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
 	}
 
 	/* ---- Landing ---- */
@@ -472,10 +448,6 @@
 	}
 
 	/* Connected apps + MCP Access on profile */
-	.connections__header {
-		margin-bottom: 1rem;
-	}
-
 	.connections__subtitle {
 		margin: 0.25rem 0 0;
 	}
@@ -1473,16 +1445,24 @@
 		}
 	}
 
-	.note-page__jump-bottom {
+	.note-page__jump-nav {
 		position: fixed;
 		right: 1rem;
 		bottom: 1rem;
 		z-index: 20;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.note-page__jump-btn {
+		min-width: 2.75rem;
+		padding: 0.65rem;
 		box-shadow: var(--flit-shadow-md);
 	}
 
 	@media (max-width: 639px) {
-		.note-page__jump-bottom {
+		.note-page__jump-nav {
 			right: 0.75rem;
 			bottom: 0.75rem;
 		}
@@ -1890,15 +1870,6 @@
 		gap: 0.35rem 1rem;
 	}
 
-	.plan-card__image {
-		height: 2.75rem;
-		width: auto;
-		max-width: 100%;
-		object-fit: contain;
-		border-radius: 0.375rem;
-		flex-shrink: 0;
-	}
-
 	.plan-card__title-group {
 		display: flex;
 		flex-direction: column;
@@ -2076,11 +2047,6 @@
 			gap: 0.5rem 0.75rem;
 		}
 
-		.grid-cards--plans .plan-card__image {
-			height: 2.25rem;
-			margin: 0;
-		}
-
 		.grid-cards--plans .plan-card__head {
 			flex: 1 1 8rem;
 			flex-direction: column;
@@ -2128,11 +2094,6 @@
 			flex-direction: column;
 			align-items: flex-start;
 			gap: 0.5rem;
-		}
-
-		.grid-cards--plans .plan-card__image {
-			height: 3.25rem;
-			margin-bottom: 0.25rem;
 		}
 
 		.grid-cards--plans .plan-card__description {

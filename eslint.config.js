@@ -33,9 +33,13 @@ export default defineConfig(
 		files: ['src/lib/utils/error-handler.ts', 'src/lib/utils/**/*.test.ts'],
 		rules: { 'no-console': 'off' }
 	},
-	// Sanitized {@html} (markdownToSafeHtml) in notes list UI only
+	// Sanitized {@html} sinks (markdownToSafeHtml / escapeJsonLd)
 	{
-		files: ['**/notes/**/+page.svelte', 'src/lib/components/notes/NoteListCard.svelte'],
+		files: [
+			'**/notes/**/+page.svelte',
+			'src/lib/components/notes/NoteListCard.svelte',
+			'src/lib/components/JsonLd.svelte'
+		],
 		rules: { 'svelte/no-at-html-tags': 'off' }
 	},
 	// SvelteMap/SvelteSet need $state for assignment updates to trigger reactivity

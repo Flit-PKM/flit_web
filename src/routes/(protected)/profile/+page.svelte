@@ -11,7 +11,7 @@
 		getPasswordStrength,
 		getPasswordStrengthLabel
 	} from '$lib/utils/auth';
-	import { FormValidator, createDebouncedValidator } from '$lib/utils/validation';
+	import { FormValidator, createDebouncedValidator, validationRules } from '$lib/utils/validation';
 	import { errorLogger, captureApiError } from '$lib/utils/error-handler';
 	import { formatProfileDate } from '$lib/utils/profile';
 	import { buildUserUpdatePayload, getProfileChangeFlags } from '$lib/utils/profile-page';
@@ -58,8 +58,11 @@
 	let newPasswordStrengthLabel = $state('Very Weak');
 
 	const validator = new FormValidator<ProfileFormData>({
-		username: { required: true, rules: [] },
-		email: { required: true, rules: [] },
+		username: {
+			required: true,
+			rules: [validationRules.minLength(3), validationRules.maxLength(50)]
+		},
+		email: { required: true, rules: [validationRules.email()] },
 		currentPassword: { required: false },
 		newPassword: { required: false },
 		confirmNewPassword: { required: false }

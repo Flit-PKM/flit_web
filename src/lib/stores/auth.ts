@@ -17,7 +17,12 @@ import type { AuthState, User, LoginFormData, RegisterFormData } from '../types/
 // Storage keys
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
-let authExpiredListenerBound = false;
+
+function clearStoredAuth(): void {
+	if (!browser) return;
+	localStorage.removeItem(TOKEN_KEY);
+	localStorage.removeItem(USER_KEY);
+}
 
 // Initialize state from localStorage (client-side only)
 function initializeAuthState(): AuthState {
@@ -46,6 +51,17 @@ function initializeAuthState(): AuthState {
 
 	// Treat expired token as no auth so we never show authenticated UI or loading
 	if (token && isTokenExpired(token)) {
+		clearStoredAuth();
+		return {
+			token: null,
+			user: null,
+			isLoading: false
+		};
+	}
+
+	// Token without user must not leave a guest UI with a Bearer header
+	if (token && !user) {
+		clearStoredAuth();
 		return {
 			token: null,
 			user: null,
@@ -67,18 +83,14 @@ const authStore = writable<AuthState>(initializeAuthState());
 authStore.subscribe((state) => {
 	if (!browser) return;
 
-	if (state.token) {
+	if (state.token && state.user) {
 		localStorage.setItem(TOKEN_KEY, state.token);
+		localStorage.setItem(USER_KEY, JSON.stringify(state.user));
 		apiClient.setToken(state.token);
 	} else {
 		localStorage.removeItem(TOKEN_KEY);
-		apiClient.clearToken();
-	}
-
-	if (state.user) {
-		localStorage.setItem(USER_KEY, JSON.stringify(state.user));
-	} else {
 		localStorage.removeItem(USER_KEY);
+		apiClient.clearToken();
 	}
 });
 
@@ -244,21 +256,24 @@ export const authActions = {
 	initialize(): void {
 		const state = initializeAuthState();
 
-		if (state.token) {
+		if (state.token && state.user) {
 			apiClient.setToken(state.token);
 		}
 
 		authStore.set(state);
 
-		// Listen for auth expiration events from API client
-		if (browser && !authExpiredListenerBound) {
-			authExpiredListenerBound = true;
-			window.addEventListener('auth:expired', () => {
-				this.logout();
-			});
+		if (state.token && state.user) {
+			void this.refreshUser();
 		}
 	}
 };
+
+// Bind auth:expired as early as possible (do not wait for layout onMount).
+if (browser) {
+	window.addEventListener('auth:expired', () => {
+		authActions.logout();
+	});
+}
 
 // Export the store itself for direct access when needed
 export const auth = authStore;

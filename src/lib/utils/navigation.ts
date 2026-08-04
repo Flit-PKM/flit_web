@@ -35,11 +35,17 @@ export function parsePostLoginRedirect(rawRedirect: string | null): string {
 	return DEFAULT_AUTH_REDIRECT;
 }
 
-/** After login/register: pending billing plan wins, else safe ?redirect= path. */
+/**
+ * After login/register: pending billing plan wins, else safe ?redirect= path.
+ * Paid plans are peeked only (billing page consumes for auto-checkout).
+ * Free plans are consumed here so they do not stick across later logins.
+ */
 export function resolvePostLoginDestination(requestedRedirect: string | null): string {
 	const pending = peekPendingBillingPlan();
 	if (pending) {
-		consumePendingBillingPlan();
+		if (pending === 'free') {
+			consumePendingBillingPlan();
+		}
 		return resolvePostAuthBillingDestination(pending);
 	}
 	return parsePostLoginRedirect(requestedRedirect);

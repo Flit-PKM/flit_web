@@ -171,4 +171,17 @@ describe('isTokenExpired', () => {
 		const token = `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
 		expect(isTokenExpired(token)).toBe(true);
 	});
+
+	it('decodes base64url payloads with - and _', () => {
+		// Forces url-safe alphabet that raw atob rejects
+		const json = JSON.stringify({
+			sub: 'user+/=',
+			exp: Math.floor(Date.now() / 1000) + 3600,
+			n: '>>>???>>>'
+		});
+		const payload = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+		expect(/[-_]/.test(payload)).toBe(true);
+		const token = `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+		expect(isTokenExpired(token)).toBe(false);
+	});
 });

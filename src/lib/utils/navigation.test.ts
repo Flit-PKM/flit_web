@@ -68,6 +68,18 @@ describe('resolvePostLoginDestination', () => {
 		expect(resolvePostLoginDestination('/profile')).toBe('/billing');
 	});
 
+	it('leaves pending plan for billing auto-checkout after routing', () => {
+		sessionStorage.setItem('flit_pending_billing_plan', 'prod_x');
+		expect(resolvePostLoginDestination('/profile')).toBe('/billing');
+		expect(sessionStorage.getItem('flit_pending_billing_plan')).toBe('prod_x');
+	});
+
+	it('routes free plan to notes and consumes it', () => {
+		sessionStorage.setItem('flit_pending_billing_plan', 'free');
+		expect(resolvePostLoginDestination('/profile')).toBe('/notes');
+		expect(sessionStorage.getItem('flit_pending_billing_plan')).toBeNull();
+	});
+
 	it('uses redirect when no pending plan', () => {
 		expect(resolvePostLoginDestination('/profile')).toBe('/profile');
 	});
