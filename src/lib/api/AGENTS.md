@@ -14,7 +14,8 @@ Single HTTP client for Flit Core. All browser → backend traffic goes through `
 
 - Use `apiClient` methods — no raw `fetch` in routes/components (vault blob export is the intentional exception inside the client)
 - Retry only GET/HEAD/OPTIONS
-- 401 clears token and dispatches `auth:expired`
+- 401 clears token and dispatches `auth:expired` (`skipAuthExpired` on logout revoke)
+- Login sliding renewal is `POST /auth/refresh`; logout revoke is `POST /auth/logout`
 - Confirm paths/schemas against `curl -s http://localhost:8000/openapi.json`
 
 ## Prefer / avoid

@@ -8,6 +8,9 @@ import {
 	validateRegisterForm,
 	validateProfileForm,
 	isTokenExpired,
+	getTokenExpiresAtMs,
+	shouldRefreshLoginToken,
+	LOGIN_TOKEN_REFRESH_LEAD_MS,
 	hasFormErrors,
 	RateLimiter
 } from './auth';
@@ -183,5 +186,41 @@ describe('isTokenExpired', () => {
 		expect(/[-_]/.test(payload)).toBe(true);
 		const token = `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
 		expect(isTokenExpired(token)).toBe(false);
+	});
+});
+
+function jwtWithExp(expUnix: number): string {
+	const payload = btoa(JSON.stringify({ sub: 1, exp: expUnix }));
+	return `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+}
+
+describe('getTokenExpiresAtMs', () => {
+	it('returns null for invalid tokens', () => {
+		expect(getTokenExpiresAtMs('')).toBeNull();
+		expect(getTokenExpiresAtMs('not.jwt')).toBeNull();
+	});
+
+	it('returns exp in milliseconds', () => {
+		const exp = 1_700_000_000;
+		expect(getTokenExpiresAtMs(jwtWithExp(exp))).toBe(exp * 1000);
+	});
+});
+
+describe('shouldRefreshLoginToken', () => {
+	it('returns false for expired or undecodable tokens', () => {
+		expect(shouldRefreshLoginToken(jwtWithExp(Math.floor(Date.now() / 1000) - 60))).toBe(false);
+		expect(shouldRefreshLoginToken('not.jwt')).toBe(false);
+	});
+
+	it('returns false when remaining lifetime is above the lead window', () => {
+		const now = 1_700_000_000_000;
+		const exp = Math.floor(now / 1000) + 20 * 60;
+		expect(shouldRefreshLoginToken(jwtWithExp(exp), now)).toBe(false);
+	});
+
+	it('returns true when remaining lifetime is within the lead window', () => {
+		const now = 1_700_000_000_000;
+		const exp = Math.floor((now + LOGIN_TOKEN_REFRESH_LEAD_MS) / 1000) - 1;
+		expect(shouldRefreshLoginToken(jwtWithExp(exp), now)).toBe(true);
 	});
 });

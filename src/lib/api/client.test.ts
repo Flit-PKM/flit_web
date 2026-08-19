@@ -111,4 +111,39 @@ describe('ApiClient', () => {
 		await expect(client.login('a@b.com', 'Secret1!')).rejects.toBeInstanceOf(Error);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
+
+	it('refreshLogin posts /auth/refresh and stores the new token', async () => {
+		client.setToken('old_tok');
+		fetchMock.mockResolvedValue(
+			new Response(JSON.stringify({ access_token: 'new_tok', token_type: 'bearer' }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			})
+		);
+
+		const token = await client.refreshLogin();
+
+		expect(token.access_token).toBe('new_tok');
+		expect(client.getToken()).toBe('new_tok');
+		const url = fetchMock.mock.calls[0][0] as string;
+		expect(url).toContain('/auth/refresh');
+		const init = fetchMock.mock.calls[0][1] as RequestInit;
+		expect(init.method).toBe('POST');
+		expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer old_tok');
+	});
+
+	it('logout posts /auth/logout and does not dispatch auth:expired on 401', async () => {
+		client.setToken('tok');
+		const expired = vi.fn();
+		window.addEventListener('auth:expired', expired);
+		fetchMock.mockResolvedValue(new Response('Unauthorized', { status: 401 }));
+
+		await expect(client.logout()).rejects.toMatchObject({ status: 401 });
+		expect(client['token']).toBeNull();
+		expect(expired).not.toHaveBeenCalled();
+
+		const url = fetchMock.mock.calls[0][0] as string;
+		expect(url).toContain('/auth/logout');
+		window.removeEventListener('auth:expired', expired);
+	});
 });

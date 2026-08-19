@@ -10,7 +10,12 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { apiClient, HttpError } from '../api/client';
-import { isTokenExpired } from '../utils/auth';
+import {
+	isTokenExpired,
+	getTokenExpiresAtMs,
+	shouldRefreshLoginToken,
+	LOGIN_TOKEN_REFRESH_LEAD_MS
+} from '../utils/auth';
 import { handleApiError, formatErrorForUser, errorLogger } from '../utils/error-handler';
 import type { AuthState, User, LoginFormData, RegisterFormData } from '../types/auth';
 
@@ -100,6 +105,61 @@ export const currentUser = derived(authStore, ($auth) => $auth.user);
 export const isLoading = derived(authStore, ($auth) => $auth.isLoading);
 export const authToken = derived(authStore, ($auth) => $auth.token);
 
+let loginRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let loginRefreshInFlight: Promise<void> | null = null;
+
+function clearLoginRefreshTimer(): void {
+	if (loginRefreshTimer != null) {
+		clearTimeout(loginRefreshTimer);
+		loginRefreshTimer = null;
+	}
+}
+
+async function refreshLoginSession(): Promise<void> {
+	if (loginRefreshInFlight) return loginRefreshInFlight;
+
+	const token = get(authStore).token;
+	if (!token || isTokenExpired(token)) return;
+
+	loginRefreshInFlight = (async () => {
+		try {
+			const tokenResponse = await apiClient.refreshLogin();
+			authStore.update((state) =>
+				state.token && state.user ? { ...state, token: tokenResponse.access_token } : state
+			);
+			armLoginRefresh(tokenResponse.access_token);
+		} catch {
+			const current = get(authStore).token;
+			if (current && !isTokenExpired(current)) {
+				armLoginRefresh(current);
+			}
+		}
+	})().finally(() => {
+		loginRefreshInFlight = null;
+	});
+
+	return loginRefreshInFlight;
+}
+
+function armLoginRefresh(token: string | null): void {
+	clearLoginRefreshTimer();
+	if (!browser || !token || isTokenExpired(token)) return;
+
+	if (shouldRefreshLoginToken(token)) {
+		void refreshLoginSession();
+		return;
+	}
+
+	const expiresAt = getTokenExpiresAtMs(token);
+	if (expiresAt == null) return;
+
+	const delay = Math.max(0, expiresAt - Date.now() - LOGIN_TOKEN_REFRESH_LEAD_MS);
+	loginRefreshTimer = setTimeout(() => {
+		loginRefreshTimer = null;
+		void refreshLoginSession();
+	}, delay);
+}
+
 // Authentication actions
 export const authActions = {
 	/**
@@ -119,6 +179,7 @@ export const authActions = {
 				user: userData,
 				isLoading: false
 			});
+			armLoginRefresh(tokenResponse.access_token);
 
 			return { success: true };
 		} catch (error) {
@@ -146,6 +207,7 @@ export const authActions = {
 				user: userData,
 				isLoading: false
 			});
+			armLoginRefresh(tokenResponse.access_token);
 
 			return { success: true };
 		} catch (error) {
@@ -193,6 +255,13 @@ export const authActions = {
 	 * Logout the current user
 	 */
 	logout(): void {
+		clearLoginRefreshTimer();
+		if (get(authStore).token) {
+			void apiClient.logout().catch(() => {
+				// Local sign-out still proceeds if revoke fails
+			});
+		}
+
 		authStore.set({
 			token: null,
 			user: null,
@@ -263,6 +332,7 @@ export const authActions = {
 		authStore.set(state);
 
 		if (state.token && state.user) {
+			armLoginRefresh(state.token);
 			void this.refreshUser();
 		}
 	}
@@ -272,6 +342,13 @@ export const authActions = {
 if (browser) {
 	window.addEventListener('auth:expired', () => {
 		authActions.logout();
+	});
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState !== 'visible') return;
+		const token = get(authStore).token;
+		if (token && shouldRefreshLoginToken(token)) {
+			void refreshLoginSession();
+		}
 	});
 }
 

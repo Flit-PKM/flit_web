@@ -238,8 +238,7 @@ export class ApiClient {
 				// Handle authentication errors
 				if (response.status === 401) {
 					this.clearToken();
-					// Trigger auth expiration handling
-					if (typeof window !== 'undefined') {
+					if (!options.skipAuthExpired && typeof window !== 'undefined') {
 						window.dispatchEvent(new CustomEvent('auth:expired'));
 					}
 					throw new HttpError('Authentication required', response.status);
@@ -356,6 +355,28 @@ export class ApiClient {
 		this.setToken(response.data.access_token);
 
 		return response.data;
+	}
+
+	/**
+	 * Slide the login JWT. POST /auth/refresh. Requires a still-valid Bearer login token.
+	 */
+	async refreshLogin(): Promise<AuthToken> {
+		const response = await this.request<AuthToken>('/auth/refresh', {
+			method: 'POST'
+		});
+		this.setToken(response.data.access_token);
+		return response.data;
+	}
+
+	/**
+	 * Revoke the current login JWT. POST /auth/logout.
+	 * 401 does not dispatch auth:expired (caller is already leaving the session).
+	 */
+	async logout(): Promise<void> {
+		await this.request<unknown>('/auth/logout', {
+			method: 'POST',
+			skipAuthExpired: true
+		});
 	}
 
 	async register(userData: UserCreate): Promise<User> {

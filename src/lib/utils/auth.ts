@@ -261,6 +261,9 @@ export function isValidJwtToken(token: string): boolean {
 	}
 }
 
+/** Refresh a still-valid login JWT this far before `exp` (Core TTL is 30 minutes). */
+export const LOGIN_TOKEN_REFRESH_LEAD_MS = 5 * 60 * 1000;
+
 /**
  * Check if token is expired
  */
@@ -272,6 +275,23 @@ export function isTokenExpired(token: string): boolean {
 	if (typeof exp !== 'number') return false; // No expiration claim
 
 	return exp * 1000 < Date.now();
+}
+
+/** JWT `exp` as epoch milliseconds, or null if missing/undecodable. */
+export function getTokenExpiresAtMs(token: string): number | null {
+	const decoded = decodeJwtPayload(token);
+	if (!decoded || typeof decoded.exp !== 'number') return null;
+	return decoded.exp * 1000;
+}
+
+/**
+ * True when the login JWT is still valid but within the sliding-refresh lead.
+ * Expired tokens cannot be refreshed (Core requires a still-valid JWT).
+ */
+export function shouldRefreshLoginToken(token: string, now = Date.now()): boolean {
+	const expiresAt = getTokenExpiresAtMs(token);
+	if (expiresAt == null || expiresAt <= now) return false;
+	return expiresAt - now <= LOGIN_TOKEN_REFRESH_LEAD_MS;
 }
 
 /**

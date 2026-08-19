@@ -232,6 +232,8 @@ export interface RequestOptions {
 	headers?: Record<string, string>;
 	body?: unknown;
 	timeout?: number;
+	/** Skip `auth:expired` on 401 (logout revoke; still clears the in-memory token). */
+	skipAuthExpired?: boolean;
 }
 
 /**

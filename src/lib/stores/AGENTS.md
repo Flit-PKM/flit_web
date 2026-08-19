@@ -13,6 +13,7 @@ App-wide Svelte stores.
 
 - Auth requires **token and user**; orphan tokens are cleared
 - `auth:expired` listener is bound at module load (browser)
+- Sliding login refresh runs ~5 minutes before JWT `exp` (timer + `visibilitychange`); logout revokes the server JWT then clears local auth
 - `(protected)` layout is UX only — API Bearer is authoritative
 
 ## See also
