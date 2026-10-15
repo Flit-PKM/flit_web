@@ -62,7 +62,7 @@ export function parseRootRedirectTarget(
 	if (isAuthenticated) return '/notes';
 	const target = redirectParam?.toLowerCase();
 	if (target === 'login') return '/login';
-	if (target === 'register') return '/register';
+	if (target === 'register') return '/login?mode=register';
 	return null;
 }
 

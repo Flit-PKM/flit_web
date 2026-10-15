@@ -229,19 +229,21 @@ export const authActions = {
 		authStore.update((state) => ({ ...state, isLoading: true }));
 
 		try {
-			await apiClient.register({
+			const tokenResponse = await apiClient.register({
 				email: userData.email,
 				password: userData.password,
 				...(userData.cf_turnstile_response && {
 					cf_turnstile_response: userData.cf_turnstile_response
 				})
 			});
+			const userDataFromApi = await apiClient.getCurrentUser();
 
 			authStore.set({
-				token: null, // Registration doesn't return a token
-				user: null, // Clear any existing user data
+				token: tokenResponse.access_token,
+				user: userDataFromApi,
 				isLoading: false
 			});
+			armLoginRefresh(tokenResponse.access_token);
 
 			return { success: true };
 		} catch (error) {

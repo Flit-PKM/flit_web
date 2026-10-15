@@ -3,7 +3,8 @@
 	import { resolve, asset } from '$app/paths';
 	import { page } from '$app/stores';
 	import { isAuthenticated, currentUser } from '$lib/stores/auth';
-	import { parseRootRedirectTarget } from '$lib/utils/navigation';
+	import { parseRootRedirectTarget, resolvePostLoginDestination } from '$lib/utils/navigation';
+	import AuthCredentialsForm from '$lib/components/AuthCredentialsForm.svelte';
 	import SeoHead from '$lib/components/SeoHead.svelte';
 	import JsonLd from '$lib/components/JsonLd.svelte';
 	import {
@@ -14,7 +15,7 @@
 	} from '$lib/utils/seo';
 
 	const homeDescription =
-		'Personal note taking and knowledge management. Capture thoughts, connect ideas, and sync across the Flit-PKM ecosystem.';
+		'Simple notes that stay useful. Write, organize, and sync across devices.';
 
 	let siteOrigin = $derived(getSiteOrigin($page.url.origin));
 	let pageUrl = $derived(buildCanonicalUrl(siteOrigin, $page.url.pathname));
@@ -43,7 +44,12 @@
 			return;
 		}
 
-		const target = parseRootRedirectTarget($isAuthenticated, params.get('redirect'));
+		if ($isAuthenticated) {
+			goto(resolvePostLoginDestination(null) as Parameters<typeof goto>[0]);
+			return;
+		}
+
+		const target = parseRootRedirectTarget(false, params.get('redirect'));
 		if (target) goto(target as Parameters<typeof goto>[0]);
 	});
 </script>
@@ -53,12 +59,9 @@
 
 <header class="hero">
 	<h1>Flit</h1>
-	<h2>Personal Note Taking & Knowledge Management</h2>
-	<p class="card__meta">Butterfly on the web of consciousness, Flutter.</p>
+	<p class="card__meta">Simple notes. Effective when you need them.</p>
 	<p>
-		Welcome to the Flit-PKM ecosystem — your secure, personal space to capture thoughts, weave ideas
-		together, and let powerful AI gently reveal hidden connections, smart summaries, and fresh
-		insights you never expected.
+		A place for your notes — write, organize, and find them later. Sync when you want a backup.
 	</p>
 </header>
 
@@ -66,101 +69,35 @@
 	<div class="card small">
 		{#if $isAuthenticated && $currentUser}
 			<div class="landing__stack">
-				<div class="landing__avatar" data-tone="positive">
-					<svg class="icon_md text-positive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-						/>
-					</svg>
-				</div>
-				<h3>Welcome back, {$currentUser.email}!</h3>
-				<p class="card__meta">You are successfully signed in to your account.</p>
+				<h3>Welcome back, {$currentUser.email}</h3>
+				<p class="card__meta">You’re signed in.</p>
 				<a href={resolve('/profile')} class="btn btn-primary">View Profile</a>
 			</div>
 		{:else}
 			<div class="landing__stack">
-				<div class="landing__avatar" data-tone="muted">
-					<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-						/>
-					</svg>
-				</div>
-				<h3>Get Started</h3>
-				<p class="card__meta">
-					Create an account or sign in to access your knowledge graph and manage your notes.
-				</p>
-				<div class="landing__cta">
-					<a href={resolve('/register')} class="btn btn-primary btn--block">Create Account</a>
-					<a href={resolve('/login')} class="btn btn-secondary btn--block">Sign In</a>
-				</div>
+				<h3>Get started</h3>
+				<p class="card__meta">Create an account or sign in to use your notes.</p>
+				<AuthCredentialsForm />
 			</div>
 		{/if}
 	</div>
 
-	<div class="grid-cards landing__highlights">
+	<div class="landing__highlights">
 		<article class="landing__tile">
-			<div class="landing__tile-icon" data-tone="positive">
-				<svg class="icon_base" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-					/>
-				</svg>
-			</div>
-			<h3>Connected Thinking, AI-Powered</h3>
+			<h3>Notes that stay out of the way</h3>
 			<p>
-				Create your ultimate personal knowledge hub: write notes, weave them together with
-				effortless back-and-forth links, organize by topic or project, and summarize on demand. Then
-				let AI scan your entire base to surface surprising links, deeper insights, and creative
-				connections that help you think bigger and clearer.
+				Write, edit, and keep going. Markdown, categories, and links — without extra ceremony.
 			</p>
 		</article>
 
 		<article class="landing__tile">
-			<div class="landing__tile-icon" data-tone="primary">
-				<svg class="icon_base" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-					/>
-				</svg>
-			</div>
-			<h3>Fortress-Level Security for Your Mind</h3>
-			<p>
-				We take your privacy seriously. Every piece of your knowledge is shielded with
-				industry-leading encryption — end-to-end and at rest — so it remains 100% yours and
-				unreadable to anyone else. Safe today, safe tomorrow.
-			</p>
+			<h3>Yours</h3>
+			<p>Your account, your notes. Encryption in transit and at rest.</p>
 		</article>
 
 		<article class="landing__tile">
-			<div class="landing__tile-icon" data-tone="primary">
-				<svg class="icon_base" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-					/>
-				</svg>
-			</div>
-			<h3>Share Ideas Without Limits</h3>
-			<p>
-				Export your connected knowledge base as standard Markdown files — ideal for collaborating,
-				archiving, or using elsewhere. Import Markdown from other apps or friends to expand your
-				base instantly. No barriers, no formats to fight — just pure, easy flow of your thoughts.
-			</p>
+			<h3>Take them with you</h3>
+			<p>Import and export Markdown. Sync across devices on Flit Core, including MCP access.</p>
 		</article>
 	</div>
 </div>

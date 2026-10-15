@@ -379,11 +379,13 @@ export class ApiClient {
 		});
 	}
 
-	async register(userData: UserCreate): Promise<User> {
-		const response = await this.request<User>('/auth/register', {
+	async register(userData: UserCreate): Promise<AuthToken> {
+		const response = await this.request<AuthToken>('/auth/register', {
 			method: 'POST',
 			body: userData
 		});
+
+		this.setToken(response.data.access_token);
 
 		return response.data;
 	}

@@ -12,15 +12,14 @@
 	.hero {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
-		text-align: center;
+		gap: 0.5rem;
+		text-align: start;
 	}
 
 	/* ---- Nav ---- */
 	nav {
 		border-bottom: 1px solid var(--color-border);
 		background-color: var(--color-canvas-lv1);
-		box-shadow: var(--flit-shadow-sm);
 		padding: 0.5rem;
 	}
 
@@ -81,11 +80,6 @@
 
 	.nav__links .link--active {
 		border-color: var(--color-blue);
-		color: var(--color-ink);
-	}
-
-	.nav__auth-welcome {
-		font-size: 0.875rem;
 		color: var(--color-ink);
 	}
 
@@ -256,10 +250,10 @@
 	.main h1 {
 		padding-top: 1rem;
 		padding-bottom: 1.5rem;
-		text-align: center;
+		text-align: start;
 	}
 	.main > p {
-		text-align: center;
+		text-align: start;
 	}
 
 	/* ---- Auth routes (login, register, verify, …) ---- */

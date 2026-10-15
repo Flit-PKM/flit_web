@@ -5,7 +5,7 @@
 export const SITE_NAME = 'Flit Web';
 
 export const DEFAULT_DESCRIPTION =
-	'Flit Web — personal note taking and knowledge management. Create notes, build relationships, categorize ideas, and sync across devices. Part of the Flit-PKM ecosystem.';
+	'Flit Web — simple notes that stay useful. Write, organize, and sync across devices.';
 
 /** Static Open Graph / Twitter card image (1200×630 PNG). */
 export const OG_IMAGE_PATH = '/Twitter_card3.png';

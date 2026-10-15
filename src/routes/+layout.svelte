@@ -24,6 +24,7 @@
 	}
 
 	let isLoggedIn = $derived($isAuthenticated && $currentUser);
+	let showFooter = $derived(!isLoggedIn);
 	let canonicalUrl = $derived(
 		buildCanonicalUrl(getSiteOrigin($page.url.origin), $page.url.pathname)
 	);
@@ -146,13 +147,10 @@
 
 			<div class="nav__links nav__links--end">
 				{#if isLoggedIn}
-					<span class="nav__auth-welcome">
-						Welcome, <span>{$currentUser?.username}</span>
-					</span>
-					<button type="button" onclick={handleLogout} class="btn"> Sign out </button>
+					<button type="button" onclick={handleLogout} class="link">Sign out</button>
 				{:else}
 					<a href={resolve('/login')} class="btn"> Sign in </a>
-					<a href={resolve('/register')} class="btn btn-primary">Sign up</a>
+					<a href="{resolve('/login')}?mode=register" class="btn btn-primary">Sign up</a>
 				{/if}
 			</div>
 
@@ -217,8 +215,9 @@
 						{:else}
 							<div class="nav__mobile-actions">
 								<a href={resolve('/login')} class="nav__mobile-action">Sign in</a>
-								<a href={resolve('/register')} class="nav__mobile-action nav__mobile-action--link"
-									>Sign up</a
+								<a
+									href="{resolve('/login')}?mode=register"
+									class="nav__mobile-action nav__mobile-action--link">Sign up</a
 								>
 							</div>
 						{/if}
@@ -232,20 +231,22 @@
 		{@render children()}
 	</main>
 	<ConfirmDialog />
-	<footer>
-		<div class="container">
-			<div class="footer__links">
-				<a href={resolve('/about')} class="link">About</a>
-				<a href={resolve('/terms')} class="link">Terms</a>
+	{#if showFooter}
+		<footer>
+			<div class="container">
+				<div class="footer__links">
+					<a href={resolve('/about')} class="link">About</a>
+					<a href={resolve('/terms')} class="link">Terms</a>
+				</div>
+				<p>
+					"But seek first the kingdom of God and His righteousness, and all these things shall be
+					added to you." - Matthew 6:33
+				</p>
+				<p>
+					&copy; 2026 Flit-PKM and all related apps are brought to you by
+					<a href="https://bmd-studios.com" target="_blank" rel="noopener noreferrer">BMD-Studios</a>
+				</p>
 			</div>
-			<p>
-				"But seek first the kingdom of God and His righteousness, and all these things shall be
-				added to you." - Matthew 6:33
-			</p>
-			<p>
-				&copy; 2026 Flit-PKM and all related apps are brought to you by
-				<a href="https://bmd-studios.com" target="_blank" rel="noopener noreferrer">BMD-Studios</a>
-			</p>
-		</div>
-	</footer>
+		</footer>
+	{/if}
 </div>

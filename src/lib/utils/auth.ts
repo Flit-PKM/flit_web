@@ -91,11 +91,6 @@ export function validateRegisterForm(data: RegisterFormData): FormErrors {
 		rules: [validationRules.minLength(8), validationRules.password()]
 	});
 	if (passwordErr) errors.password = passwordErr;
-	const confirmErr = validateField(data.confirmPassword, {
-		required: true,
-		rules: [validationRules.match(data.password, 'Passwords do not match')]
-	});
-	if (confirmErr) errors.confirmPassword = confirmErr;
 	errorLogger.logDebug('Registration form validation complete', {
 		errors,
 		isValid: Object.keys(errors).length === 0

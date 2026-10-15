@@ -67,7 +67,7 @@
 			<p class="plan-card__price">{formatPlanPrice(plan.price)}</p>
 		</div>
 		<div class="plan-card__description">
-			<p class="plan-card__tagline">Access to Flit Core features:</p>
+			<p class="plan-card__tagline">Included:</p>
 			<ul class="plan-card__features">
 				{#each CORE_PLAN_FEATURES as feature (feature)}
 					<li>{feature}</li>

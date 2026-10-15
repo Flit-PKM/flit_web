@@ -98,11 +98,11 @@ export function sortSubscriptionPlans(plans: PlanDetailResponse[]): PlanDetailRe
 }
 
 export const CORE_PLAN_FEATURES = [
-	'Multi-device sync & backup',
-	'AI inference',
+	'Multi-device sync and backup',
+	'Encryption at rest',
 	'MCP access',
-	'Rich markdown notes & categories',
-	'Connected apps integration'
+	'Markdown notes and categories',
+	'Connected apps'
 ] as const;
 
 export function getPlanDisplayTitle(plan: PlanDetailResponse): string {

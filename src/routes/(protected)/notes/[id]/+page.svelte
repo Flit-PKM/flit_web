@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
@@ -90,12 +90,10 @@
 	let relatedNoteTitles = $state(new SvelteMap<number, string>());
 	let lastHydratedNoteId = $state<number | null>(null);
 
-	let saveToastVisible = $state(false);
-	let saveToastTimer: ReturnType<typeof setTimeout> | null = null;
-
 	let saveRequestId = 0;
 	let saveInFlight: Promise<void> | null = null;
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
+	let metaEditing = $state(false);
 
 	function isTitleDirty(): boolean {
 		return normalizeNoteTitle(liveTitle) !== normalizeNoteTitle(lastSyncedTitle);
@@ -127,15 +125,6 @@
 			version: updated.version,
 			updated_at: updated.updated_at
 		});
-	}
-
-	function pulseSaveToast() {
-		if (saveToastTimer) clearTimeout(saveToastTimer);
-		saveToastVisible = true;
-		saveToastTimer = setTimeout(() => {
-			saveToastVisible = false;
-			saveToastTimer = null;
-		}, 2400);
 	}
 
 	async function flushNoteToServer() {
@@ -194,7 +183,6 @@
 					clearDraftNote(note!.id);
 				}
 				errorLogger.logDebug('Note autosaved', { noteId: note!.id });
-				pulseSaveToast();
 				saveStatus = 'saved';
 			} catch (err) {
 				if (id === saveRequestId) {
@@ -453,13 +441,6 @@
 			window.removeEventListener('beforeunload', onBeforeUnload);
 			document.removeEventListener('visibilitychange', onVisibilityChange);
 		};
-	});
-
-	onDestroy(() => {
-		if (saveToastTimer) {
-			clearTimeout(saveToastTimer);
-			saveToastTimer = null;
-		}
 	});
 
 	$effect(() => {
@@ -800,42 +781,53 @@
 				{/if}
 			</div>
 
-			<NoteCategoriesPanel
-				categories={filteredCategories}
-				{availableCategories}
-				{addCategoryId}
-				{isSaving}
-				onAddCategoryIdChange={(id) => (addCategoryId = id)}
-				onAddCategory={addCategory}
-				onRemoveCategory={removeCategory}
-			/>
+			<div class="note-meta">
+				<NoteCategoriesPanel
+					categories={filteredCategories}
+					{availableCategories}
+					{addCategoryId}
+					{isSaving}
+					editing={metaEditing}
+					onAddCategoryIdChange={(id) => (addCategoryId = id)}
+					onAddCategory={addCategory}
+					onRemoveCategory={removeCategory}
+				/>
 
-			<NoteRelationshipsPanel
-				{note}
-				relationships={filteredRelationships}
-				{relatedNoteTitles}
-				{addRelType}
-				{isSaving}
-				onAddRelTypeChange={(t) => (addRelType = t)}
-				onOpenSearch={openNoteSearchPopup}
-				onRemoveRelationship={removeRelationship}
-			/>
+				<NoteRelationshipsPanel
+					{note}
+					relationships={filteredRelationships}
+					{relatedNoteTitles}
+					{addRelType}
+					{isSaving}
+					editing={metaEditing}
+					onAddRelTypeChange={(t) => (addRelType = t)}
+					onOpenSearch={openNoteSearchPopup}
+					onRemoveRelationship={removeRelationship}
+				/>
 
-			<NoteColorSlider
-				{liveColor}
-				disabled={isSaving}
-				onColorChange={(hex) => {
-					liveColor = hex;
-					scheduleAutosave();
-				}}
-			/>
+				{#if metaEditing}
+					<NoteColorSlider
+						{liveColor}
+						disabled={isSaving}
+						onColorChange={(hex) => {
+							liveColor = hex;
+							scheduleAutosave();
+						}}
+					/>
+				{/if}
+
+				<button
+					type="button"
+					class="notes-toolbar__text"
+					aria-expanded={metaEditing}
+					onclick={() => (metaEditing = !metaEditing)}
+				>
+					{metaEditing ? 'Done' : 'Edit'}
+				</button>
+			</div>
 		</article>
 	{/if}
 </div>
-
-{#if browser && saveToastVisible}
-	<div class="note-save-toast" role="status" aria-live="polite">...updated</div>
-{/if}
 
 {#if showJumpToTop || showJumpToBottom}
 	<div class="note-page__jump-nav">

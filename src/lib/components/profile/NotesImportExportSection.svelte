@@ -102,7 +102,7 @@
 		if (!vaultImportFile) return;
 		if (
 			!(await confirmAction(
-				'Import this file? New notes will be added to your vault. Existing notes are never changed or deleted.'
+				'Import this file? New notes will be added. Existing notes are never changed or deleted.'
 			))
 		) {
 			return;
@@ -126,9 +126,9 @@
 </script>
 
 <div class="card">
-	<div class="notes-transfer__header notes-transfer__header--balanced">
+	<div class="notes-transfer__header">
 		<div class="notes-transfer__header-title">
-			<h2>Import and Export Notes</h2>
+			<h2>Import and export</h2>
 			<p class="card__meta">Back up your notes or bring markdown files into Flit.</p>
 		</div>
 		<button
@@ -190,16 +190,6 @@
 
 	<div class="notes-transfer">
 		<section class="notes-transfer__panel" aria-labelledby="notes-export-heading">
-			<div class="notes-transfer__panel-icon" aria-hidden="true">
-				<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-					/>
-				</svg>
-			</div>
 			<h3 id="notes-export-heading" class="notes-transfer__panel-title">Export</h3>
 			<p class="card__meta">
 				Download a ZIP backup of your active notes—one UTF-8 markdown file per note.
@@ -237,16 +227,6 @@
 		</section>
 
 		<section class="notes-transfer__panel" aria-labelledby="notes-import-heading">
-			<div class="notes-transfer__panel-icon" aria-hidden="true">
-				<svg class="icon_md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-					/>
-				</svg>
-			</div>
 			<h3 id="notes-import-heading" class="notes-transfer__panel-title">Import</h3>
 			<p class="card__meta">Add notes from a Flit ZIP backup or a single markdown file.</p>
 
@@ -367,7 +347,7 @@
 							Each note is one <code>.md</code> file at the root of the archive, with title, body, categories,
 							timestamps, and note relationships where both notes are in the export.
 						</li>
-						<li>Not included: soft-deleted notes, pin state, embeddings, or audio.</li>
+						<li>Not included: notes in Trash, pin state, or audio.</li>
 						<li>Export needs at least one active note; otherwise it fails.</li>
 					</ul>
 				</section>
@@ -379,7 +359,7 @@
 							Use a Flit export ZIP (or another archive that follows the same layout: only
 							<code>.md</code> files at the root, no folders).
 						</li>
-						<li>Every file in the ZIP is imported as a new note and merged into your vault.</li>
+						<li>Every file in the ZIP is imported as a new note.</li>
 						<li>
 							Categories are matched by name (existing categories are reused; new names are
 							created).
@@ -413,7 +393,7 @@
 					<h3 class="notes-transfer-help__heading">Important</h3>
 					<ul class="notes-transfer-help__list">
 						<li>
-							Import never replaces your vault. It always adds notes; it does not update or delete
+							Import never replaces your notes. It always adds notes; it does not update or delete
 							existing ones by title or filename.
 						</li>
 						<li>
@@ -422,7 +402,7 @@
 						</li>
 						<li>
 							Relationship links are batch-local. They connect notes created in that one import
-							only; they do not attach to notes already in your vault.
+							only; they do not attach to notes you already have.
 						</li>
 						<li>
 							Wikilinks in note text are not turned into relationships—only the structured

@@ -7,11 +7,14 @@
 		categories = [],
 		hasActiveFilters = false,
 		isCategoryBusy = false,
+		isCreatingNote = false,
+		showCategoryTools = false,
 		selectedCategoryId,
 		onSearchInput,
 		onCategoryChange,
 		onClearFilters,
-		onOpenCreateCategory,
+		onToggleCategories,
+		onCreateNote,
 		onDeleteSelectedCategory
 	}: {
 		searchQuery?: string;
@@ -19,41 +22,33 @@
 		categories?: CategoryRead[];
 		hasActiveFilters?: boolean;
 		isCategoryBusy?: boolean;
+		isCreatingNote?: boolean;
+		showCategoryTools?: boolean;
 		selectedCategoryId?: number;
 		onSearchInput: (event: Event) => void;
 		onCategoryChange: (event: Event) => void;
 		onClearFilters: () => void;
-		onOpenCreateCategory: () => void;
+		onToggleCategories: () => void;
+		onCreateNote: () => void;
 		onDeleteSelectedCategory: () => void;
 	} = $props();
 </script>
 
 <div class="notes-toolbar">
 	<div class="notes-toolbar__row">
-		<span class="notes-toolbar__icon" aria-hidden="true">
-			<svg fill="none" class="icon_md" viewBox="0 0 24 24" stroke="currentColor">
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-				/>
-			</svg>
-		</span>
-		<div class="notes-toolbar__grow">
+		<div class="notes-toolbar__search">
+			<label class="visually-hidden" for="notes-search">Search notes</label>
 			<input
+				id="notes-search"
 				type="text"
-				placeholder="Search notes..."
+				placeholder="Search notes…"
 				value={searchQuery}
 				oninput={onSearchInput}
 				class="input wide"
 			/>
 		</div>
-	</div>
-
-	<div class="notes-toolbar__row">
-		<label for="category-filter" class="notes-toolbar__label nowrap">Category</label>
-		<div class="notes-toolbar__grow">
+		<div class="notes-toolbar__category">
+			<label class="visually-hidden" for="category-filter">Category</label>
 			<select
 				id="category-filter"
 				value={selectedCategory}
@@ -66,36 +61,44 @@
 				{/each}
 			</select>
 		</div>
-		<div class="profile-section__row">
-			<button
-				type="button"
-				onclick={onOpenCreateCategory}
-				disabled={isCategoryBusy}
-				class="btn"
-				title="Create category">+</button
-			>
+		<button type="button" onclick={onCreateNote} disabled={isCreatingNote} class="btn btn-primary">
+			New note
+		</button>
+		<button
+			type="button"
+			class="notes-toolbar__text"
+			aria-expanded={showCategoryTools}
+			onclick={onToggleCategories}
+		>
+			Categories
+		</button>
+		{#if hasActiveFilters}
+			<button type="button" onclick={onClearFilters} class="notes-toolbar__text">Clear</button>
+		{/if}
+	</div>
+
+	{#if showCategoryTools}
+		<div class="notes-toolbar__row">
 			<button
 				type="button"
 				onclick={onDeleteSelectedCategory}
 				disabled={selectedCategoryId === undefined || isCategoryBusy}
-				class="btn"
-				title="Delete selected category">−</button
+				class="notes-toolbar__text"
 			>
-			{#if hasActiveFilters}
-				<button type="button" onclick={onClearFilters} class="btn"> Clear </button>
+				Delete selected
+			</button>
+		</div>
+	{/if}
+
+	{#if hasActiveFilters}
+		<div class="notes-toolbar__row">
+			<span class="notes-toolbar__label">Filtering by</span>
+			{#if searchQuery}
+				<span class="badge badge--primary">Search: "{searchQuery}"</span>
+			{/if}
+			{#if selectedCategory}
+				<span class="badge badge--primary">Category: {selectedCategory}</span>
 			{/if}
 		</div>
-	</div>
+	{/if}
 </div>
-
-{#if hasActiveFilters}
-	<div class="profile-section__row mt-sm">
-		<span>Filtering by:</span>
-		{#if searchQuery}
-			<span class="badge badge--primary">Search: "{searchQuery}"</span>
-		{/if}
-		{#if selectedCategory}
-			<span class="badge badge--primary">Category: {selectedCategory}</span>
-		{/if}
-	</div>
-{/if}

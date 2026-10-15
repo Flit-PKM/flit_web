@@ -281,6 +281,11 @@
 		categoryError = '';
 	}
 
+	function toggleCategoryTools() {
+		if (showCreateCategory) cancelCreateCategory();
+		else openCreateCategory();
+	}
+
 	function cancelCreateCategory() {
 		showCreateCategory = false;
 		newCategoryName = '';
@@ -532,7 +537,7 @@
 	});
 </script>
 
-<SeoHead title="Notes – Flit Web" description="Your Flit Web notes and knowledge graph." />
+<SeoHead title="Notes – Flit Web" description="Your Flit Web notes." />
 <svelte:window
 	onclick={() => {
 		if (activeOptionsNoteId !== null) closeNoteOptions();
@@ -546,36 +551,31 @@
 
 <h1>Notes</h1>
 
-<section class="card">
-	<NotesSearchFilters
-		{searchQuery}
-		{selectedCategory}
-		{categories}
-		{hasActiveFilters}
-		{isCategoryBusy}
-		{selectedCategoryId}
-		onSearchInput={handleSearchInput}
-		onCategoryChange={handleCategoryChange}
-		onClearFilters={clearFilters}
-		onOpenCreateCategory={openCreateCategory}
-		onDeleteSelectedCategory={deleteSelectedCategory}
-	/>
-	<NotesCategoryManager
-		{showCreateCategory}
-		{newCategoryName}
-		{categoryError}
-		{isCategoryBusy}
-		onNameInput={(v) => (newCategoryName = v)}
-		onSubmit={submitCreateCategory}
-		onCancel={cancelCreateCategory}
-	/>
-</section>
-
-<div class="card__row card__row--end mt-md">
-	<button type="button" onclick={createNewNote} disabled={isCreatingNote} class="btn btn-primary">
-		+ New Note
-	</button>
-</div>
+<NotesSearchFilters
+	{searchQuery}
+	{selectedCategory}
+	{categories}
+	{hasActiveFilters}
+	{isCategoryBusy}
+	{isCreatingNote}
+	showCategoryTools={showCreateCategory}
+	{selectedCategoryId}
+	onSearchInput={handleSearchInput}
+	onCategoryChange={handleCategoryChange}
+	onClearFilters={clearFilters}
+	onToggleCategories={toggleCategoryTools}
+	onCreateNote={createNewNote}
+	onDeleteSelectedCategory={deleteSelectedCategory}
+/>
+<NotesCategoryManager
+	{showCreateCategory}
+	{newCategoryName}
+	{categoryError}
+	{isCategoryBusy}
+	onNameInput={(v) => (newCategoryName = v)}
+	onSubmit={submitCreateCategory}
+	onCancel={cancelCreateCategory}
+/>
 
 {#if isLoading}
 	<div class="loading">
@@ -598,26 +598,12 @@
 		{/if}
 	</div>
 {:else if notes.length === 0}
-	<div class="card card__column card__column--center">
-		{#if hasActiveFilters}
-			<span class="icon_md" aria-hidden="true">
-				<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-					/>
-				</svg>
-			</span>
-			<p class="card__meta card__meta--mt-sm">No notes match your filters.</p>
-			<button type="button" onclick={clearFilters} class="btn btn-primary mt-md"
-				>Clear filters</button
-			>
-		{:else}
-			<p class="card__meta">No notes yet.</p>
-		{/if}
-	</div>
+	{#if hasActiveFilters}
+		<p class="card__meta">No notes match your filters.</p>
+		<button type="button" onclick={clearFilters} class="notes-toolbar__text">Clear filters</button>
+	{:else}
+		<p class="card__meta">Nothing here yet.</p>
+	{/if}
 {:else}
 	<p class="muted">
 		{notes.length} note{notes.length === 1 ? '' : 's'}

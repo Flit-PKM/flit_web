@@ -157,7 +157,6 @@ export interface LoginFormData extends Record<string, unknown> {
 export interface RegisterFormData extends Record<string, unknown> {
 	email: string;
 	password: string;
-	confirmPassword: string;
 	cf_turnstile_response?: string | null;
 }
 

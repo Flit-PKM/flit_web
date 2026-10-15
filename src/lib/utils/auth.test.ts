@@ -101,19 +101,17 @@ describe('validateRegisterForm', () => {
 	it('returns no errors for valid data', () => {
 		const result = validateRegisterForm({
 			email: 'user@example.com',
-			password: 'Abcdef1!',
-			confirmPassword: 'Abcdef1!'
+			password: 'Abcdef1!'
 		});
 		expect(hasFormErrors(result)).toBe(false);
 	});
 
-	it('returns error when passwords do not match', () => {
+	it('returns error for a weak password', () => {
 		const result = validateRegisterForm({
 			email: 'user@example.com',
-			password: 'Abcdef1!',
-			confirmPassword: 'Abcdef2!'
+			password: 'short'
 		});
-		expect(result.confirmPassword).toBeDefined();
+		expect(result.password).toBeDefined();
 	});
 });
 

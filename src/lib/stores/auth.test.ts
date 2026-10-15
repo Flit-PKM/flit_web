@@ -16,6 +16,7 @@ const setToken = vi.fn();
 const clearToken = vi.fn();
 const refreshLogin = vi.fn();
 const logoutApi = vi.fn();
+const registerApi = vi.fn();
 
 vi.mock('../api/client', () => ({
 	apiClient: {
@@ -26,7 +27,7 @@ vi.mock('../api/client', () => ({
 		logout: (...args: unknown[]) => logoutApi(...args),
 		login: vi.fn(),
 		loginWithGoogle: vi.fn(),
-		register: vi.fn()
+		register: (...args: unknown[]) => registerApi(...args)
 	},
 	HttpError: class HttpError extends Error {
 		status: number;
@@ -97,6 +98,7 @@ describe('auth store', () => {
 		clearToken.mockReset();
 		refreshLogin.mockReset();
 		logoutApi.mockReset();
+		registerApi.mockReset();
 		logoutApi.mockResolvedValue(undefined);
 		refreshLogin.mockResolvedValue({
 			access_token: jwtWithExp(1800),
@@ -136,6 +138,26 @@ describe('auth store', () => {
 		expect(get(isAuthenticated)).toBe(false);
 		expect(get(auth).token).toBeNull();
 		expect(localStorage.getItem('auth_token')).toBeNull();
+	});
+
+	it('register persists token and user like login', async () => {
+		const token = jwtWithExp(1800);
+		registerApi.mockResolvedValue({ access_token: token, token_type: 'bearer' });
+		getCurrentUser.mockResolvedValue(sampleUser);
+
+		const { auth, isAuthenticated, authActions } = await import('./auth');
+		const result = await authActions.register({
+			email: 'a@b.com',
+			password: 'Abcdef1!'
+		});
+
+		const { get } = await import('svelte/store');
+		expect(result.success).toBe(true);
+		expect(get(isAuthenticated)).toBe(true);
+		expect(get(auth).token).toBe(token);
+		expect(get(auth).user).toEqual(sampleUser);
+		expect(registerApi).toHaveBeenCalled();
+		expect(getCurrentUser).toHaveBeenCalled();
 	});
 
 	it('logout revokes the server session then clears token and user', async () => {

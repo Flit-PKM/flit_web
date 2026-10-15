@@ -36,7 +36,7 @@
 </script>
 
 <div class="card">
-	<h2>Access Code</h2>
+	<h2>Access code</h2>
 	{#if $currentUser?.access_grant}
 		<div class="alert alert--success card__block" role="status">
 			<p class="card__label">

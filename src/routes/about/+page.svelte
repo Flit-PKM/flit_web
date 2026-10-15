@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/stores';
-	import { asset } from '$app/paths';
 	import SeoHead from '$lib/components/SeoHead.svelte';
 	import JsonLd from '$lib/components/JsonLd.svelte';
 	import {
@@ -10,10 +9,9 @@
 		getSiteOrigin,
 		wrapJsonLdGraph
 	} from '$lib/utils/seo';
-	// About page - generic content
 
 	const aboutDescription =
-		'Learn about Flit Web — a privacy-first personal knowledge management ecosystem with AI-powered note taking, sync, and connected apps.';
+		'Flit Web is a simple place for your notes — write, organize, and sync across devices.';
 
 	let siteOrigin = $derived(getSiteOrigin($page.url.origin));
 	let pageUrl = $derived(buildCanonicalUrl(siteOrigin, $page.url.pathname));
@@ -34,122 +32,54 @@
 <SeoHead title="About - Flit Web" description={aboutDescription} />
 <JsonLd data={jsonLd} />
 
-<h1>About Flit-PKM</h1>
-<div class="card">
-	<div class="prose">
-		<p class="section-title">Your Private Second Brain — Secure, Connected, Enhanced.</p>
-		<section>
-			<h2>What is Flit?</h2>
-			<p>
-				Flit is your modern Personal Knowledge Management (PKM) ecosystem — a private, secure space
-				where your notes, insights, and daily reflections come together with powerful AI to help you
-				think deeper and discover more.
-				<br />Imagine your thoughts no longer scattered: Flit blends effortless note-taking with
-				smart AI that summarizes, connects ideas, and uncovers hidden patterns and fresh insights
-				you might never have spotted on your own. It's built for people who want their knowledge to
-				feel alive, organized, and truly theirs.
-			</p>
-		</section>
+<h1>About Flit</h1>
+<div class="prose">
+	<p class="card__meta">Simple notes. Effective when you need them. Yours.</p>
+	<section>
+		<h2>What is Flit?</h2>
+		<p>
+			Flit is a private place for your notes. Write them down, organize them, and find them later
+			— without extra tools getting in the way.
+		</p>
+	</section>
 
-		<section>
-			<h2>Our Mission</h2>
-			<p>
-				We believe your knowledge should be connected, effortless to navigate, and completely under
-				your control. Flit empowers you to build a growing personal knowledge base with intuitive
-				tools for linking ideas, organizing thoughts, and revealing meaningful insights — all while
-				keeping everything 100% private.<br />
-				Our connected apps make it even better:
-			</p>
-			<ul class="card__meta">
-				<li>Flit-App — Capture notes and ideas anytime, anywhere.</li>
-				<li>
-					Still — Elegant meditation timer and journaling to track sessions, set intentions, and
-					reflect deeply.
-				</li>
-				<li>And more on the way soon...</li>
-			</ul>
-			<br />
-			<p>
-				Together, they bridge the different parts of your life — work, wellness, creativity — into
-				one unified, private second brain that evolves with you.
-			</p>
-		</section>
+	<section>
+		<h2>Why Flit</h2>
+		<p>
+			Your notes should be easy to keep and fully under your control. Flit is built to stay useful:
+			capture, organize, and sync — privately.
+		</p>
+		<ul class="card__meta">
+			<li>Flit Web — Notes in the browser.</li>
+			<li>Flit-App — Capture notes and ideas on the go.</li>
+			<li>
+				Still — Meditation timer and journaling to track sessions, set intentions, and reflect.
+			</li>
+		</ul>
+	</section>
 
-		<section>
-			<h2>Features</h2>
-			<ul class="card__meta">
-				<li>
-					<svg class="icon_sm link--primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/>
-					</svg>
-					<span>Fortress-Level Security</span>
-				</li>
-				<li>
-					<svg class="icon_sm link--primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/>
-					</svg>
-					<span>Connected Knowledge Graph</span>
-				</li>
-				<li>
-					<svg class="icon_sm link--primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/>
-					</svg>
-					<span>AI-Powered Insights</span>
-				</li>
-				<li>
-					<svg class="icon_sm link--primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/>
-					</svg>
-					<span>Export & Import Freedom</span>
-				</li>
-				<li>
-					<svg class="icon_sm link--primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/>
-					</svg>
-					<span>Seamless Sync & Backup</span>
-				</li>
-			</ul>
-		</section>
+	<section>
+		<h2>What you get</h2>
+		<ul class="card__meta">
+			<li><span>Notes, categories, and links</span></li>
+			<li><span>Markdown import and export</span></li>
+			<li><span>Sync and backup on Flit Core</span></li>
+			<li><span>MCP access and connected apps</span></li>
+			<li><span>Encryption in transit and at rest</span></li>
+		</ul>
+	</section>
 
-		<section>
-			<h2>Contact</h2>
-			<p>
-				Questions, feedback, ideas, or just want to say hi?<br />
-				Visit us at
-				<a href="https://bmd-studios.com" target="_blank" rel="noopener noreferrer">BMD-Studios</a>
-				or drop an email to admin @ bmd-studios . com<br />
-				We'd love to hear from you!
-			</p>
-		</section>
-		<br />
-		<hr />
-		<div>
-			<a href={resolve('/')} class="link">← Back to Home</a>
-		</div>
+	<section>
+		<h2>Contact</h2>
+		<p>
+			Questions or feedback?<br />
+			Visit
+			<a href="https://bmd-studios.com" target="_blank" rel="noopener noreferrer">BMD-Studios</a>
+			or email admin @ bmd-studios . com
+		</p>
+	</section>
+	<hr />
+	<div>
+		<a href={resolve('/')} class="link">← Back to home</a>
 	</div>
 </div>

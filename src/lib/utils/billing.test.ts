@@ -118,14 +118,14 @@ describe('resolveSubscriptionPlanName', () => {
 	const plans: PlanDetailResponse[] = [
 		{
 			product_id: 'prod_monthly',
-			name: 'Monthly Core AI',
+			name: 'Monthly Core',
 			is_recurring: true,
 			price: { currency: 'USD', price: 999 }
 		}
 	];
 
 	it('returns the matching plan name', () => {
-		expect(resolveSubscriptionPlanName('prod_monthly', plans)).toBe('Monthly Core AI');
+		expect(resolveSubscriptionPlanName('prod_monthly', plans)).toBe('Monthly Core');
 	});
 
 	it('returns null when product id is missing or unknown', () => {

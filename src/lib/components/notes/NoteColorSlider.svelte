@@ -32,7 +32,10 @@
 	}
 </script>
 
-<section class="note-detail__block note-color-slider" aria-labelledby="note-color-label">
+<section
+	class="note-detail__block note-detail__block--editing note-color-slider"
+	aria-labelledby="note-color-label"
+>
 	<h2 id="note-color-label" class="note-detail__block-title">Color</h2>
 	<div class="note-color-slider__row">
 		<span class="note-color-slider__swatch" style:background-color={swatchCss} aria-hidden="true"

@@ -266,10 +266,10 @@
 
 <SeoHead
 	title="Profile - Flit Web"
-	description="Manage your Flit Web account profile and knowledge graph access."
+	description="Manage your Flit Web account and notes."
 />
 
-<h1>Your Profile</h1>
+<h1>Profile</h1>
 
 {#if isLoading}
 	<div class="loading">
@@ -294,7 +294,7 @@
 	</div>
 {:else if $currentUser}
 	<div class="page-subhead card__row card__row--between">
-		<p class="card__meta">Manage your account information</p>
+		<p class="card__meta">Account, billing, and connected apps.</p>
 		<div class="card__row">
 			<a href={resolve('/billing')} class="btn btn-secondary">Billing</a>
 			<button onclick={handleLogout} class="btn">
@@ -329,7 +329,7 @@
 		<div>
 			<form class="card" onsubmit={handleSubmit} novalidate>
 				<!-- Account Information Section -->
-				<h2>Account Information</h2>
+				<h2>Account</h2>
 				<div class="card__column">
 					<!-- Username Field -->
 					<div class="card__row card__row--start">
@@ -380,7 +380,7 @@
 					<!-- Color Scheme Preference -->
 					<div class="card__column">
 						<span class="card__label">Color scheme</span>
-						<p class="card__meta">Choose your preferred color scheme for the interface</p>
+						<p class="card__meta">How Flit looks</p>
 						<div class="color-scheme-picker">
 							<label
 								class="radio-card radio-card--light-preview"
@@ -466,7 +466,7 @@
 					<!-- Account Status (entitlement: subscription or access-code grant) -->
 					<div class="card__column">
 						<div>
-							<span class="card__label--muted"> Account Status </span>
+							<span class="card__label--muted">Account status</span>
 							<div>
 								<span
 									class="badge {($currentUser?.entitlement_active ?? false)
@@ -480,7 +480,7 @@
 							</div>
 						</div>
 						<div>
-							<span class="card__label--muted"> Email Verified </span>
+							<span class="card__label--muted">Email</span>
 							<div class="card__row flex-start">
 								<span
 									class="badge {$currentUser.is_verified ? 'badge--positive' : 'badge--muted'}"
@@ -539,13 +539,13 @@
 					<!-- Account Dates -->
 					<div>
 						<div>
-							<span class="card__label--muted"> Member Since: </span>
+							<span class="card__label--muted">Member since</span>
 							<span class="card__meta" aria-label="Account creation date">
 								{formatProfileDate($currentUser.created_at)}
 							</span>
 						</div>
 						<div>
-							<span class="card__label--muted"> Last Updated: </span>
+							<span class="card__label--muted">Last updated</span>
 							<span class="card__meta" aria-label="Account last updated date">
 								{formatProfileDate($currentUser.updated_at)}
 							</span>
@@ -556,7 +556,7 @@
 				<!-- Password Change Section -->
 				<div class="card__column">
 					<div class="card__row">
-						<h2>Change Password</h2>
+						<h2>Password</h2>
 						<button type="button" onclick={togglePasswordChange} class="btn">
 							{showPasswordChange ? 'Cancel' : 'Change password'}
 						</button>
@@ -741,7 +741,7 @@
 							</span>
 							Saving...
 						{:else}
-							Save Changes
+							Save changes
 						{/if}
 					</button>
 				</div>
@@ -755,9 +755,7 @@
 		<!-- Feedback -->
 		<div class="card">
 			<h2>Feedback</h2>
-			<p class="card__meta">
-				Share your love, hate and everything in between! Your feedback helps us improve.
-			</p>
+			<p class="card__meta">What works, what doesn’t — it all helps.</p>
 			{#if feedbackError}
 				<div class="alert alert--error" role="alert">
 					<svg class="alert__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -813,9 +811,9 @@
 	</div>
 {:else}
 	<!-- Not authenticated -->
-	<h2>Access Denied</h2>
+	<h2>Sign in required</h2>
 	<div class="card">
-		<p>You need to sign in to access your profile.</p>
+		<p>Sign in to view your profile.</p>
 		<div class="card__row">
 			<a href={resolve('/login')} class="btn btn-primary">Sign In</a>
 		</div>

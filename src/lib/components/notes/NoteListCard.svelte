@@ -33,16 +33,14 @@
 	let accentColor = $derived(normalizeNoteColor(note.color));
 	let accentStyle = $derived(
 		accentColor
-			? `background: color-mix(in oklab, ${accentColor} 42%, var(--flit-card-bg))`
+			? `--note-accent: color-mix(in oklab, ${accentColor} 42%, var(--flit-card-bg))`
 			: undefined
 	);
 </script>
 
-<div class="card note-list__card">
-	<div class="note-list__accent" style={accentStyle} aria-hidden="true"></div>
+<div class="note-list__card" class:note-list__card--accent={!!accentColor} style={accentStyle}>
 	<a href={resolve(`/notes/${note.id}`)} class="note-list__main-link">
 		<h2 class="note-list__title">{note.title}</h2>
-		<hr class="note-list__divider" />
 		{#if showPreview}
 			<div class="prose">
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via markdownToSafeHtml -->

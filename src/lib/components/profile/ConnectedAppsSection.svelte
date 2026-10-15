@@ -283,12 +283,11 @@
 </script>
 
 <div class="card">
-	<div class="notes-transfer__header notes-transfer__header--balanced">
+	<div class="notes-transfer__header">
 		<div class="notes-transfer__header-title">
-			<h2>Connected Apps</h2>
+			<h2>Connected apps</h2>
 			<p class="card__meta connections__subtitle">
-				Link Flit native apps with a pairing code, or connect MCP clients via OAuth or Bearer
-				tokens.
+				Pair a Flit app with a code, or connect MCP clients with OAuth or a Bearer token.
 			</p>
 		</div>
 		<button
@@ -731,7 +730,7 @@
 
 			<div class="notes-transfer-help__body">
 				<section>
-					<h3 class="notes-transfer-help__heading">Native Apps</h3>
+					<h3 class="notes-transfer-help__heading">Native apps</h3>
 					<ul class="notes-transfer-help__list">
 						<li>
 							Click <code>+ Connect Native App</code> to generate a short-lived pairing code.

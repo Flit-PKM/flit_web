@@ -145,7 +145,7 @@
 
 	function handleGuestPlanSelect(plan: PendingBillingPlan) {
 		setPendingBillingPlan(plan);
-		goto(resolve('/register'));
+		goto(`${resolve('/login')}?mode=register` as Parameters<typeof goto>[0]);
 	}
 
 	async function handleOpenPortal() {
@@ -197,15 +197,14 @@
 	}
 </script>
 
-<div class="card">
-	<h2>Billing</h2>
-	<p class="card__meta">
-		{guestMode
-			? 'Choose a plan, then create an account to get started.'
-			: hasActiveSubscription
+<div>
+	{#if !guestMode}
+		<p class="card__meta">
+			{hasActiveSubscription
 				? 'Your active subscription.'
 				: 'Manage your subscription and payment.'}
-	</p>
+		</p>
+	{/if}
 
 	{#if !guestMode && subscriptionLoading}
 		<p class="card__meta">Loading subscription…</p>

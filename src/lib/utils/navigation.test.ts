@@ -49,7 +49,7 @@ describe('parseRootRedirectTarget', () => {
 
 	it('allows login/register redirect for guests', () => {
 		expect(parseRootRedirectTarget(false, 'login')).toBe('/login');
-		expect(parseRootRedirectTarget(false, 'register')).toBe('/register');
+		expect(parseRootRedirectTarget(false, 'register')).toBe('/login?mode=register');
 	});
 
 	it('returns null for unsupported guest redirects', () => {

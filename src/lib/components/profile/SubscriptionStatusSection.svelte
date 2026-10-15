@@ -75,7 +75,7 @@
 </script>
 
 <div>
-	<span class="card__label--muted"> Subscription Status </span>
+	<span class="card__label--muted">Subscription</span>
 	<div class="card__row flex-start">
 		<span
 			class="badge badge--{formattedStatus.badgeVariant}"

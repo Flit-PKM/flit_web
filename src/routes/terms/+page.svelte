@@ -3,32 +3,30 @@
 	import SeoHead from '$lib/components/SeoHead.svelte';
 
 	const termsDescription =
-		'Flit Web Terms of Service and Privacy Policy. Privacy-first personal knowledge management.';
+		'Flit Web Terms of Service and Privacy Policy. Simple, private notes.';
 </script>
 
 <SeoHead title="Terms of Service & Privacy Policy - Flit Web" description={termsDescription} />
 
 <h1>Flit Terms of Service</h1>
-<div class="card prose">
-	<p class="card__meta">Effective Date: February 05, 2026</p>
+<div class="prose">
+	<p class="card__meta">Effective Date: October 15, 2026</p>
 	<p>
-		Welcome to Flit! We're delighted you've found your way to our privacy-first personal knowledge
-		management ecosystem. These Terms of Service ("Terms") are a straightforward agreement between
-		you and the operator of Flit ("we," "us," or "our")—a sole developer building tools to help you
-		capture, connect, and reflect on your thoughts securely.
+		Welcome to Flit. These Terms of Service ("Terms") are an agreement between you and the operator
+		of Flit ("we," "us," or "our")—a sole developer building tools to help you capture and organize
+		notes securely.
 	</p>
 	<p class="card__meta">
-		By joining the waitlist, creating an account, or using any part of Flit (the "Service"—including
-		the mobile apps, web app, Core sync, and AI features), you agree to these Terms. If you don't
-		agree, please don't use the Service.
+		By creating an account or using any part of Flit (the "Service"—including the mobile apps, web
+		app, and Core sync), you agree to these Terms. If you don't agree, please don't use the Service.
 	</p>
 
 	<section>
 		<h2>1. Accounts and Access</h2>
 		<ul class="card__meta">
 			<li>
-				You need an account to use most features (currently via waitlist email; full accounts will
-				use OAuth with JWT and upcoming SSO).
+				You need an account to use most features (email/password, Google Sign-In, and related
+				authentication).
 			</li>
 			<li>
 				You're responsible for keeping your login details secure and for all activity on your
@@ -44,14 +42,14 @@
 	<section>
 		<h2>2. Free and Paid Features</h2>
 		<ul class="card__meta">
-			<li>All Flit apps (mobile and web) are 100% free forever.</li>
+			<li>All Flit apps (mobile and web) are 100% free forever for core note taking.</li>
 			<li>
-				Core features—cloud database sync and optional off-device AI speech-to-text—are available
-				through a paid subscription (details will be shown in-app when launched).
+				Flit Core paid features—multi-device sync and backup, encryption at rest, MCP access, and
+				connected apps—are available through a paid subscription (details are shown in-app).
 			</li>
 			<li>
-				Payments will be processed via Dodo Payments. We do not store your full payment card
-				details; they are handled securely by the provider.
+				Payments are processed via Dodo Payments. We do not store your full payment card details;
+				they are handled securely by the provider.
 			</li>
 			<li>
 				Subscriptions auto-renew unless cancelled. No refunds for partial periods except where
@@ -64,21 +62,11 @@
 		<h2>3. Your Content and Privacy</h2>
 		<ul class="card__meta">
 			<li>
-				You own all your notes, voice recordings, journal entries, and any other content you create
-				("Your Content").
+				You own all your notes, journal entries, and any other content you create ("Your Content").
 			</li>
 			<li>
-				In the Flit apps, transcription and AI processing happen 100% on-device—nothing leaves your
-				phone unless you explicitly opt into Core off-device processing.
-			</li>
-			<li>
-				If you subscribe to Core and enable off-device speech-to-text, you grant us a limited,
-				revocable license to process that audio solely to provide the transcription service. We
-				delete the audio immediately after processing.
-			</li>
-			<li>
-				We will never sell, share for advertising, or use your personal content for training public
-				AI models.
+				We will never sell, share for advertising, or use your personal content to train public
+				models.
 			</li>
 		</ul>
 	</section>
@@ -103,9 +91,9 @@
 		<ul class="card__meta">
 			<li>
 				Flit (code, design, branding) belongs to us. You get a limited, non-transferable license to
-				use the Service for personal knowledge management.
+				use the Service for personal notes.
 			</li>
-			<li>You keep full rights to Your Content and any insights you generate.</li>
+			<li>You keep full rights to Your Content.</li>
 		</ul>
 	</section>
 
@@ -115,10 +103,6 @@
 			<li>
 				Flit is provided "as is" without warranties. We're in active development—things might break,
 				change, or be temporarily unavailable.
-			</li>
-			<li>
-				AI transcriptions and insights are helpful tools, not perfect or professional advice
-				(especially for wellness features). Always verify important information yourself.
 			</li>
 			<li>
 				To the fullest extent permitted by law, we are not liable for indirect, incidental, or
@@ -163,43 +147,37 @@
 			(or the contact form on our site).
 		</p>
 		<p class="card__meta">
-			Thank you for trusting Flit with your thoughts—we're building this with privacy and care at
-			the heart.
+			Thank you for trusting Flit with your notes—we're building this with privacy and care at the
+			heart.
 		</p>
 	</section>
 </div>
 <!-- Privacy Policy -->
 <h2>Flit Privacy Policy</h2>
-<div class="card prose">
-	<p class="card__meta">Effective Date: February 05, 2026</p>
+<div class="prose">
+	<p class="card__meta">Effective Date: October 15, 2026</p>
 
 	<p>
-		At Flit, your privacy is not a feature—it's the foundation. We designed the system so most
-		processing stays on your device. This Privacy Policy explains what little data we do collect,
-		how we use it, and your rights.
+		At Flit, your privacy is not a feature—it's the foundation. This Privacy Policy explains what
+		data we collect, how we use it, and your rights.
 	</p>
 
 	<section>
 		<h2>1. Data We Collect</h2>
 		<ul class="card__meta">
 			<li>
-				<strong>Account data:</strong> Email address (for waitlist and login), and any profile details
-				you add.
+				<strong>Account data:</strong> Email address (for login), and any profile details you add.
 			</li>
 			<li>
 				<strong>Usage data:</strong> Anonymous analytics about which features you use (to improve the
 				apps—no personal identifiers).
 			</li>
 			<li>
-				<strong>Content:</strong> Your notes, voice recordings, journals—processed primarily on-device.
+				<strong>Content:</strong> Your notes and related files you choose to store with the Service.
 			</li>
 			<li>
 				<strong>Payment data:</strong> If you subscribe, billing info is handled securely by our payment
 				processor (we only receive confirmation and subscription status).
-			</li>
-			<li>
-				<strong>Off-device audio:</strong> Only if you explicitly enable Core off-device speech-to-text;
-				deleted immediately after transcription.
 			</li>
 		</ul>
 	</section>
@@ -207,9 +185,7 @@
 	<section>
 		<h2>2. How We Use Your Data</h2>
 		<ul class="card__meta">
-			<li>
-				To provide and improve the Service (account management, sync, optional transcription).
-			</li>
+			<li>To provide and improve the Service (account management, sync, and related features).</li>
 			<li>To communicate updates, feature announcements, or support responses.</li>
 			<li>To process payments and manage subscriptions.</li>
 			<li>For legal compliance if required.</li>
@@ -218,7 +194,7 @@
 		<ul class="card__meta">
 			<li>Sell your data.</li>
 			<li>Share it for marketing.</li>
-			<li>Use your personal content to train AI models.</li>
+			<li>Use your personal content to train public models.</li>
 			<li>Track you across other sites or apps.</li>
 		</ul>
 	</section>
@@ -231,7 +207,6 @@
 				States (via Render, US East region).
 			</li>
 			<li>We use industry-standard encryption in transit and at rest.</li>
-			<li>On-device processing means most sensitive data never leaves your phone.</li>
 		</ul>
 	</section>
 
@@ -302,6 +277,6 @@
 	</section>
 
 	<div>
-		<a href={resolve('/')} class="link">← Back to Home</a>
+		<a href={resolve('/')} class="link">← Back to home</a>
 	</div>
 </div>

@@ -24,7 +24,6 @@
 		font-weight: 500;
 		background: var(--color-canvas-lv2);
 		color: var(--color-ink);
-		box-shadow: var(--flit-shadow-sm);
 		border: 1px solid transparent;
 		transition:
 			opacity 0.2s,
@@ -35,7 +34,7 @@
 	}
 
 	.btn:hover:not(:disabled) {
-		border: 1px solid var(--color-ink);
+		background: var(--color-canvas-lv3);
 	}
 
 	.btn:disabled {
@@ -50,7 +49,7 @@
 	}
 
 	.btn-primary:hover:not(:disabled) {
-		border: 1px solid var(--color-ink-neutral);
+		background: color-mix(in oklab, var(--color-blue) 28%, var(--color-canvas));
 	}
 
 	.btn-danger {
@@ -58,7 +57,7 @@
 	}
 
 	.btn-danger:hover:not(:disabled) {
-		border: 1px solid var(--color-ink-negative);
+		background: color-mix(in oklab, var(--color-red) 28%, var(--color-canvas));
 	}
 
 	.btn-secondary {
@@ -87,7 +86,7 @@
 	/* ---- Input ---- */
 	.input {
 		border-radius: 0.5rem;
-		border: 1px solid var(--color-ink);
+		border: 1px solid var(--color-border);
 		background-color: var(--color-canvas);
 		padding: 0.75rem;
 		color: var(--color-ink);
@@ -165,7 +164,6 @@
 		border: 1px solid var(--color-border);
 		background-color: var(--color-canvas-lv1);
 		padding: 1.5rem;
-		box-shadow: var(--flit-shadow-sm);
 		width: auto;
 		display: flex;
 		flex-direction: column;
@@ -187,10 +185,6 @@
 		flex-direction: column;
 		gap: 1.5rem;
 		align-items: center;
-		text-align: center;
-	}
-
-	.card h2 {
 		text-align: center;
 	}
 

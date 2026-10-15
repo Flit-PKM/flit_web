@@ -6,7 +6,6 @@
 	import { apiClient, HttpError } from '$lib/api/client';
 	import { buildLoginRedirect } from '$lib/utils/navigation';
 	import { consumePendingBillingPlan } from '$lib/utils/billing-selection';
-	import { CORE_PLAN_FEATURES } from '$lib/utils/billing';
 	import BillingSection from '$lib/components/billing/BillingSection.svelte';
 	import AccessCodeSection from '$lib/components/billing/AccessCodeSection.svelte';
 	import SeoHead from '$lib/components/SeoHead.svelte';
@@ -19,7 +18,7 @@
 	} from '$lib/utils/seo';
 
 	const billingDescription =
-		'View Flit Web subscription plans, manage billing, and activate access codes.';
+		'Flit Web plans: free notes, or Flit Core for sync, encryption, and MCP access.';
 
 	let guestMode = $derived(!$isAuthenticated);
 	let subscriptionActive = $state(false);
@@ -119,31 +118,10 @@
 	</div>
 {/if}
 
-<section class="card prose" aria-label="Subscription plans overview">
-	<h2 class="section-title">Subscription plans</h2>
-	<p>
-		Flit Web offers a free tier and paid Flit Core plans billed monthly or annually. Paid plans
-		include the features below; live prices appear in the plan selector once loaded.
-	</p>
-	<ul>
-		<li>
-			<strong>Free</strong> — use Flit Web at no cost. Create notes, link ideas, and organize your knowledge.
-			Upgrade anytime for AI and encryption features.
-		</li>
-		<li>
-			<strong>Monthly</strong> — Flit Core billed every month with full access to paid features.
-		</li>
-		<li>
-			<strong>Annual</strong> — Flit Core billed yearly with a 15% discount compared to paying monthly.
-		</li>
-	</ul>
-	<p class="card__meta">Flit Core paid plan features:</p>
-	<ul class="card__meta">
-		{#each CORE_PLAN_FEATURES as feature (feature)}
-			<li>{feature}</li>
-		{/each}
-	</ul>
-</section>
+<p>
+	Notes are free. Flit Core adds sync, encryption at rest, MCP access, and connected apps. Pay
+	monthly, or yearly at 15% off.
+</p>
 
 <div class="profile-stack">
 	<BillingSection {guestMode} {autoCheckoutProductId} bind:subscriptionActive />

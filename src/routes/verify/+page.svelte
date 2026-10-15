@@ -17,11 +17,11 @@
 </script>
 
 <SeoHead
-	title="Email Verification - Flit Web"
+	title="Email verification - Flit Web"
 	description="Email verification status for your Flit Web account."
 	noindex
 />
-<h1>Email Verification</h1>
+<h1>Email verification</h1>
 <div class="card">
 	<div role={verificationState === 'success' ? 'status' : 'alert'}>
 		{#if verificationState === 'success'}
@@ -38,7 +38,7 @@
 				</div>
 				<h2>Email verified</h2>
 				<p class="card__meta">
-					Your email address has been verified successfully. You can now sign in to your account.
+					Your email is verified. You can sign in.
 				</p>
 				<a href={resolve('/login')} class="btn btn-primary">Sign in</a>
 			</div>
@@ -61,7 +61,7 @@
 				</p>
 				<div class="card__row">
 					<a href={resolve('/login')} class="btn btn-primary">Sign in</a>
-					<a href={resolve('/register')} class="btn">Sign up</a>
+					<a href="{resolve('/login')}?mode=register" class="btn">Sign up</a>
 				</div>
 			</div>
 		{:else if verificationState === 'unconfigured'}
@@ -83,7 +83,7 @@
 				</p>
 				<div class="card__row">
 					<a href={resolve('/login')} class="btn btn-primary">Sign in</a>
-					<a href={resolve('/register')} class="btn">Sign up</a>
+					<a href="{resolve('/login')}?mode=register" class="btn">Sign up</a>
 				</div>
 			</div>
 		{:else}
@@ -105,7 +105,7 @@
 				</p>
 				<div class="card__row">
 					<a href={resolve('/login')} class="btn btn-primary">Sign in</a>
-					<a href={resolve('/register')} class="btn">Sign up</a>
+					<a href="{resolve('/login')}?mode=register" class="btn">Sign up</a>
 				</div>
 			</div>
 		{/if}

@@ -17,7 +17,7 @@ Configure as needed (see `.env.example`):
 | ------------------------- | ------------------------------------------------------------------------------------------ |
 | `VITE_API_BASE_URL`       | Dev API origin (default `http://localhost:8000`). Production uses same origin as the page. |
 | `VITE_LOG_PROFILE`        | `debug` / `test` / `deploy` log verbosity                                                  |
-| `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (register / forgot-password)                                 |
+| `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (create-account mode / forgot-password)                      |
 | `VITE_GOOGLE_CLIENT_ID`   | Google Sign-In web client ID                                                               |
 | `VITE_SITE_ORIGIN`        | Canonical origin for SEO / sitemap                                                         |
 

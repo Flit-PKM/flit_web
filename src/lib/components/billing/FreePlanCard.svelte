@@ -53,9 +53,8 @@
 			<h3 class="plan-card__title">Free</h3>
 			<p class="plan-card__price">$0</p>
 		</div>
-		<div class="plan-card__description card__meta">
-			<p>Use Flit Web at no cost. Create notes, link ideas, and organize your knowledge.</p>
-			<p>Upgrade anytime with a paid plan for AI and encryption features.</p>
+		<div class="plan-card__description">
+			<p>Notes in the browser. Upgrade for sync, encryption, and MCP access.</p>
 		</div>
 	</div>
 {/snippet}
